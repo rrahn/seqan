@@ -46,7 +46,7 @@
 #include <seqan/file.h>
 #include <seqan/sequence.h>
 #include <seqan/journaled_set.h>
-#include <seqan/journaled_string_tree.h>.h>
+#include <seqan/journaled_string_tree.h>
 
 // ===========================================================================
 // First Header Group.
