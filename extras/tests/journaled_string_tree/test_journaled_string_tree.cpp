@@ -32,7 +32,7 @@
 // Author: Rene Rahn <rene.rahn@fu-berlin.de>
 // ==========================================================================
 
-//#define DEBUG_DATA_PARALLEL
+#define TEST_DEBUG_OUTPUT
 
 
 #include <seqan/basic.h>

@@ -109,19 +109,19 @@ struct SequenceAppender
     void operator()(TTraverser & traverser)
     {
         typedef typename Position<TTraverser>::Type TPosVec;
-#ifdef DEBUG_DATA_PARALLEL
+#ifdef TEST_DEBUG_OUTPUT
         std::cerr << "position(traverser): ";
 #endif
         TPosVec posVec = position(traverser);
         for (unsigned i = 0; i < length(posVec); ++i)
         {
-#ifdef DEBUG_DATA_PARALLEL
+#ifdef TEST_DEBUG_OUTPUT
             std::cerr << "("<< posVec[i].i1 << ", " <<  posVec[i].i2 << ")" << "; ";
 #endif
             appendValue(_processedSeq[posVec[i].i1],
                         value(journalData(container(traverser)), posVec[i].i1)[posVec[i].i2]);
         }
-#ifdef DEBUG_DATA_PARALLEL
+#ifdef TEST_DEBUG_OUTPUT
         std::cerr << std::endl;
 #endif
     }
@@ -143,10 +143,10 @@ bool compareResults(TTestSeq const & testSeq, TCompareSeq const & compSeq, TSize
 template <typename TMock, typename TTester, typename TSize>
 void _printDebugInfo(TMock const & mockGen, TTester const & dpTester, TSize const & windowSize)
 {
-    std::cerr << "Host: " << host(journalData(mockGen)) << std::endl;
+    std::cerr << "Host: " << host(journalData(mockGen._mock)) << std::endl;
     for (unsigned i = 0; i < length(dpTester._processedSeq); ++i)
         std::cerr << "Compare 1: " << dpTester._processedSeq[i] << "\nCompare 2: "
-        << prefix(mockGen._seqData[i], length(mockGen._seqData[i]) - (windowSize - 1)) << "\n"
+        << prefix(journalData(mockGen._mock)[i], length(mockGen._seqData[i]) - (windowSize - 1)) << "\n"
         << std::endl;
 }
 
@@ -166,8 +166,8 @@ bool _runTestForConfiguration(unsigned posConf,
     typedef SequenceAppender<char> TSequenceAppender;
     typedef MockGenerator_<unsigned, char> TMockGenerator;
     typedef TMockGenerator::TStringTree TStringTree;
-    typedef Traverser<TStringTree, TraverserSpec<ContextPositionLeft, ContextBeginLeft> > TTraverser;
-    typedef StringTreeTraversalTester<TTraverser> TDataParallelTester;
+    typedef Traverser<TStringTree, TraverserSpec<> > TTraverser;
+    typedef StringTreeTraversalTester<TTraverser> TDummyCaller;
 
     TVarData varData;
     TCovData covData;
@@ -180,10 +180,10 @@ bool _runTestForConfiguration(unsigned posConf,
 
     TSequenceAppender seqAppender(length(journalData(mockGen._mock)));
     TTraverser traverser(mockGen._mock, windowSize);
-    TDataParallelTester traversalTester(traverser);
-    traverse(traverser, traversalTester, seqAppender);
+    TDummyCaller dummyCaller(traverser);
+    traverse(traverser, dummyCaller, seqAppender);
 
-#ifdef DEBUG_DATA_PARALLEL
+#ifdef TEST_DEBUG_OUTPUT
     _printDebugInfo(mockGen, seqAppender, windowSize);
 #endif
 
