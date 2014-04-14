@@ -204,7 +204,7 @@ struct JournalData<JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageStore
 template <typename TDeltaMap, typename TSpec, typename THost>
 inline void
 setHost(JournaledStringTree<TDeltaMap, TSpec> & stringTree,
-        THost const & newHost)
+        THost & newHost)
 {
     setHost(journalData(stringTree), newHost);
 }

@@ -359,10 +359,10 @@ host(StringSet<TString, Owner<JournaledSet> > const & journalSet)
 ..include:seqan/journal_set.h
 */
 
-template <typename TString>
+template <typename TString, typename THost>
 inline void
 setHost(StringSet<TString, Owner<JournaledSet> > & journalSet,
-        typename Host<TString>::Type & newGlobalRef)
+        THost & newGlobalRef)
 {
     setValue(journalSet._globalRefHolder, newGlobalRef);
 }
@@ -401,7 +401,7 @@ setHost(StringSet<TString, Owner<JournaledSet> > & journalSet,
 template <typename TString>
 inline void
 createHost(StringSet<TString, Owner<JournaledSet> > & journalSet,
-                   typename Host<TString>::Type const & newGlobalRef)
+           typename Host<StringSet<TString, Owner<JournaledSet> > >::Type const & newGlobalRef)
 {
     create(journalSet._globalRefHolder, newGlobalRef);
 }
