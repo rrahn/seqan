@@ -233,7 +233,7 @@ SEQAN_CHECKPOINT
 	TWord compare = (TWord)1 << (me.needleLength - 1);
 	while (!atEnd(finder)) 
 	{
-		TWord pos = ordValue(convert<TValue>(getValue(finder)));
+		TWord pos = ordValue(convert<TValue>(getValue(hostIterator(finder))));
 		me.prefSufMatch[0] = ((me.prefSufMatch[0] << 1) | (TWord)1) & me.bitMasks[pos];
 		if ((me.prefSufMatch[0] & compare) != 0) 
 		{
@@ -257,7 +257,7 @@ SEQAN_CHECKPOINT
 	TWord compare = (TWord)1 << ((me.needleLength - 1) % BitsPerValue<TWord>::VALUE);
 	while (!atEnd(finder)) 
 	{
-		TWord pos = ordValue(convert<TValue>(getValue(finder)));
+		TWord pos = ordValue(convert<TValue>(getValue(hostIterator(finder))));
 		TWord carry = 1;
 		for(TWord block = 0; block < me.blockCount; ++block)
 		{
