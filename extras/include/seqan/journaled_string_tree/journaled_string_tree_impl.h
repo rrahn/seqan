@@ -81,7 +81,7 @@ public:
     {}
 
     template <typename THost>
-    JournaledStringTree(THost const & host, TDeltaMap const & varData) : _emptyJournal(true)
+    JournaledStringTree(THost & host, TDeltaMap const & varData) : _emptyJournal(true)
     {
         _journalSize = coverageSize(deltaCoverageStore(varData));
         setValue(_variantData, varData);
