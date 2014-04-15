@@ -1,0 +1,37 @@
+TODOs:
+
+1. Sequence format for storing compressed data (journal sequnece information)
+	a) define binary sequence format.  .bjs
+		i) requests: it must be searchable.
+	b) define plain diff format.	.djs
+	c) how to handle sufficient sequence format.
+2. Stable IO using record reader principle. 
+	a) how can i jump within the file.
+	b) display sequence given it's position
+	c) display sequence given it's id
+	d) display sequence given the chr number and the offset.
+		i) if no chromosomes are specified ignore and take offset as absolute offset
+		ii) journal sequence format which 
+	e) define error handling.
+	f) support different output formats.
+3. Find methods:
+	a) construct delta tree out of read journal sequences.
+	b) use horspool to find a pattern.
+	
+	
+4. compress methods
+	a) how to compress a seuqence set against a reference sequence.
+	b) write a method to compress a vcf file to a journal sequnece
+
+5. index methods:
+	a) construct delta-index.
+	
+	
+jseq-tools display -R refFile -J jseqIndexFile (-I seq1 | -i 0 ) if both parameter omitted we display everything -c chromosome -p 10 -p 12000
+jseq-tools display jseqIndexFile => prints the jseqIndexFile
+
+0 	-> seqID
+1 	-> seqID
+2 	-> seqID
+	...
+n-1 -> seqID
