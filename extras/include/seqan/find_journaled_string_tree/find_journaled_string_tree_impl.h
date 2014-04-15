@@ -31,11 +31,11 @@
 // ==========================================================================
 // Author: Rene Rahn <rene.rahn@fu-berlin.de>
 // ==========================================================================
-// Implements the pattern state for the horspool algorithm.
+// Implements the finder interface for the journaled string tree.
 // ==========================================================================
 
-#ifndef EXTRAS_INCLUDE_SEQAN_FIND_DATA_PARALLEL_FIND_DATA_PARALLEL_IMPL_H_
-#define EXTRAS_INCLUDE_SEQAN_FIND_DATA_PARALLEL_FIND_DATA_PARALLEL_IMPL_H_
+#ifndef EXTRAS_INCLUDE_SEQAN_FIND_JOURNALED_STRING_TREE_FIND_JOURNALED_STRING_TREE_IMPL_H_
+#define EXTRAS_INCLUDE_SEQAN_FIND_JOURNALED_STRING_TREE_FIND_JOURNALED_STRING_TREE_IMPL_H_
 
 namespace seqan
 {
@@ -47,6 +47,7 @@ namespace seqan
 // ============================================================================
 // Tags, Classes, Enums
 // ============================================================================
+
 
 template <typename TContainer, typename TPattern, typename TSpec>
 struct Finder2<TContainer, TPattern, DataParallel<TSpec> >
@@ -71,6 +72,7 @@ struct Finder2<TContainer, TPattern, DataParallel<TSpec> >
                                      _needReinit(other._needReinit)
     {}
 
+    // Assignment Operator
     Finder2 & operator=(Finder2 const & other)
     {
         if (this != &other)
@@ -81,37 +83,55 @@ struct Finder2<TContainer, TPattern, DataParallel<TSpec> >
         }
         return *this;
     }
-
-//    Finder2(TContainer & hystk, TPattern & pattern) :
-//            _containerPtr(&hystk),
-//            _finderFunctor(pattern),
-//            _needReinit(false)
-//    {}
-//
-//    template <typename TMinScore>
-//    Finder2(TContainer & hystk, TPattern & pattern, TMinScore const & minScore) :
-//            _containerPtr(&hystk),
-//            _finderFunctor(pattern, minScore),
-//            _needReinit(false)
-//    {}
 };
 
 // ============================================================================
 // Metafunctions
 // ============================================================================
 
+// ----------------------------------------------------------------------------
+// Metafunction ContextIteratorPosition
+// ----------------------------------------------------------------------------
+
 template <typename TContainer, typename TPattern, typename TSpec>
-struct GetTraverserForFinder_<Finder2<TContainer, TPattern, TSpec> const>
+struct ContextIteratorPosition<Finder2<TContainer, TPattern, TSpec> >
 {
-    typedef typename PatternSpecificTraversalSpec<TPattern>::Type TTraversalSpec_;
-    typedef Traverser<TContainer const, TTraversalSpec_> Type;
+    typedef Finder2<TContainer, TPattern, TSpec> TFinder_;
+    typedef typename FinderFunctor<TFinder_>::Type TFinderFunctor_;
+    typedef typename ContextIteratorPosition<TFinderFunctor_>::Type Type;
 };
+
+template <typename TContainer, typename TPattern, typename TSpec>
+struct ContextIteratorPosition<Finder2<TContainer, TPattern, TSpec> const > :
+    ContextIteratorPosition<Finder2<TContainer, TPattern, TSpec> >{};
+
+// ----------------------------------------------------------------------------
+// Metafunction RequireFullContext
+// ----------------------------------------------------------------------------
+
+template <typename TContainer, typename TPattern, typename TSpec>
+struct RequireFullContext<Finder2<TContainer, TPattern, TSpec> >
+{
+    typedef Finder2<TContainer, TPattern, TSpec> TFinder_;
+    typedef typename FinderFunctor<TFinder_>::Type TFinderFunctor_;
+    typedef typename RequireFullContext<TFinderFunctor_>::Type Type;
+};
+
+template <typename TContainer, typename TPattern, typename TSpec>
+struct RequireFullContext<Finder2<TContainer, TPattern, TSpec> const > :
+    RequireFullContext<Finder2<TContainer, TPattern, TSpec> >{};
+
+// ----------------------------------------------------------------------------
+// Metafunction GetTraverserForFinder_
+// ----------------------------------------------------------------------------
 
 template <typename TContainer, typename TPattern, typename TSpec>
 struct GetTraverserForFinder_<Finder2<TContainer, TPattern, TSpec> >
 {
-    typedef typename PatternSpecificTraversalSpec<TPattern>::Type TTraversalSpec_;
-    typedef Traverser<TContainer, TTraversalSpec_> Type;
+    typedef Finder2<TContainer, TPattern, TSpec> TFinder_;
+    typedef typename ContextIteratorPosition<TFinder_>::Type TContextPosition;
+    typedef typename RequireFullContext<TFinder_>::Type TRequireContext_;
+    typedef JstTraverser<TContainer const, JstTraverserSpec<TContextPosition, TRequireContext_> > Type;
 };
 
 
@@ -242,8 +262,9 @@ find(Finder2<TContainer, TPattern, DataParallel<TSpec> > & finder,
      TPattern & pattern,
      TDelegate & delegate,
      int scoreLimit = 0,
-     Tag<TParallelTag> tag = Serial())    // A tag must be specified.
+     Tag<TParallelTag> tag = Serial())
 {
+
     typedef Finder2<TContainer, TPattern, DataParallel<TSpec> > TFinder;
     typedef typename FinderFunctor<TFinder>::Type TFinderFunctor;
     typedef typename GetTraverserForFinder_<TFinder>::Type TTraverser;
@@ -252,14 +273,16 @@ find(Finder2<TContainer, TPattern, DataParallel<TSpec> > & finder,
     typedef typename Position<TContainer>::Type TPosition;
 
 
-    requireJournal(container(finder), tag);  // Build the journal set on demand - works in parallel too.
-
     if (finder._needReinit)
     {
         // finder._finderFunctor(pattern, initState);
         _init(finder, pattern, scoreLimit, typename ErrorsSupported<TFinderFunctor>::Type());
         finder._needReinit = false;
     }
+
+    requireJournal(container(finder), tag);  // Build the journal set on demand - works in parallel too.
+
+
 
     // Initialize the traverser.
     TTraverser traverser(container(finder), length(needle(pattern)) - scoreLimit);
@@ -325,4 +348,4 @@ find(Finder2<TContainer, TPattern, DataParallel<TSpec> > & finder,
 
 }
 
-#endif // EXTRAS_INCLUDE_SEQAN_FIND_DATA_PARALLEL_FIND_DATA_PARALLEL_IMPL_H_
+#endif // EXTRAS_INCLUDE_SEQAN_FIND_JOURNALED_STRING_TREE_FIND_JOURNALED_STRING_TREE_IMPL_H_

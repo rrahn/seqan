@@ -125,10 +125,10 @@ struct TraverseStateBranch_;
 typedef Tag<TraverseStateBranch_> StateTraverseBranch;
 
 template <typename TContainer, typename TSpec>
-class Traverser;
+class JstTraverser;
 
 template <typename TDeltaMap, typename TTreeSpec, typename TSpec>
-class Traverser<JournaledStringTree<TDeltaMap, TTreeSpec>, TSpec>
+class JstTraverser<JournaledStringTree<TDeltaMap, TTreeSpec>, TSpec>
 {
 public:
     typedef JournaledStringTree<TDeltaMap, TTreeSpec> TContainer;
@@ -182,13 +182,13 @@ public:
     // Managing virtual positions - This is necessary for the sparse string tree.
 //    TVPManager _vpManager;
 
-    Traverser() : _traversalState(TRAVERSAL_STATE_NULL),
+    JstTraverser() : _traversalState(TRAVERSAL_STATE_NULL),
                   _haystackPtr((TContainer*) 0),
                   _windowSize(1),
                   _needInit(true)
     {}
 
-    Traverser(TContainer & haystack, TSize windowSize) :
+    JstTraverser(TContainer & haystack, TSize windowSize) :
         _traversalState(TRAVERSAL_STATE_NULL),
         _windowSize(windowSize),
         _needInit(false)
@@ -206,13 +206,13 @@ public:
 // ----------------------------------------------------------------------------
 
 template <typename TContainer, typename TSpec>
-struct Container<Traverser<TContainer, TSpec> >
+struct Container<JstTraverser<TContainer, TSpec> >
 {
     typedef TContainer Type;
 };
 
 template <typename TContainer, typename TSpec>
-struct Container<Traverser<TContainer, TSpec> const>
+struct Container<JstTraverser<TContainer, TSpec> const>
 {
     typedef TContainer const Type;
 };
@@ -222,7 +222,7 @@ struct Container<Traverser<TContainer, TSpec> const>
 // ----------------------------------------------------------------------------
 
 template <typename TContainer, typename TSpec>
-struct Position<Traverser<TContainer, TSpec> >
+struct Position<JstTraverser<TContainer, TSpec> >
 {
     typedef typename Container<TContainer>::Type TJournalSet_;
     typedef typename Value<TJournalSet_>::Type TJournalString_;
@@ -232,37 +232,37 @@ struct Position<Traverser<TContainer, TSpec> >
 };
 
 template <typename TContainer, typename TSpec>
-struct Position<Traverser<TContainer, TSpec> const> :
-    Position<Traverser<TContainer, TSpec> >{};
+struct Position<JstTraverser<TContainer, TSpec> const> :
+    Position<JstTraverser<TContainer, TSpec> >{};
 
 // ----------------------------------------------------------------------------
 // Metafunction Size
 // ----------------------------------------------------------------------------
 
 template <typename TContainer, typename TSpec>
-struct Size<Traverser<TContainer, TSpec> > :
+struct Size<JstTraverser<TContainer, TSpec> > :
        Size<TContainer>{};
 
 template <typename TContainer, typename TSpec>
-struct Size<Traverser<TContainer, TSpec> const> :
+struct Size<JstTraverser<TContainer, TSpec> const> :
        Size<TContainer const>{};
 
 // ----------------------------------------------------------------------------
 // Metafunction BranchNode
 // ----------------------------------------------------------------------------
 
-template <typename TTraverser>
+template <typename TJstTraverser>
 struct BranchNode;
 
 template <typename TContainer, typename TSpec>
-struct BranchNode<Traverser<TContainer, TSpec> >
+struct BranchNode<JstTraverser<TContainer, TSpec> >
 {
     typedef typename VariantData<TContainer>::Type TDeltaMap_;
     typedef typename Iterator<TDeltaMap_, Rooted>::Type Type;
 };
 
 template <typename TContainer, typename TSpec>
-struct BranchNode<Traverser<TContainer, TSpec> const>
+struct BranchNode<JstTraverser<TContainer, TSpec> const>
 {
     typedef typename VariantData<TContainer>::Type TDeltaMap_;
     typedef typename Iterator<TDeltaMap_ const, Rooted>::Type Type;
@@ -279,7 +279,7 @@ struct BranchNode<Traverser<TContainer, TSpec> const>
 // TODO(rmaerker): Make private
 template <typename TContainer, typename TContextPos, typename TContextInit>
 inline typename MakeSigned<typename Position<TContainer>::Type>::Type
-windowBeginPosition(Traverser<TContainer, TraverserSpec<TContextPos, TContextInit> > const & traverser,
+windowBeginPosition(JstTraverser<TContainer, JstTraverserSpec<TContextPos, TContextInit> > const & traverser,
                     StateTraverseMaster const & /*tag*/)
 {
     typedef typename Position<TContainer>::Type TPosition;
@@ -298,7 +298,7 @@ windowBeginPosition(Traverser<TContainer, TraverserSpec<TContextPos, TContextIni
 // TODO(rmaerker): Make private
 template <typename TContainer, typename TContextPos, typename TContextInit>
 inline typename MakeSigned<typename Position<TContainer>::Type>::Type
-windowBeginPosition(Traverser<TContainer, TraverserSpec<TContextPos, TContextInit> > const & traverser,
+windowBeginPosition(JstTraverser<TContainer, JstTraverserSpec<TContextPos, TContextInit> > const & traverser,
                     StateTraverseBranch const & /*tag*/)
 {
     typedef typename Position<TContainer>::Type TPosition;
@@ -312,7 +312,7 @@ windowBeginPosition(Traverser<TContainer, TraverserSpec<TContextPos, TContextIni
 
 template <typename TContainer, typename TSpec>
 inline typename Position<TContainer>::Type
-windowBeginPosition(Traverser<TContainer, TSpec> const & traverser)
+windowBeginPosition(JstTraverser<TContainer, TSpec> const & traverser)
 {
     if (isMaster(traverser))
         return windowBeginPosition(traverser, StateTraverseMaster());
@@ -322,7 +322,7 @@ windowBeginPosition(Traverser<TContainer, TSpec> const & traverser)
 
 template <typename TContainer, typename TSpec, typename TTraversalState>
 inline typename Position<TContainer>::Type
-windowBeginPositionClipped(Traverser<TContainer, TSpec> const & traverser,
+windowBeginPositionClipped(JstTraverser<TContainer, TSpec> const & traverser,
                            TTraversalState const & /*tag*/)
 {
     return _max(0, windowBeginPosition(traverser, TTraversalState()));
@@ -334,7 +334,7 @@ windowBeginPositionClipped(Traverser<TContainer, TSpec> const & traverser,
 
 template <typename TContainer, typename TContextPos, typename TContextInit>
 inline typename Position<TContainer>::Type
-windowEndPosition(Traverser<TContainer, TraverserSpec<TContextPos, TContextInit> > const & traverser,
+windowEndPosition(JstTraverser<TContainer, JstTraverserSpec<TContextPos, TContextInit> > const & traverser,
                     StateTraverseMaster const & /*tag*/)
 {
     if (IsSameType<TContextPos, ContextPositionLeft>::VALUE)
@@ -352,7 +352,7 @@ windowEndPosition(Traverser<TContainer, TraverserSpec<TContextPos, TContextInit>
 
 template <typename TContainer, typename TContextPos, typename TContextInit>
 inline typename Position<TContainer>::Type
-windowEndPosition(Traverser<TContainer, TraverserSpec<TContextPos, TContextInit> > const & traverser,
+windowEndPosition(JstTraverser<TContainer, JstTraverserSpec<TContextPos, TContextInit> > const & traverser,
                   StateTraverseBranch const & /*tag*/)
 {
     if (IsSameType<TContextPos, ContextPositionLeft>::VALUE)
@@ -366,7 +366,7 @@ windowEndPosition(Traverser<TContainer, TraverserSpec<TContextPos, TContextInit>
 
 template <typename TContainer, typename TSpec>
 inline typename Position<TContainer>::Type
-windowEndPosition(Traverser<TContainer, TSpec> const & traverser)
+windowEndPosition(JstTraverser<TContainer, TSpec> const & traverser)
 {
     if (isMaster(traverser))
         return windowEndPosition(traverser, StateTraverseMaster());
@@ -376,7 +376,7 @@ windowEndPosition(Traverser<TContainer, TSpec> const & traverser)
 
 template <typename TContainer, typename TSpec, typename TTraversalState>
 inline typename Position<TContainer>::Type
-windowEndPositionClipped(Traverser<TContainer, TSpec> const & traverser,
+windowEndPositionClipped(JstTraverser<TContainer, TSpec> const & traverser,
                          TTraversalState const & /*tag*/)
 {
     if (IsSameType<TTraversalState, StateTraverseMaster>::VALUE)
@@ -391,16 +391,16 @@ windowEndPositionClipped(Traverser<TContainer, TSpec> const & traverser,
 // ----------------------------------------------------------------------------
 
 template <typename TContainer, typename TContextBegin>
-inline typename Traverser<TContainer, TraverserSpec<ContextPositionLeft, TContextBegin> >::TMasterBranchIterator
-windowBegin(Traverser<TContainer, TraverserSpec<ContextPositionLeft, TContextBegin> > & traverser,
+inline typename JstTraverser<TContainer, JstTraverserSpec<ContextPositionLeft, TContextBegin> >::TMasterBranchIterator
+windowBegin(JstTraverser<TContainer, JstTraverserSpec<ContextPositionLeft, TContextBegin> > & traverser,
             StateTraverseMaster const & /*tag*/)
 {
     return traverser._masterIt;
 }
 
 template <typename TContainer, typename TContextBegin>
-inline typename Traverser<TContainer, TraverserSpec<ContextPositionLeft, TContextBegin> >::TMasterBranchIterator const &
-windowBegin(Traverser<TContainer, TraverserSpec<ContextPositionLeft, TContextBegin> > const& traverser,
+inline typename JstTraverser<TContainer, JstTraverserSpec<ContextPositionLeft, TContextBegin> >::TMasterBranchIterator const &
+windowBegin(JstTraverser<TContainer, JstTraverserSpec<ContextPositionLeft, TContextBegin> > const& traverser,
             StateTraverseMaster const & /*tag*/)
 {
     return traverser._masterIt;
@@ -411,8 +411,8 @@ windowBegin(Traverser<TContainer, TraverserSpec<ContextPositionLeft, TContextBeg
 // ----------------------------------------------------------------------------
 
 template <typename TContainer, typename TContextBegin>
-inline typename Traverser<TContainer, TraverserSpec<ContextPositionLeft, TContextBegin> >::TMasterBranchIterator
-windowEnd(Traverser<TContainer, TraverserSpec<ContextPositionLeft, TContextBegin> > const & traverser,
+inline typename JstTraverser<TContainer, JstTraverserSpec<ContextPositionLeft, TContextBegin> >::TMasterBranchIterator
+windowEnd(JstTraverser<TContainer, JstTraverserSpec<ContextPositionLeft, TContextBegin> > const & traverser,
           StateTraverseMaster const & /*tag*/)
 {
     return traverser._masterIt + (traverser._windowSize - 1);
@@ -423,16 +423,16 @@ windowEnd(Traverser<TContainer, TraverserSpec<ContextPositionLeft, TContextBegin
 // ----------------------------------------------------------------------------
 
 template <typename TContainer, typename TContextBegin>
-inline typename Traverser<TContainer, TraverserSpec<ContextPositionLeft, TContextBegin> >::TJournalIterator &
-windowBegin(Traverser<TContainer, TraverserSpec<ContextPositionLeft, TContextBegin> > & traverser,
+inline typename JstTraverser<TContainer, JstTraverserSpec<ContextPositionLeft, TContextBegin> >::TJournalIterator &
+windowBegin(JstTraverser<TContainer, JstTraverserSpec<ContextPositionLeft, TContextBegin> > & traverser,
             StateTraverseBranch const & /*tag*/)
 {
     return traverser._branchIt;
 }
 
 template <typename TContainer, typename TContextBegin>
-inline typename Traverser<TContainer, TraverserSpec<ContextPositionLeft, TContextBegin> >::TJournalIterator const &
-windowBegin(Traverser<TContainer, TraverserSpec<ContextPositionLeft, TContextBegin> > const& traverser,
+inline typename JstTraverser<TContainer, JstTraverserSpec<ContextPositionLeft, TContextBegin> >::TJournalIterator const &
+windowBegin(JstTraverser<TContainer, JstTraverserSpec<ContextPositionLeft, TContextBegin> > const& traverser,
             StateTraverseBranch const & /*tag*/)
 {
     return traverser._branchIt;
@@ -443,8 +443,8 @@ windowBegin(Traverser<TContainer, TraverserSpec<ContextPositionLeft, TContextBeg
 // ----------------------------------------------------------------------------
 
 template <typename TContainer, typename TContextBegin>
-inline typename Traverser<TContainer, TraverserSpec<ContextPositionLeft, TContextBegin> >::TJournalIterator
-windowEnd(Traverser<TContainer, TraverserSpec<ContextPositionLeft, TContextBegin> > const & traverser,
+inline typename JstTraverser<TContainer, JstTraverserSpec<ContextPositionLeft, TContextBegin> >::TJournalIterator
+windowEnd(JstTraverser<TContainer, JstTraverserSpec<ContextPositionLeft, TContextBegin> > const & traverser,
           StateTraverseBranch const & /*tag*/)
 {
     return traverser._branchIt + (traverser._windowSize - 1);
@@ -455,8 +455,8 @@ windowEnd(Traverser<TContainer, TraverserSpec<ContextPositionLeft, TContextBegin
 // ----------------------------------------------------------------------------
 
 template <typename TContainer, typename TContextBegin>
-inline typename Traverser<TContainer, TraverserSpec<ContextPositionRight, TContextBegin> >::TMasterBranchIterator
-windowBegin(Traverser<TContainer, TraverserSpec<ContextPositionRight, TContextBegin> > const& traverser,
+inline typename JstTraverser<TContainer, JstTraverserSpec<ContextPositionRight, TContextBegin> >::TMasterBranchIterator
+windowBegin(JstTraverser<TContainer, JstTraverserSpec<ContextPositionRight, TContextBegin> > const& traverser,
             StateTraverseMaster const & /*tag*/)
 {
     return traverser._masterIt - (traverser._windowSize - 1);
@@ -467,16 +467,16 @@ windowBegin(Traverser<TContainer, TraverserSpec<ContextPositionRight, TContextBe
 // ----------------------------------------------------------------------------
 
 template <typename TContainer, typename TContextBegin>
-inline typename Traverser<TContainer, TraverserSpec<ContextPositionRight, TContextBegin> >::TMasterBranchIterator &
-windowEnd(Traverser<TContainer, TraverserSpec<ContextPositionRight, TContextBegin> > & traverser,
+inline typename JstTraverser<TContainer, JstTraverserSpec<ContextPositionRight, TContextBegin> >::TMasterBranchIterator &
+windowEnd(JstTraverser<TContainer, JstTraverserSpec<ContextPositionRight, TContextBegin> > & traverser,
           StateTraverseMaster const & /*tag*/)
 {
     return traverser._masterIt;
 }
 
 template <typename TContainer, typename TContextBegin>
-inline typename Traverser<TContainer, TraverserSpec<ContextPositionRight, TContextBegin> >::TMasterBranchIterator const &
-windowEnd(Traverser<TContainer, TraverserSpec<ContextPositionRight, TContextBegin> > const & traverser,
+inline typename JstTraverser<TContainer, JstTraverserSpec<ContextPositionRight, TContextBegin> >::TMasterBranchIterator const &
+windowEnd(JstTraverser<TContainer, JstTraverserSpec<ContextPositionRight, TContextBegin> > const & traverser,
           StateTraverseMaster const & /*tag*/)
 {
     return traverser._masterIt;
@@ -487,8 +487,8 @@ windowEnd(Traverser<TContainer, TraverserSpec<ContextPositionRight, TContextBegi
 // ----------------------------------------------------------------------------
 
 template <typename TContainer, typename TContextBegin>
-inline typename Traverser<TContainer, TraverserSpec<ContextPositionRight, TContextBegin> >::TJournalIterator
-windowBegin(Traverser<TContainer, TraverserSpec<ContextPositionRight, TContextBegin> > const& traverser,
+inline typename JstTraverser<TContainer, JstTraverserSpec<ContextPositionRight, TContextBegin> >::TJournalIterator
+windowBegin(JstTraverser<TContainer, JstTraverserSpec<ContextPositionRight, TContextBegin> > const& traverser,
             StateTraverseBranch const & /*tag*/)
 {
     return traverser._branchIt - (traverser._windowSize - 1);
@@ -499,16 +499,16 @@ windowBegin(Traverser<TContainer, TraverserSpec<ContextPositionRight, TContextBe
 // ----------------------------------------------------------------------------
 
 template <typename TContainer, typename TContextBegin>
-inline typename Traverser<TContainer, TraverserSpec<ContextPositionRight, TContextBegin> >::TJournalIterator &
-windowEnd(Traverser<TContainer, TraverserSpec<ContextPositionRight, TContextBegin> > & traverser,
+inline typename JstTraverser<TContainer, JstTraverserSpec<ContextPositionRight, TContextBegin> >::TJournalIterator &
+windowEnd(JstTraverser<TContainer, JstTraverserSpec<ContextPositionRight, TContextBegin> > & traverser,
           StateTraverseBranch const & /*tag*/)
 {
     return traverser._branchIt;
 }
 
 template <typename TContainer, typename TContextBegin>
-inline typename Traverser<TContainer, TraverserSpec<ContextPositionRight, TContextBegin> >::TJournalIterator const &
-windowEnd(Traverser<TContainer, TraverserSpec<ContextPositionRight, TContextBegin> > const & traverser,
+inline typename JstTraverser<TContainer, JstTraverserSpec<ContextPositionRight, TContextBegin> >::TJournalIterator const &
+windowEnd(JstTraverser<TContainer, JstTraverserSpec<ContextPositionRight, TContextBegin> > const & traverser,
           StateTraverseBranch const & /*tag*/)
 {
     return traverser._branchIt;
@@ -520,13 +520,13 @@ windowEnd(Traverser<TContainer, TraverserSpec<ContextPositionRight, TContextBegi
 
 template <typename TContainer, typename TSpec, typename TOperator, typename TDelegate>
 inline void
-refresh(Traverser<TContainer, TSpec> & traverser,
+refresh(JstTraverser<TContainer, TSpec> & traverser,
         TOperator & traversalCaller,
         TDelegate & delegate,
         StateTraverseMaster const & /*tag*/)
 {
-    typedef Traverser<TContainer, TSpec> TTraverser;
-    typedef typename ComputeState<TTraverser>::Type TComputeState;
+    typedef JstTraverser<TContainer, TSpec> TJstTraverser;
+    typedef typename ComputeState<TJstTraverser>::Type TComputeState;
 
     TComputeState res = compute(traversalCaller, traverser._masterIt);
     if (res.i1)
@@ -541,68 +541,17 @@ refresh(Traverser<TContainer, TSpec> & traverser,
     traverser._masterIt += res.i2;  // Move iterator to the right.
 }
 
-template <typename THost, typename TSpec, typename TOperator, typename TDelegate>
-inline void
-refresh(Traverser<JournaledStringTree<THost, StringTreeSparse>, TSpec> & traverser,
-        TOperator & traversalCaller,
-        TDelegate & delegate,
-        StateTraverseMaster const & /*tag*/)
-{
-    typedef JournaledStringTree<THost, StringTreeSparse> TContainer;
-    typedef Traverser<TContainer, TSpec> TTraverser;
-    typedef typename ComputeState<TTraverser>::Type TComputeState;
-
-    TComputeState res = compute(traversalCaller, traverser._masterIt);
-
-    if (res.i1)
-    {
-        update(traverser._vpManager, traverser._activeMasterCoverage);
-        delegate(traverser);  // Calls the option that should be executed if the response evaluates to true.
-        setSteps(traverser._vpManager, 0);
-    }
-
-    if (empty(traverser._mergePointStack._mergePoints))
-    {
-        traverser._masterIt += res.i2;
-        addSteps(traverser._vpManager, res.i2);
-        return;
-    }
-
-    unsigned endPos = _min(*traverser._branchNodeIt, windowBeginPosition(traverser, StateTraverseMaster()) + res.i2);
-    while(!empty(traverser._mergePointStack._mergePoints) && topMergePoint(traverser._mergePointStack) <= endPos)
-    {
-        // First update the
-        int delta = topMergePoint(traverser._mergePointStack) - windowBeginPosition(traverser, StateTraverseMaster());
-        addSteps(traverser._vpManager, delta - 1);  // Update the step size to current merge point.
-        update(traverser._vpManager, traverser._activeMasterCoverage);  // Set the vp for the active coverage.
-        // Sync the coverage at the merge point.
-                transform(traverser._activeMasterCoverage, traverser._activeMasterCoverage,
-                          topMergePointCoverage(traverser._mergePointStack),
-                          FunctorBitwiseOr());
-
-        setSteps(traverser._vpManager, 1);  // Update the step size to current merge point.
-        update(traverser._vpManager, traverser._activeMasterCoverage);  // Set the vp for the active coverage.
-        setSteps(traverser._vpManager, 0);  // Reset the steps count.
-
-        traverser._masterIt += delta;
-        res.i2 -= delta;  // Remove the intermediate step size from remaining.
-        pop(traverser._mergePointStack);  // Pop the first element from the stack.
-    }
-    SEQAN_ASSERT_GEQ(res.i2, 0u);
-    addSteps(traverser._vpManager, res.i2);
-    traverser._masterIt += res.i2;  // We set the iterator to the next position.
-}
 
 template <typename TContainer, typename TSpec, typename TOperator, typename TDelegate, typename TBranchStackNode>
-inline typename Size<Traverser<TContainer, TSpec> >::Type
-refresh(Traverser<TContainer, TSpec> & traverser,
+inline typename Size<JstTraverser<TContainer, TSpec> >::Type
+refresh(JstTraverser<TContainer, TSpec> & traverser,
         TOperator & traversalCaller,
         TDelegate & delegate,
         TBranchStackNode & branchStackNode,
         StateTraverseBranch const & /*tag*/)
 {
-    typedef Traverser<TContainer, TSpec> TTraverser;
-    typedef typename ComputeState<TTraverser>::Type TComputeState;
+    typedef JstTraverser<TContainer, TSpec> TJstTraverser;
+    typedef typename ComputeState<TJstTraverser>::Type TComputeState;
 
     TComputeState res = compute(traversalCaller, traverser._branchIt);
     if (res.i1)
@@ -615,98 +564,19 @@ refresh(Traverser<TContainer, TSpec> & traverser,
     return res.i2;
 }
 
-template <typename THost, typename TSpec, typename TOperator, typename TDelegate, typename TCoverage>
-inline typename Size<Traverser<JournaledStringTree<THost, StringTreeSparse>, TSpec> >::Type
-refresh(Traverser<JournaledStringTree<THost, StringTreeSparse>, TSpec> & traverser,
-        TOperator & traversalCaller,
-        TDelegate & delegate,
-        TCoverage const & branchCoverage,
-        StateTraverseBranch const & /*tag*/)
-{
-    typedef JournaledStringTree<THost, StringTreeSparse> TContainer;
-    typedef Traverser<TContainer, TSpec> TTraverser;
-    typedef typename ComputeState<TTraverser>::Type TComputeState;
-
-    typedef typename TTraverser::TMergePointStore TMergePointStack;
-    typedef typename TMergePointStack::TMergePoints const TMergePoints;
-    typedef typename Iterator<TMergePoints const, Rooted>::Type TMergePointIt;
-
-    TComputeState res = compute(traversalCaller, traverser._branchIt);
-
-    if (res.i1)
-    {
-        update(traverser._vpManager, traverser._activeBranchCoverage);
-        delegate(traverser);  // Calls the option that should be executed if the response evaluates to true.
-        setMasterPos(traverser._vpManager, masterPos(traverser._vpManager) + steps(traverser._vpManager));
-        setSteps(traverser._vpManager, 0);
-    }
-
-    // No merge point or the virtual master position points behind the breakpoint.
-    // Just update the steps and move the branch iterator.
-    if (empty(traverser._mergePointStack._mergePoints) ||
-        masterPos(traverser._vpManager) >= *traverser._branchNodeIt)
-    {
-        traverser._branchIt += res.i2;
-        addSteps(traverser._vpManager, res.i2);
-        return res.i2;
-    }
-
-    SEQAN_ASSERT_NOT(empty(traverser._mergePointStack._mergePoints));
-    // There might be a merge point affecting the current branch.
-    TMergePointIt it = end(traverser._mergePointStack._mergePoints, Rooted());
-    while (*(--it) <= masterPos(traverser._vpManager) && !atBegin(it));  // Ignore all merge points that lie before the current mapped master position.
-
-    // Move along the stack. Ignore all merge points before the current master position.
-
-    // Visited last breakpoint and master position is greater than the breakpoint.
-    if (*it <= masterPos(traverser._vpManager))
-    {
-        SEQAN_ASSERT(atBegin(it));
-        traverser._branchIt += res.i2;
-        addSteps(traverser._vpManager, res.i2);
-        return res.i2;
-    }
-
-    // We might need to update the steps for each merge point between the current master and the next master pos.
-    int remaining = res.i2;
-    unsigned endPos = _min(*traverser._branchNodeIt, masterPos(traverser._vpManager) + steps(traverser._vpManager) + remaining);
-    while(*it <= endPos)
-    {
-        int delta = *it - (masterPos(traverser._vpManager) + steps(traverser._vpManager));
-        addSteps(traverser._vpManager, delta - 1);
-        update(traverser._vpManager, traverser._activeBranchCoverage);  // Set the vp for the active coverage.
-        // Sync the coverage at the merge point.
-        bitwiseOr(traverser._activeBranchCoverage, traverser._activeBranchCoverage,
-                  traverser._mergePointStack._mergePointCoverge[position(it)]);
-        bitwiseAnd(traverser._activeBranchCoverage, traverser._activeBranchCoverage, branchCoverage);
-        setSteps(traverser._vpManager, 1);  // Set all active positions to the merge point.
-        update(traverser._vpManager, traverser._activeBranchCoverage);
-        setMasterPos(traverser._vpManager, *it);  // Update the step size to current merge point.
-        remaining -= delta;  // Remove the intermediate step size from remaining.
-        setSteps(traverser._vpManager, 0);  // Reset the steps count.
-        if (atBegin(it))
-            break;
-        --it;  // We need to access the next element without popping it.
-    }
-    SEQAN_ASSERT_GEQ(remaining, 0);
-    addSteps(traverser._vpManager, remaining);
-    traverser._branchIt += res.i2;  // We set the iterator to the next position.
-    return res.i2;
-}
-
 // ----------------------------------------------------------------------------
 // Function _globalInit()
 // ----------------------------------------------------------------------------
 
 template <typename TContainer, typename TSpec>
 inline void
-_globalInit(Traverser<TContainer, TSpec> & traverser)
+_globalInit(JstTraverser<TContainer, TSpec> & traverser)
 {
-    typedef Traverser<TContainer, TSpec> TTraverser;
+    typedef JstTraverser<TContainer, TSpec> TJstTraverser;
     typedef typename VariantData<TContainer>::Type TDeltaMap;
     typedef typename MappedDelta<TDeltaMap>::Type TMappedDelta;
     typedef typename MappedCoverage<TDeltaMap>::Type TMappedCoverage;
-    typedef typename TTraverser::TBranchNodeIterator TBranchNodeIt;
+    typedef typename TJstTraverser::TBranchNodeIterator TBranchNodeIt;
 
     resize(traverser._activeMasterCoverage, journalSize(container(traverser)), true, Exact());  // Set all seq active.
     traverser._delCoverage = traverser._activeMasterCoverage;  // Set the current master coverage.
@@ -751,12 +621,12 @@ _globalInit(Traverser<TContainer, TSpec> & traverser)
 // ----------------------------------------------------------------------------
 
 template <typename TContainer, typename TSpec>
-inline typename Position<Traverser<JournaledStringTree<TContainer, StringTreeSparse>, TSpec> const >::Type
-_position(Traverser<JournaledStringTree<TContainer, StringTreeSparse>, TSpec> const & traverser)
+inline typename Position<JstTraverser<JournaledStringTree<TContainer, StringTreeSparse>, TSpec> const >::Type
+_position(JstTraverser<JournaledStringTree<TContainer, StringTreeSparse>, TSpec> const & traverser)
 {
     typedef JournaledStringTree<TContainer, StringTreeDefault> TStringTree;
-    typedef Traverser<TStringTree, TSpec> const TTraverser;
-    typedef typename Position<TTraverser>::Type TPosition;
+    typedef JstTraverser<TStringTree, TSpec> const TJstTraverser;
+    typedef typename Position<TJstTraverser>::Type TPosition;
     typedef typename Value<TPosition>::Type TPositionValue;
 
     typedef typename VariantData<TStringTree>::Type TDeltaMap;
@@ -794,12 +664,12 @@ _position(Traverser<JournaledStringTree<TContainer, StringTreeSparse>, TSpec> co
 // ----------------------------------------------------------------------------
 
 template <typename TContainer, typename TContextPos, typename TContextBegin>
-inline typename Position<Traverser<JournaledStringTree<TContainer, StringTreeDefault>, TraverserSpec<TContextPos, TContextBegin> > const >::Type
-_position(Traverser<JournaledStringTree<TContainer, StringTreeDefault>, TraverserSpec<TContextPos, TContextBegin> > const & traverser)
+inline typename Position<JstTraverser<JournaledStringTree<TContainer, StringTreeDefault>, JstTraverserSpec<TContextPos, TContextBegin> > const >::Type
+_position(JstTraverser<JournaledStringTree<TContainer, StringTreeDefault>, JstTraverserSpec<TContextPos, TContextBegin> > const & traverser)
 {
     typedef JournaledStringTree<TContainer, StringTreeDefault> THaystack;
-    typedef Traverser<THaystack, TraverserSpec<TContextPos, TContextBegin> > const TTraverser;
-    typedef typename Position<TTraverser>::Type TPosition;
+    typedef JstTraverser<THaystack, JstTraverserSpec<TContextPos, TContextBegin> > const TJstTraverser;
+    typedef typename Position<TJstTraverser>::Type TPosition;
     typedef typename Value<TPosition>::Type TPositionValue;
 
     typedef typename JournalData<THaystack>::Type TJournalSet;
@@ -877,7 +747,7 @@ _position(Traverser<JournaledStringTree<TContainer, StringTreeDefault>, Traverse
 
 template <typename TContainer, typename TSpec>
 inline TraversalState
-state(Traverser<TContainer, TSpec> const & traverser)
+state(JstTraverser<TContainer, TSpec> const & traverser)
 {
     return traverser._traversalState;
 }
@@ -888,7 +758,7 @@ state(Traverser<TContainer, TSpec> const & traverser)
 
 template <typename TContainer, typename TSpec>
 inline bool
-isMaster(Traverser<TContainer, TSpec> const & traverser)
+isMaster(JstTraverser<TContainer, TSpec> const & traverser)
 {
     return state(traverser) == TRAVERSAL_STATE_MASTER;
 }
@@ -899,7 +769,7 @@ isMaster(Traverser<TContainer, TSpec> const & traverser)
 
 template <typename TContainer, typename TSpec>
 inline bool
-isBranch(Traverser<TContainer, TSpec> const & traverser)
+isBranch(JstTraverser<TContainer, TSpec> const & traverser)
 {
     return state(traverser) == TRAVERSAL_STATE_BRANCH;
 }
@@ -910,8 +780,8 @@ isBranch(Traverser<TContainer, TSpec> const & traverser)
 // ----------------------------------------------------------------------------
 
 template <typename TContainer, typename TSpec>
-inline typename Position<Traverser<TContainer, TSpec> const >::Type
-position(Traverser<TContainer, TSpec> const & traverser)
+inline typename Position<JstTraverser<TContainer, TSpec> const >::Type
+position(JstTraverser<TContainer, TSpec> const & traverser)
 {
     return _position(traverser);
 }
@@ -922,7 +792,7 @@ position(Traverser<TContainer, TSpec> const & traverser)
 
 template <typename TContainer, typename TSpec>
 inline typename MappedCoverage<typename VariantData<TContainer const>::Type> ::Type &
-coverage(Traverser<TContainer, TSpec> const & traverser)
+coverage(JstTraverser<TContainer, TSpec> const & traverser)
 {
     if (isMaster(traverser))
         return traverser._activeMasterCoverage;
@@ -931,7 +801,7 @@ coverage(Traverser<TContainer, TSpec> const & traverser)
 
 template <typename TContainer, typename TSpec>
 inline typename MappedCoverage<typename VariantData<TContainer>::Type> ::Type &
-coverage(Traverser<TContainer, TSpec> & traverser)
+coverage(JstTraverser<TContainer, TSpec> & traverser)
 {
     if (isMaster(traverser))
         return traverser._activeMasterCoverage;
@@ -943,15 +813,15 @@ coverage(Traverser<TContainer, TSpec> & traverser)
 // ----------------------------------------------------------------------------
 
 template <typename TContainer, typename TSpec>
-inline typename BranchNode<Traverser<TContainer, TSpec> >::Type &
-branchNode(Traverser<TContainer, TSpec> & traverser)
+inline typename BranchNode<JstTraverser<TContainer, TSpec> >::Type &
+branchNode(JstTraverser<TContainer, TSpec> & traverser)
 {
     return traverser._branchNodeIt;
 }
 
 template <typename TContainer, typename TSpec>
-inline typename BranchNode<Traverser<TContainer, TSpec> const>::Type &
-branchNode(Traverser<TContainer, TSpec> const & traverser)
+inline typename BranchNode<JstTraverser<TContainer, TSpec> const>::Type &
+branchNode(JstTraverser<TContainer, TSpec> const & traverser)
 {
     return traverser._branchNodeIt;
 }
@@ -981,14 +851,14 @@ _selectNextSplitPoint(TBranchStackNode const & proxyWindow,
 // ----------------------------------------------------------------------------
 
 // TODO(rmaerker): Not needed anymore!
-template <typename TProxyId, typename TOffset, typename TTraverser, typename TPosition, typename TCoverage>
+template <typename TProxyId, typename TOffset, typename TJstTraverser, typename TPosition, typename TCoverage>
 void _selectProxy(TProxyId & proxyId,
                   TOffset & offset,
-                  TTraverser & traverser,
+                  TJstTraverser & traverser,
                   TPosition const & currentMasterPos,
                   TCoverage const & proxyCoverage)
 {
-    typedef typename TTraverser::TMergePointStore TMergePointStack;
+    typedef typename TJstTraverser::TMergePointStore TMergePointStack;
     typedef typename TMergePointStack::TMergePoints TMergePointString;
     typedef typename Iterator<TMergePointString, Rooted>::Type TMPIterator;
 
@@ -1066,14 +936,14 @@ _refreshSegmentBorders(Iter<TJournalString, JournaledStringIterSpec<TSpec> > & i
 template <typename TContainer, typename TContextPosition, typename TContextBegin, typename TBranchStack,
           typename TOperator, typename TDelegate>
 inline void
-_traverseBranch(Traverser<TContainer, TraverserSpec<TContextPosition, TContextBegin> > & traverser,
+_traverseBranch(JstTraverser<TContainer, JstTraverserSpec<TContextPosition, TContextBegin> > & traverser,
                 TBranchStack & branchStack,
                 TOperator & traversalCaller,
                 TDelegate & delegate)
 {
-    typedef TraverserSpec<TContextPosition, TContextBegin> TTraverserSpec_;
-    typedef Traverser<TContainer, TTraverserSpec_ > TTraverser;
-    typedef typename TTraverser::TBranchNodeIterator TBranchNodeIter;
+    typedef JstTraverserSpec<TContextPosition, TContextBegin> TJstTraverserSpec_;
+    typedef JstTraverser<TContainer, TJstTraverserSpec_ > TJstTraverser;
+    typedef typename TJstTraverser::TBranchNodeIterator TBranchNodeIter;
 
     typedef typename Value<TBranchStack>::Type TBranchStackNode;
     typedef typename TBranchStackNode::TCoverage_ TBitVector;
@@ -1290,20 +1160,20 @@ _traverseBranch(Traverser<TContainer, TraverserSpec<TContextPosition, TContextBe
 // Function _updateBranchBegin()
 // ----------------------------------------------------------------------------
 
-template <typename TProxyId, typename TTraverser, typename TPosition, typename TCoverage>
-inline typename Size<typename Container<TTraverser>::Type>::Type
+template <typename TProxyId, typename TJstTraverser, typename TPosition, typename TCoverage>
+inline typename Size<typename Container<TJstTraverser>::Type>::Type
 _selectValidBeginAndProxy(TProxyId & proxyId,
-                          TTraverser & traverser,
+                          TJstTraverser & traverser,
                           TPosition const & contextBeginPosHost,
                           TCoverage const & branchCoverage)
 {
-    typedef typename TTraverser::TBranchNodeIterator TBranchNodeIterator;
+    typedef typename TJstTraverser::TBranchNodeIterator TBranchNodeIterator;
 
-    typedef typename TTraverser::TMergePointStore TMergePointStack;
+    typedef typename TJstTraverser::TMergePointStore TMergePointStack;
     typedef typename TMergePointStack::TMergePoints TMergePoints;
     typedef typename Iterator<TMergePoints>::Type TMergePointIterator;
 
-    typedef typename Size<TTraverser>::Type TSize;
+    typedef typename Size<TJstTraverser>::Type TSize;
 
     TCoverage tmp;
     transform(tmp, branchCoverage, traverser._activeMasterCoverage, FunctorBitwiseAnd());
@@ -1438,12 +1308,12 @@ _selectValidBeginAndProxy(TProxyId & proxyId,
 template <typename TContainer, typename TContextPosition, typename TContextBegin, typename TOperator, typename TDelegate,
           typename TCallerState>
 void
-_traverseBranchWithAlt(Traverser<TContainer, TraverserSpec<TContextPosition, TContextBegin> > & traverser,
+_traverseBranchWithAlt(JstTraverser<TContainer, JstTraverserSpec<TContextPosition, TContextBegin> > & traverser,
                        TOperator & traversalCaller,
                        TDelegate & delegate,
                        TCallerState & lastActiveState)
 {
-    typedef Traverser<TContainer, TraverserSpec<TContextPosition, TContextBegin> > TTraverser;
+    typedef JstTraverser<TContainer, JstTraverserSpec<TContextPosition, TContextBegin> > TJstTraverser;
 
     typedef typename JournalData<TContainer>::Type TJournalSet;
     typedef typename Value<TJournalSet>::Type TJournalString;
@@ -1454,7 +1324,7 @@ _traverseBranchWithAlt(Traverser<TContainer, TraverserSpec<TContextPosition, TCo
     typedef typename TDeltaMap::TDeltaStore_ TDeltaStore;
     typedef typename DeltaValue<TDeltaStore, DeltaType::DELTA_TYPE_INDEL>::Type TIndel;
 
-    typedef typename TTraverser::TBranchNodeIterator TBranchNodeIterator;
+    typedef typename TJstTraverser::TBranchNodeIterator TBranchNodeIterator;
     typedef typename Size<TContainer>::Type TSize;
 
     typedef BranchStackNode<TJournalString, TBitVector, TBranchNodeIterator, TCallerState> TBranchStackNode;
@@ -1590,12 +1460,12 @@ _traverseBranchWithAlt(Traverser<TContainer, TraverserSpec<TContextPosition, TCo
 }
 
 template <typename TContainer, typename TOperator, typename TDelegate, typename TCallerState>
-void _traverseBranchWithAlt(Traverser<TContainer, TraverserSpec<ContextPositionRight, ContextBeginLeft> > & traverser,
+void _traverseBranchWithAlt(JstTraverser<TContainer, JstTraverserSpec<ContextPositionRight, ContextBeginLeft> > & traverser,
                             TOperator & traversalCaller,
                             TDelegate & delegate,
                             TCallerState & lastActiveState)
 {
-    typedef Traverser<TContainer, TraverserSpec<ContextPositionRight, ContextBeginLeft> > TTraverser;
+    typedef JstTraverser<TContainer, JstTraverserSpec<ContextPositionRight, ContextBeginLeft> > TJstTraverser;
 
     typedef typename JournalData<TContainer>::Type TJournalSet;
     typedef typename Value<TJournalSet>::Type TJournalString;
@@ -1606,7 +1476,7 @@ void _traverseBranchWithAlt(Traverser<TContainer, TraverserSpec<ContextPositionR
     typedef typename TDeltaMap::TDeltaStore_ TDeltaStore;
     typedef typename DeltaValue<TDeltaStore, DeltaType::DELTA_TYPE_INDEL>::Type TIndel;
 
-    typedef typename TTraverser::TBranchNodeIterator TBranchNodeIterator;
+    typedef typename TJstTraverser::TBranchNodeIterator TBranchNodeIterator;
     typedef typename Size<TContainer>::Type TSize;
 
     typedef BranchStackNode<TJournalString, TBitVector, TBranchNodeIterator, TCallerState> TBranchStackNode;
@@ -1726,13 +1596,13 @@ void _traverseBranchWithAlt(Traverser<TContainer, TraverserSpec<ContextPositionR
 // Function _syncAndUpdateCoverage()
 // ----------------------------------------------------------------------------
 
-template <typename TTraverser>
+template <typename TJstTraverser>
 inline bool
-_syncAndUpdateCoverage(TTraverser & traverser,
+_syncAndUpdateCoverage(TJstTraverser & traverser,
                        StateTraverseMaster const & /*tag*/)
 {
-    typedef typename TTraverser::TBranchNodeIterator TBranchNodeIterator;
-    typedef typename Container<TTraverser>::Type TContainer;
+    typedef typename TJstTraverser::TBranchNodeIterator TBranchNodeIterator;
+    typedef typename Container<TJstTraverser>::Type TContainer;
     typedef typename Position<TContainer>::Type TPosition;
     typedef typename MakeSigned<TPosition>::Type TPos_;
 
@@ -1767,18 +1637,18 @@ _syncAndUpdateCoverage(TTraverser & traverser,
     return false;
 }
 
-template <typename TTraverser, typename TBranchStackNode>
+template <typename TJstTraverser, typename TBranchStackNode>
 inline bool
-_syncAndUpdateCoverage(TTraverser & traverser,
+_syncAndUpdateCoverage(TJstTraverser & traverser,
                        TBranchStackNode & branchStackNode,
                        StateTraverseBranch const & /*tag*/)
 {
-    typedef typename TTraverser::TBranchNodeIterator TBranchNodeIterator;
-    typedef typename Container<TTraverser>::Type TContainer;
+    typedef typename TJstTraverser::TBranchNodeIterator TBranchNodeIterator;
+    typedef typename Container<TJstTraverser>::Type TContainer;
     typedef typename Position<TContainer>::Type TPos;
     typedef typename MakeSigned<TPos>::Type TPos_;
 
-    typedef typename TTraverser::TMergePointStore TMergePointStack;
+    typedef typename TJstTraverser::TMergePointStore TMergePointStack;
     typedef typename TMergePointStack::TMergePoints TMergePoints;
     typedef typename Iterator<TMergePoints, Standard>::Type TMergePointIterator;
 
@@ -1848,7 +1718,7 @@ _syncAndUpdateCoverage(TTraverser & traverser,
 
 template <typename TContainer, typename TContextPosition, typename TContextBegin, typename TOperator, typename TDelegate>
 inline void
-_execTraversal(Traverser<TContainer, TraverserSpec<TContextPosition, TContextBegin> > & traverser,
+_execTraversal(JstTraverser<TContainer, JstTraverserSpec<TContextPosition, TContextBegin> > & traverser,
                TOperator & traversalCaller,
                TDelegate & delegate)
 {
@@ -2004,7 +1874,7 @@ _execTraversal(Traverser<TContainer, TraverserSpec<TContextPosition, TContextBeg
 template <typename TContainer, typename TContextPosition, typename TContextBegin,
           typename TDeltaNodeIterator, typename THostSegmentBegin, typename THostSegmentEnd>
 inline void
-_initSegment(Traverser<TContainer, TraverserSpec<TContextPosition, TContextBegin> > & traverser,
+_initSegment(JstTraverser<TContainer, JstTraverserSpec<TContextPosition, TContextBegin> > & traverser,
              TDeltaNodeIterator const & nodeItBegin,
              TDeltaNodeIterator const & nodeItEnd,
              THostSegmentBegin const & hostSegmentBeginPosition,
@@ -2025,7 +1895,7 @@ _initSegment(Traverser<TContainer, TraverserSpec<TContextPosition, TContextBegin
 
 template <typename TContainer, typename TContextPosition, typename TContextBegin>
 inline void
-init(Traverser<TContainer, TraverserSpec<TContextPosition, TContextBegin> > & traverser,
+init(JstTraverser<TContainer, JstTraverserSpec<TContextPosition, TContextBegin> > & traverser,
      TContainer & obj)
 {
     setContainer(traverser, obj);
@@ -2045,7 +1915,7 @@ init(Traverser<TContainer, TraverserSpec<TContextPosition, TContextBegin> > & tr
 
 template <typename TContainer, typename TSpec, typename TOperator, typename TDelegate>
 inline void
-traverse(Traverser<TContainer, TSpec> & traverser,
+traverse(JstTraverser<TContainer, TSpec> & traverser,
          TOperator & traversalCaller,
          TDelegate & delegate)
 {
@@ -2058,7 +1928,7 @@ traverse(Traverser<TContainer, TSpec> & traverser,
 
 template <typename TContainer, typename TSpec>
 inline void
-setContainer(Traverser<TContainer, TSpec> & traverser,
+setContainer(JstTraverser<TContainer, TSpec> & traverser,
              TContainer & container)
 {
     traverser._haystackPtr = &container;
@@ -2070,7 +1940,7 @@ setContainer(Traverser<TContainer, TSpec> & traverser,
 
 template <typename TContainer, typename TSpec, typename TSize>
 inline void
-setWindowSize(Traverser<TContainer, TSpec> & traverser,
+setWindowSize(JstTraverser<TContainer, TSpec> & traverser,
              TSize const & newWindowSize)
 {
     traverser._windowSize = newWindowSize;
@@ -2081,8 +1951,8 @@ setWindowSize(Traverser<TContainer, TSpec> & traverser,
 // ----------------------------------------------------------------------------
 
 template <typename TContainer, typename TSpec>
-inline typename Size<Traverser<TContainer, TSpec> >::Type
-windowSize(Traverser<TContainer, TSpec> const & traverser)
+inline typename Size<JstTraverser<TContainer, TSpec> >::Type
+windowSize(JstTraverser<TContainer, TSpec> const & traverser)
 {
     return traverser._windowSize;
 }
@@ -2092,15 +1962,15 @@ windowSize(Traverser<TContainer, TSpec> const & traverser)
 // ----------------------------------------------------------------------------
 
 template <typename TContainer, typename TSpec>
-inline typename Container<Traverser<TContainer, TSpec> >::Type &
-container(Traverser<TContainer, TSpec> & traverser)
+inline typename Container<JstTraverser<TContainer, TSpec> >::Type &
+container(JstTraverser<TContainer, TSpec> & traverser)
 {
     return *traverser._haystackPtr;
 }
 
 template <typename TContainer, typename TSpec>
-inline typename Container<Traverser<TContainer, TSpec> const>::Type &
-container(Traverser<TContainer, TSpec> const & traverser)
+inline typename Container<JstTraverser<TContainer, TSpec> const>::Type &
+container(JstTraverser<TContainer, TSpec> const & traverser)
 {
     return *traverser._haystackPtr;
 }

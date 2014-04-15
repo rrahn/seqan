@@ -72,11 +72,11 @@ struct ContextBeginRight_;
 typedef Tag<ContextBeginRight_> ContextBeginRight;
 
 // ----------------------------------------------------------------------------
-// Struct TraverserSpec
+// Struct JstTraverserSpec
 // ----------------------------------------------------------------------------
 
 template <typename TContextPosition = ContextPositionLeft, typename TContextBegin = ContextBeginLeft>
-struct TraverserSpec;
+struct JstTraverserSpec;
 
 // ----------------------------------------------------------------------------
 // Tag StringTreeDefault

@@ -31,11 +31,11 @@
 // ==========================================================================
 // Author: Rene Rahn <rene.rahn@fu-berlin.de>
 // ==========================================================================
-// Defines tags and classes used in for package find_data_parallel.
+// Tags and structures used globally for journaled string tree finder.
 // ==========================================================================
 
-#ifndef EXTRAS_INCLUDE_SEQAN_FIND_DATA_PARALLEL_FIND_DATA_PARALLEL_BASE_H_
-#define EXTRAS_INCLUDE_SEQAN_FIND_DATA_PARALLEL_FIND_DATA_PARALLEL_BASE_H_
+#ifndef EXTRAS_INCLUDE_SEQAN_FIND_JOURNALED_STRING_TREE_FIND_JOURNALED_STRING_TREE_BASE_H_
+#define EXTRAS_INCLUDE_SEQAN_FIND_JOURNALED_STRING_TREE_FIND_JOURNALED_STRING_TREE_BASE_H_
 
 namespace seqan {
 
@@ -47,8 +47,16 @@ namespace seqan {
 // Tags, Classes, Enums
 // ============================================================================
 
+// ----------------------------------------------------------------------------
+// Tag BitAlgorithmLongNeedle
+// ----------------------------------------------------------------------------
+
 struct BitAlgorithmLongNeedle_;
 typedef Tag<BitAlgorithmLongNeedle_> BitAlgorithmLongNeedle;
+
+// ----------------------------------------------------------------------------
+// Tag BitAlgorithmSmallNeedle
+// ----------------------------------------------------------------------------
 
 struct BitAlgorithmSmallNeedle_;
 typedef Tag<BitAlgorithmSmallNeedle_> BitAlgorithmSmallNeedle;
@@ -61,49 +69,39 @@ template <typename TSpec = void>
 struct DataParallel;
 
 // ----------------------------------------------------------------------------
-// Struct FinderInitializationState
-// ----------------------------------------------------------------------------
-
-template <typename TSpec = Default>
-struct FinderInitializationState{};
-
-// ----------------------------------------------------------------------------
 // Struct FinderFunctor
 // ----------------------------------------------------------------------------
 
 template <typename TFinder>
 struct FinderFunctor{};
 
-// ----------------------------------------------------------------------------
-// Struct FinderState
-// ----------------------------------------------------------------------------
-
-template <typename TFinder>
-struct FinderState
-{
-    typedef Nothing Type;  // Default finder state.
-};
-
 // ============================================================================
 // Metafunctions
 // ============================================================================
 
 // ----------------------------------------------------------------------------
-// Metafunction InitStateForFinder
+// Metafunction ContextIteratorPosition
 // ----------------------------------------------------------------------------
 
-template <typename TFinder>
-struct InitStateForFinder
+template <typename T>
+struct ContextIteratorPosition
 {
-    typedef FinderInitializationState<Default> Type;
+    typedef ContextPositionLeft Type;
 };
+
+// ----------------------------------------------------------------------------
+// Metafunction RequireFullContext
+// ----------------------------------------------------------------------------
+
+template <typename T>
+struct RequireFullContext : True{};
 
 // ----------------------------------------------------------------------------
 // Metafunction TraversalSpec
 // ----------------------------------------------------------------------------
 
 template <typename T>
-struct PatternSpecificTraversalSpec
+struct GetTraverserForFinder
 {
     typedef TraverserSpec<> Type;
 };
@@ -115,17 +113,10 @@ struct PatternSpecificTraversalSpec
 template <typename TFinder>
 struct GetTraverserForFinder_;
 
-// ----------------------------------------------------------------------------
-// Metafunction ErrorsSupported
-// ----------------------------------------------------------------------------
-
-template <typename TFinderFunctor>
-struct ErrorsSupported : False{};
-
 // ============================================================================
 // Functions
 // ============================================================================
 
 }  // namespace seqan
 
-#endif  // EXTRAS_INCLUDE_SEQAN_FIND_DATA_PARALLEL_FIND_DATA_PARALLEL_BASE_H_
+#endif  // EXTRAS_INCLUDE_SEQAN_FIND_JOURNALED_STRING_TREE_FIND_JOURNALED_STRING_TREE_BASE_H_
