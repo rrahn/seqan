@@ -104,14 +104,11 @@ class JournaledStringTree;
 // ============================================================================
 
 // ----------------------------------------------------------------------------
-// Metafunction CallerState
+// Metafunction GetState
 // ----------------------------------------------------------------------------
 
 template <typename T>
-struct CallerState
-{
-    typedef Nothing Type;
-};
+struct GetState;
 
 // ----------------------------------------------------------------------------
 // Metafunction ComputeState
@@ -124,32 +121,27 @@ struct ComputeState
     typedef Pair<bool, TSize_> Type;
 };
 
+// ----------------------------------------------------------------------------
+// Metafunction ContextIteratorPosition
+// ----------------------------------------------------------------------------
+
+template <typename T>
+struct ContextIteratorPosition
+{
+    typedef ContextPositionLeft Type;
+};
+
+// ----------------------------------------------------------------------------
+// Metafunction RequireFullContext
+// ----------------------------------------------------------------------------
+
+template <typename T>
+struct RequireFullContext : True{};
+
 
 // ============================================================================
 // Functions
 // ============================================================================
-
-// ----------------------------------------------------------------------------
-// Function getCallerState()
-// ----------------------------------------------------------------------------
-
-template <typename T>
-inline typename CallerState<T>::Type
-getCallerState(T const & /*obj*/)
-{
-    return typename CallerState<T>::Type();
-}
-
-// ----------------------------------------------------------------------------
-// Function getCallerState()
-// ----------------------------------------------------------------------------
-
-template <typename T, typename TState>
-inline void
-setCallerState(T & /*obj*/, TState const & /*state*/)
-{
-    // no-op function.
-}
 
 }  // namespace seqan
 

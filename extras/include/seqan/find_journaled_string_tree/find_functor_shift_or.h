@@ -53,26 +53,22 @@ namespace seqan
 // ----------------------------------------------------------------------------
 
 template <typename TFinder>
-struct ShiftOrFunctor_;
-
-template <typename TContainer, typename TNeedle, typename TSpec>
-struct ShiftOrFunctor_<Finder2<TContainer, Pattern<TNeedle, ShiftOr>, TSpec> >
+struct ExtensionFunctor<TFinder, ShiftOr>
 {
-    typedef Finder2<TContainer, Pattern<TNeedle, ShiftOr>, TSpec> TFinder;
-    typedef typename CallerState<TFinder>::Type TState;
+    typedef typename GetPattern<TFinder>::Type TPattern;
+    typedef typename Needle<TPattern>::Type TNeedle;
     typedef unsigned int TWord;
 
+    TWord       mask;
+    TPattern    _state;
+    bool        _isSmallNeedle;
 
-    TWord mask;
-    TState _state;
-    bool _isSmallNeedle;
-
-    ShiftOrFunctor_()
+    ExtensionFunctor() : mask(), _state(), _isSmallNeedle(true)
     {}
 
-    ShiftOrFunctor_(Pattern<TNeedle, ShiftOr> & pattern)
+    ExtensionFunctor(TPattern & pattern)
     {
-        _init(*this, pattern);
+        init(*this, pattern);
     }
 
     template <typename TResult, typename THystkIt>
@@ -119,47 +115,50 @@ struct ShiftOrFunctor_<Finder2<TContainer, Pattern<TNeedle, ShiftOr>, TSpec> >
 // ============================================================================
 
 // ----------------------------------------------------------------------------
-// Metafunction PatternSpecificTraversalSpec                         [ShiftAnd]
+// Metafunction ContextIteratorPosition                               [ShiftOr]
 // ----------------------------------------------------------------------------
 
-template <typename TNeedle>
-struct PatternSpecificTraversalSpec<Pattern<TNeedle, ShiftOr> >
+template <typename TFinder>
+struct ContextIteratorPosition<ExtensionFunctor<TFinder, ShiftOr> >
 {
-    typedef TraverserSpec<ContextPositionRight, ContextBeginLeft> Type;
+    typedef ContextPositionRight Type;
 };
 
 // ----------------------------------------------------------------------------
-// Metafunction CallerState
+// Metafunction RequireFullContext                                    [ShiftOr]
 // ----------------------------------------------------------------------------
 
-template <typename TContainer, typename TNeedle, typename TSpec>
-struct CallerState<Finder2<TContainer, Pattern<TNeedle, ShiftOr>, TSpec> >
+template <typename TFinder>
+struct RequireFullContext<ExtensionFunctor<TFinder, ShiftOr> > :
+    False{};
+
+// ----------------------------------------------------------------------------
+// Metafunction ExtensionState                                        [ShiftOr]
+// ----------------------------------------------------------------------------
+
+template <typename TFinder>
+struct ExtensionState<ExtensionFunctor<TFinder, ShiftOr> >
 {
-    typedef Pattern<TNeedle, ShiftOr> Type;
+    typedef ExtensionFunctor<TFinder, ShiftOr> TExtensionfunctor;
+    typedef typename TExtensionfunctor::TPattern Type;
 };
 
-template <typename TContainer, typename TNeedle, typename TSpec>
-struct CallerState<Finder2<TContainer, Pattern<TNeedle, ShiftOr>, TSpec> const>
+template <typename TFinder>
+struct ExtensionState<ExtensionFunctor<TFinder, ShiftOr> const>
 {
-    typedef Pattern<TNeedle, ShiftOr> Type;
+    typedef ExtensionFunctor<TFinder, ShiftOr> TExtensionfunctor;
+    typedef typename TExtensionfunctor::TPattern const Type;
 };
 
 // ----------------------------------------------------------------------------
 // Metafunction FinderFunctor                                         [ShiftOr]
 // ----------------------------------------------------------------------------
 
-template <typename THaystack, typename TNeedle, typename TSpec>
-struct FinderFunctor<Finder2<THaystack, Pattern<TNeedle, ShiftOr>, TSpec> >
+template <typename TContainer, typename TNeedle, typename TSpec>
+struct FinderExtension<Finder2<TContainer, Pattern<TNeedle, ShiftOr>, DataParallel<TSpec> > >
 {
-    typedef Finder2<THaystack, Pattern<TNeedle, ShiftOr>, TSpec> TFinder;
-    typedef ShiftOrFunctor_<TFinder> Type;
-};
-
-template <typename THaystack, typename TNeedle, typename TSpec>
-struct FinderFunctor<Finder2<THaystack, Pattern<TNeedle, ShiftOr>, TSpec> const>
-{
-    typedef Finder2<THaystack const, Pattern<TNeedle, ShiftOr>, TSpec> TFinder;
-    typedef ShiftOrFunctor_<TFinder> Type;
+    typedef Finder2<TContainer, Pattern<TNeedle, ShiftOr>, DataParallel<TSpec> > TFinder_;
+    typedef ExtensionFunctor<TFinder_, ShiftOr> Type;
 };
 
 // ============================================================================
@@ -167,63 +166,62 @@ struct FinderFunctor<Finder2<THaystack, Pattern<TNeedle, ShiftOr>, TSpec> const>
 // ============================================================================
 
 // ----------------------------------------------------------------------------
-// Function getCallerState()                                         [ShiftAnd]
+// Function getExtensionState                                         [ShiftOr]
 // ----------------------------------------------------------------------------
 
-template <typename TContainer, typename TNeedle, typename TSpec>
-inline typename CallerState<Finder2<TContainer, Pattern<TNeedle, ShiftOr>, TSpec> >::Type &
-getCallerState(Finder2<TContainer, Pattern<TNeedle, ShiftOr>, TSpec> & finder)
+template <typename TFinder>
+inline typename ExtensionState<ExtensionFunctor<TFinder, ShiftOr> >::Type &
+getExtensionState(ExtensionFunctor<TFinder, ShiftOr> & extensionFunctor)
 {
-    return finder._finderFunctor._state;
+    return extensionFunctor._state;
 }
 
-template <typename TContainer, typename TNeedle, typename TSpec>
-inline typename CallerState<Finder2<TContainer, Pattern<TNeedle, ShiftOr>, TSpec> const>::Type &
-getCallerState(Finder2<TContainer, Pattern<TNeedle, ShiftOr>, TSpec> const & finder)
+template <typename TFinder>
+inline typename ExtensionState<ExtensionFunctor<TFinder, ShiftOr> const>::Type &
+getExtensionState(ExtensionFunctor<TFinder, ShiftOr> const & extensionFunctor)
 {
-    return finder._finderFunctor._pattern;
+    return extensionFunctor._state;
 }
 
 // ----------------------------------------------------------------------------
-// Function setCallerState()
+// Function setExtensionState()                                       [ShiftOr]
 // ----------------------------------------------------------------------------
 
-template <typename TContainer, typename TNeedle, typename TSpec>
+template <typename TFinder>
 inline void
-setCallerState(Finder2<TContainer, Pattern<TNeedle, ShiftOr>, TSpec> & finder,
-               typename CallerState<Finder2<TContainer, Pattern<TNeedle, ShiftOr>, TSpec> >::Type const & state)
+setExtensionState(ExtensionFunctor<TFinder, ShiftOr>  & extensionFunctor,
+                  typename ExtensionState<ExtensionFunctor<TFinder, ShiftOr> >::Type const & state)
 {
-    finder._finderFunctor._state = state;
+    extensionFunctor._state = state;
 }
 
-template <typename TContainer, typename TNeedle, typename TSpec, typename TIter>
-inline typename ComputeState<TContainer>::Type
-compute(Finder2<TContainer, Pattern<TNeedle, ShiftOr>, DataParallel<TSpec> > & finder,
-        TIter const & hystkIt)
-{
-    typedef Finder2<TContainer, Pattern<TNeedle, ShiftOr>, DataParallel<TSpec> > TFinder;
-    typedef typename GetTraverserForFinder_<TFinder>::Type TTraverser;
-    typedef typename ComputeState<TTraverser>::Type TComputeState;
+// ----------------------------------------------------------------------------
+// Function execute()
+// ----------------------------------------------------------------------------
 
-    TComputeState state(false, 1);
-    if (finder._finderFunctor._isSmallNeedle)
-        finder._finderFunctor(state, hystkIt, BitAlgorithmSmallNeedle());
+template <typename TResult, typename TFinder, typename TContextIter>
+inline void
+execute(TResult & res,
+        ExtensionFunctor<TFinder, ShiftOr> & extensionFunctor,
+        TContextIter & contextIter)
+{
+    if (extensionFunctor._isSmallNeedle)
+        extensionFunctor(res, contextIter, BitAlgorithmSmallNeedle());
     else
-        finder._finderFunctor(state, hystkIt, BitAlgorithmLongNeedle());
-
-    return state;
+        extensionFunctor(res, contextIter, BitAlgorithmLongNeedle());
+    return res;
 }
 
 // ----------------------------------------------------------------------------
-// Function _init()
+// Function init()
 // ----------------------------------------------------------------------------
 
-template <typename TFinder, typename TNeedle>
+template <typename TFinder>
 inline void
-_init(ShiftOrFunctor_<TFinder> & shiftOrFunctor,
-      Pattern<TNeedle, ShiftOr> & pattern)
+init(ExtensionFunctor<TFinder, ShiftOr> & shiftOrFunctor,
+     typename GetPattern<TFinder>::Type & pattern)
 {
-    typedef ShiftOrFunctor_<TFinder> TShiftOrFunctor;
+    typedef ExtensionFunctor<TFinder, ShiftOr> TShiftOrFunctor;
     typedef typename TShiftOrFunctor::TWord TWord;
 
     _patternInit(pattern);

@@ -1,0 +1,22 @@
+Interface for ExtensionFunctor
+
+template <typename TObject, typename TSpec>
+class ExtensionFunctor
+{
+
+	operator()(Result, Iterator) : void
+};
+
+MF:
+
+FinderExtension
+[ExtensionState]
+[ContextBeginPosition]
+[RequireFullContext]
+
+FN:
+
+init() : void
+[setExtensionState(ExtensionFunctor, State) : void]
+[getExtensionState(ExtensionFunctor) : ExtensionState]
+[execute(Result, ExtensionFunctor, Iterator) : void]

@@ -44,23 +44,31 @@ namespace seqan {
 // Forwards
 // ============================================================================
 
+// TODO(rmaerker): @weese - can this be moved to find_myers_ukkonen.h?
+template <typename TNeedle, typename TSpec, typename THasState, typename TFindBeginPatternSpec>
+struct Spec<Pattern<TNeedle, Myers<TSpec, THasState, TFindBeginPatternSpec> > >
+{
+    typedef TSpec Type;
+};
+
+template <typename TNeedle, typename TSpec, typename THasState, typename TFindBeginPatternSpec>
+struct Spec<Pattern<TNeedle, Myers<TSpec, THasState, TFindBeginPatternSpec> > const> :
+    Spec<Pattern<TNeedle, Myers<TSpec, THasState, TFindBeginPatternSpec> > >{};
+
 // ============================================================================
 // Tags, Classes, Enums
 // ============================================================================
 
-template <typename T>
-struct MyersUkkonenFunctor_;
-
-template <typename TContainer, typename TNeedle, typename TSpec, typename THostSpec, typename TPatternBeginSpec, typename TFinderSpec>
-struct MyersUkkonenFunctor_<Finder2<TContainer, Pattern<TNeedle, Myers<TSpec, THostSpec, TPatternBeginSpec> >, DataParallel<TFinderSpec> > >
+template <typename TFinder>
+struct ExtensionFunctor<TFinder, MyersBitVector>
 {
-    typedef Pattern<TNeedle, Myers<TSpec, THostSpec, TPatternBeginSpec> > TPattern;
+    typedef typename GetPattern<TFinder>::Type TPattern;
     typedef typename PatternState<TPattern>::Type TPatternState;
-    typedef Finder2<TContainer, TPattern, DataParallel<TFinderSpec> > TFinder;
-
-    typedef MyersLargePattern_<TNeedle, TSpec> TLargePattern;
-    typedef MyersLargeState_<TNeedle, TSpec> TLargeState;
+    typedef typename Needle<TPattern>::Type TNeedle;
+    typedef typename TPattern::TLargePattern TLargePattern;
+    typedef typename TPatternState::TLargeState TLargeState;
     typedef typename TPattern::TWord TWord;
+    typedef typename Spec<TPattern>::Type TSpec;
 
     TPattern        _pattern;
     TPatternState   _state;
@@ -72,13 +80,13 @@ struct MyersUkkonenFunctor_<Finder2<TContainer, Pattern<TNeedle, Myers<TSpec, TH
 
     bool _isSmallPattern;
 
-    MyersUkkonenFunctor_()
+    ExtensionFunctor()
     {}
 
-    template <typename TErrors>
-    MyersUkkonenFunctor_(TPattern & pattern, TErrors const & errors)
+    template <typename TMinScore>
+    ExtensionFunctor(TPattern & pattern, TMinScore const & minScore)
     {
-        _init(*this, pattern, errors);
+        init(*this, pattern, minScore);
     }
 
     template <typename TResult, typename TIterator>
@@ -215,56 +223,52 @@ struct MyersUkkonenFunctor_<Finder2<TContainer, Pattern<TNeedle, Myers<TSpec, TH
 // Metafunctions
 // ============================================================================
 
+// ----------------------------------------------------------------------------
+// Metafunction ContextIteratorPosition                                 [Myers]
+// ----------------------------------------------------------------------------
+
 template <typename TFinder>
-struct ErrorsSupported<MyersUkkonenFunctor_<TFinder> > : True{};
-
-// ----------------------------------------------------------------------------
-// Metafunction PatternSpecificTraversalSpec                         [ShiftAnd]
-// ----------------------------------------------------------------------------
-
-template <typename TNeedle, typename TSpec, typename THasState, typename TBeginPatternSpec>
-struct PatternSpecificTraversalSpec<Pattern<TNeedle, Myers<TSpec, THasState, TBeginPatternSpec> > >
+struct ContextIteratorPosition<ExtensionFunctor<TFinder, MyersBitVector> >
 {
-    typedef TraverserSpec<ContextPositionRight, ContextBeginLeft> Type;
+    typedef ContextPositionRight Type;
 };
 
 // ----------------------------------------------------------------------------
-// Metafunction FinderFunctor
+// Metafunction RequireFullContext                                      [Myers]
 // ----------------------------------------------------------------------------
 
-template <typename TContainer, typename TNeedle, typename TSpec, typename THasHost, typename TPatternBeginSpec, typename TFinderSpec>
-struct FinderFunctor<Finder2<TContainer,  Pattern<TNeedle, Myers<TSpec, THasHost, TPatternBeginSpec> >, TFinderSpec> >
+template <typename TFinder>
+struct RequireFullContext<ExtensionFunctor<TFinder, MyersBitVector> > : False{};
+
+// ----------------------------------------------------------------------------
+// Metafunction FinderExtension                                         [Myers]
+// ----------------------------------------------------------------------------
+
+template <typename TContainer, typename TNeedle, typename TSpec, typename THasState, typename TFindBeginPatternSpec,
+          typename TFinderSpec>
+struct FinderExtension<Finder2<TContainer, Pattern<TNeedle, Myers<TSpec, THasState, TFindBeginPatternSpec> >, DataParallel<TFinderSpec> > >
 {
-    typedef Finder2<TContainer,  Pattern<TNeedle, Myers<TSpec, THasHost, TPatternBeginSpec> >, TFinderSpec> TFinder_;
-    typedef MyersUkkonenFunctor_<TFinder_> Type;
+    typedef Pattern<TNeedle, Myers<TSpec, THasState, TFindBeginPatternSpec> TPattern_;
+    typedef Finder2<TContainer, TPattern_, DataParallel<TSpec> > TFinder_;
+    typedef ExtensionFunctor<TFinder_, MyersBitVector> Type;
 };
 
 // ----------------------------------------------------------------------------
-// Metafunction InitStateForFinder
+// Metafunction ExtensionState
 // ----------------------------------------------------------------------------
 
-template <typename TContainer, typename TNeedle, typename TSpec, typename THasHost, typename TPatternBeginSpec, typename TFinderSpec>
-struct InitStateForFinder<Finder2<TContainer,  Pattern<TNeedle, Myers<TSpec, THasHost, TPatternBeginSpec> >, DataParallel<TFinderSpec> > >
+template <typename TFinder>
+struct ExtensionState<ExtensionFunctor<TFinder, MyersBitVector> >
 {
-    typedef FinderInitializationState<Pattern<TNeedle, Myers<TSpec, THasHost, TPatternBeginSpec> > > Type;
+    typedef ExtensionFunctor<TFinder, MyersBitVector> TExtensionFunctor;
+    typedef typename TExtensionFunctor::TPatternState Type;
 };
 
-// ----------------------------------------------------------------------------
-// Metafunction CallerState
-// ----------------------------------------------------------------------------
-
-template <typename TContainer, typename TNeedle, typename TSpec, typename THasHost, typename TPatternBeginSpec, typename TFinderSpec>
-struct CallerState<Finder2<TContainer,  Pattern<TNeedle, Myers<TSpec, THasHost, TPatternBeginSpec> >, TFinderSpec> >
+template <typename TFinder>
+struct ExtensionState<ExtensionFunctor<TFinder, MyersBitVector> const>
 {
-    typedef Pattern<TNeedle, Myers<TSpec, THasHost, TPatternBeginSpec> > TPattern_;
-    typedef typename PatternState<TPattern_>::Type Type;
-};
-
-template <typename TContainer, typename TNeedle, typename TSpec, typename THasHost, typename TPatternBeginSpec, typename TFinderSpec>
-struct CallerState<Finder2<TContainer,  Pattern<TNeedle, Myers<TSpec, THasHost, TPatternBeginSpec> >, TFinderSpec> const>
-{
-    typedef Pattern<TNeedle, Myers<TSpec, THasHost, TPatternBeginSpec> > TPattern_;
-    typedef typename PatternState<TPattern_>::Type const Type;
+    typedef ExtensionFunctor<TFinder, MyersBitVector> TExtensionFunctor;
+    typedef typename TExtensionFunctor::TPatternState const Type;
 };
 
 // ============================================================================
@@ -272,90 +276,69 @@ struct CallerState<Finder2<TContainer,  Pattern<TNeedle, Myers<TSpec, THasHost, 
 // ============================================================================
 
 // ----------------------------------------------------------------------------
-// Function compute()
+// Function execute()
 // ----------------------------------------------------------------------------
 
-template <typename TContainer, typename TNeedle, typename TPatternSpec, typename THasState,
-          typename TFindBeginPatternSpec, typename TSpec, typename TIterator>
-inline typename ComputeState<TContainer>::Type
-compute(Finder2<TContainer, Pattern<TNeedle, Myers<TPatternSpec, THasState, TFindBeginPatternSpec> >, DataParallel<TSpec> > & finder,
-        TIterator const & iter)
+template <typename TResult, typename TFinder, typename TContextIter>
+inline void
+execute(TResult & res,
+        ExtensionFunctor<TFinder, MyersBitVector> & extensionFunctor,
+        TContextIter & contextIter)
 {
-    typedef Pattern<TNeedle, Myers<TPatternSpec, THasState, TFindBeginPatternSpec> > TPattern;
-    typedef typename PatternSpecificTraversalSpec<TPattern>::Type TTraversalSpec;
-    typedef Traverser<TContainer, TTraversalSpec> TTraverser;
-
-    typedef typename ComputeState<TTraverser>::Type TComputeState;
-
-    TComputeState state(false, 1);
-    if (finder._finderFunctor._isSmallPattern)
-        finder._finderFunctor(state, iter, BitAlgorithmSmallNeedle());
+    if (extensionFunctor._isSmallNeedle)
+        extensionFunctor(res, contextIter, BitAlgorithmSmallNeedle());
     else
-        finder._finderFunctor(state, iter, BitAlgorithmLongNeedle());
-    return state;
+        extensionFunctor(res, contextIter, BitAlgorithmLongNeedle());
+    return res;
 }
 
 // ----------------------------------------------------------------------------
-// Function getCallerState                                              [Myers]
+// Function getExtensionState                                           [Myers]
 // ----------------------------------------------------------------------------
 
-template <typename TContainer, typename TNeedle, typename TSpec, typename THasHost, typename TPatternBeginSpec, typename TFinderSpec>
-inline typename CallerState<Finder2<TContainer,  Pattern<TNeedle, Myers<TSpec, THasHost, TPatternBeginSpec> >, TFinderSpec> >::Type &
-getCallerState(Finder2<TContainer, Pattern<TNeedle, Myers<TSpec, THasHost, TPatternBeginSpec> >, TFinderSpec > & finder)
+template <typename TFinder>
+inline typename ExtensionState<ExtensionFunctor<TFinder, MyersBitVector> >::Type &
+getExtensionState(ExtensionFunctor<TFinder, MyersBitVector> & extensionFunctor)
 {
-    return finder._finderFunctor._state;
+    return extensionFunctor._state;
 }
 
-template <typename TContainer, typename TNeedle, typename TSpec, typename THasHost, typename TPatternBeginSpec, typename TFinderSpec>
-inline typename CallerState<Finder2<TContainer,  Pattern<TNeedle, Myers<TSpec, THasHost, TPatternBeginSpec> >, TFinderSpec> const>::Type &
-getCallerState(Finder2<TContainer, Pattern<TNeedle, Myers<TSpec, THasHost, TPatternBeginSpec> >, TFinderSpec> const & finder)
+template <typename TFinder>
+inline typename ExtensionState<ExtensionFunctor<TFinder, MyersBitVector> const>::Type &
+getExtensionState(ExtensionFunctor<TFinder, MyersBitVector> const & extensionFunctor)
 {
-    return finder._finderFunctor._state;
+    return extensionFunctor._state;
 }
 
 // ----------------------------------------------------------------------------
-// Function setCallerState()
+// Function setExtensionState()
 // ----------------------------------------------------------------------------
 
-template <typename TContainer, typename TNeedle, typename TSpec, typename THasHost, typename TPatternBeginSpec, typename TFinderSpec>
+template <typename TFinder>
 inline void
-setCallerState(Finder2<TContainer, Pattern<TNeedle, Myers<TSpec, THasHost, TPatternBeginSpec> >, TFinderSpec> & finder,
-               typename CallerState<Finder2<TContainer, Pattern<TNeedle, Myers<TSpec, THasHost, TPatternBeginSpec> >, TFinderSpec> >::Type const & state)
+setExtensionState(ExtensionFunctor<TFinder, MyersBitVector>  & extensionFunctor,
+                  typename ExtensionState<ExtensionFunctor<TFinder, MyersBitVector> >::Type const & state)
 {
-    finder._finderFunctor._state = state;
-}
-
-// ----------------------------------------------------------------------------
-// Function setScoreLimit()
-// ----------------------------------------------------------------------------
-
-template <typename TContainer, typename TNeedle, typename TSpec, typename THasHost, typename TPatternBeginSpec,
-          typename TFinderSpec, typename TScore>
-inline void
-setScoreLimit(MyersUkkonenFunctor_<Finder2<TContainer, Pattern<TNeedle, Myers<TSpec, THasHost, TPatternBeginSpec> >, DataParallel<TFinderSpec> > > & myersFunctor,
-              TScore const & score)
-{
-    setScoreLimit(myersFunctor._state, score);
+    extensionFunctor._state = state;
 }
 
 // ----------------------------------------------------------------------------
 // Function _reinit()
 // ----------------------------------------------------------------------------
 
-template <typename TFinder, typename TNeedle, typename TSpec, typename THasHost, typename TPatternBeginSpec,
-          typename TScore>
+template <typename TFinder, typename TScore>
 inline void
-_init(MyersUkkonenFunctor_<TFinder> & myersFunctor,
-      Pattern<TNeedle, Myers<TSpec, THasHost, TPatternBeginSpec> > & pattern,
-      TScore const & scoreLimit)
+init(ExtensionFunctor<TFinder, MyersBitVector> & myersFunctor,
+     typename GetPattern<TFinder>::Type & pattern,
+     TScore const & scoreLimit)
 {
-    typedef Pattern<TNeedle, Myers<TSpec, THasHost, TPatternBeginSpec> > TPattern;
+    typedef typename GetPattern<TFinder>::Type TPattern;
     typedef typename TPattern::TWord TWord;
 
     myersFunctor._pattern = pattern;
     myersFunctor._state = pattern;
 
-    setScoreLimit(myersFunctor, scoreLimit);
+    setScoreLimit(myersFunctor._state, scoreLimit);
     _patternInit(myersFunctor._pattern, myersFunctor._state, myersFunctor);  // Initialize the pattern.
     myersFunctor._isSmallPattern = myersFunctor._pattern.largePattern == NULL;
     myersFunctor.lastBit = (TWord)1 << (pattern.needleSize - 1);

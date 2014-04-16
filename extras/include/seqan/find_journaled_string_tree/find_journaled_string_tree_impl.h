@@ -52,23 +52,23 @@ namespace seqan
 template <typename TContainer, typename TPattern, typename TSpec>
 struct Finder2<TContainer, TPattern, DataParallel<TSpec> >
 {
-    typedef typename FinderFunctor<Finder2>::Type TFinderFunctor;
+    typedef Finder2<TContainer, TPattern, DataParallel<TSpec> > TFinder;
+    typedef typename FinderExtension<TFinder>::Type TExtensionFunctor;
 
-    TContainer*     _containerPtr;
-    TFinderFunctor  _finderFunctor;
-
-    bool _needReinit;
+    TContainer*         _containerPtr;
+    TExtensionFunctor   _extensionFunctor;
+    bool                _needReinit;
 
     Finder2() : _containerPtr(NULL), _needReinit(true)
     {}
 
 
-    Finder2(TContainer & hystk) : _containerPtr(&hystk), _finderFunctor(), _needReinit(true)
+    Finder2(TContainer & hystk) : _containerPtr(&hystk), _extensionFunctor(), _needReinit(true)
     {}
 
     // Copy constructor.
     Finder2(Finder2 const & other) : _containerPtr(other._containerPtr),
-                                     _finderFunctor(other._finderFunctor),
+                                     _extensionFunctor(other._finderFunctor),
                                      _needReinit(other._needReinit)
     {}
 
@@ -78,7 +78,7 @@ struct Finder2<TContainer, TPattern, DataParallel<TSpec> >
         if (this != &other)
         {
             _containerPtr = other._containerPtr;
-            _finderFunctor = other._finderFunctor;
+            _extensionFunctor = other._finderFunctor;
             _needReinit = other._needReinit;
         }
         return *this;
@@ -97,7 +97,7 @@ template <typename TContainer, typename TPattern, typename TSpec>
 struct ContextIteratorPosition<Finder2<TContainer, TPattern, TSpec> >
 {
     typedef Finder2<TContainer, TPattern, TSpec> TFinder_;
-    typedef typename FinderFunctor<TFinder_>::Type TFinderFunctor_;
+    typedef typename FinderExtension<TFinder_>::Type TFinderFunctor_;
     typedef typename ContextIteratorPosition<TFinderFunctor_>::Type Type;
 };
 
@@ -113,7 +113,7 @@ template <typename TContainer, typename TPattern, typename TSpec>
 struct RequireFullContext<Finder2<TContainer, TPattern, TSpec> >
 {
     typedef Finder2<TContainer, TPattern, TSpec> TFinder_;
-    typedef typename FinderFunctor<TFinder_>::Type TFinderFunctor_;
+    typedef typename FinderExtension<TFinder_>::Type TFinderFunctor_;
     typedef typename RequireFullContext<TFinderFunctor_>::Type Type;
 };
 
@@ -126,35 +126,12 @@ struct RequireFullContext<Finder2<TContainer, TPattern, TSpec> const > :
 // ----------------------------------------------------------------------------
 
 template <typename TContainer, typename TPattern, typename TSpec>
-struct GetTraverserForFinder_<Finder2<TContainer, TPattern, TSpec> >
+struct GetJstTraverserForFinder_<Finder2<TContainer, TPattern, TSpec> >
 {
     typedef Finder2<TContainer, TPattern, TSpec> TFinder_;
-    typedef typename ContextIteratorPosition<TFinder_>::Type TContextPosition;
+    typedef typename ContextIteratorPosition<TFinder_>::Type TContextPosition_;
     typedef typename RequireFullContext<TFinder_>::Type TRequireContext_;
-    typedef JstTraverser<TContainer const, JstTraverserSpec<TContextPosition, TRequireContext_> > Type;
-};
-
-
-// ----------------------------------------------------------------------------
-// Metafunction Position
-// ----------------------------------------------------------------------------
-
-template <typename TContainer, typename TPattern, typename TSpec>
-struct Position<Finder2<TContainer, TPattern, DataParallel<TSpec> > >
-{
-    typedef Finder2<TContainer, TPattern, DataParallel<TSpec> > TFinder_;
-    typedef typename GetTraverserForFinder_<TFinder_>::Type TTraverser_;
-
-    typedef typename Position<TTraverser_>::Type Type;
-};
-
-template <typename TContainer, typename TPattern, typename TSpec>
-struct Position<Finder2<TContainer, TPattern, DataParallel<TSpec> > const>
-{
-    typedef Finder2<TContainer, TPattern, DataParallel<TSpec> > TFinder_;
-    typedef typename GetTraverserForFinder_<TFinder_>::Type TTraverser_;
-
-    typedef typename Position<TTraverser_ const>::Type Type;
+    typedef JstTraverser<TContainer const, JstTraverserSpec<TContextPosition_, TRequireContext_> > Type;
 };
 
 // ----------------------------------------------------------------------------
@@ -173,32 +150,114 @@ struct Container<Finder2<TContainer, TPattern, DataParallel<TSpec> > const>
     typedef TContainer const Type;
 };
 
+// ----------------------------------------------------------------------------
+// Metafunction GetState
+// ----------------------------------------------------------------------------
+
+template <typename TContainer, typename TPattern, typename TSpec>
+struct GetState<Finder2<TContainer, TPattern, DataParallel<TSpec> > >
+{
+    typedef Finder2<TContainer, TPattern, DataParallel<TSpec> > TFinder_;
+    typedef typename FinderExtension<TFinder_>::Type TFinderExtension_;
+    typedef typename ExtensionState<TFinderExtension_>::Type Type;
+};
+
+template <typename TContainer, typename TPattern, typename TSpec>
+struct GetState<Finder2<TContainer, TPattern, DataParallel<TSpec> > const> :
+    GetState<Finder2<TContainer, TPattern, DataParallel<TSpec> > >{};
+
 // ============================================================================
 // Functions
 // ============================================================================
 
 // ----------------------------------------------------------------------------
-// Function compute()
+// Function getExtensionState()
 // ----------------------------------------------------------------------------
 
-template <typename TContainer, typename TPattern, typename TSpec, typename TIterator>
-inline typename ComputeState<TContainer>::Type
-compute(Finder2<TContainer, TPattern, DataParallel<TSpec> > & finder, TIterator const & iter)
+template <typename TFinder, typename TSpec>
+inline typename ExtensionState<ExtensionFunctor<TFinder, TSpec> >::Type
+getExtensionState(ExtensionFunctor<TFinder, TSpec> const & /*extensionFunctor*/)
 {
-    typedef typename PatternSpecificTraversalSpec<TPattern>::Type TTraversalSpec;
-    typedef Traverser<TContainer, TTraversalSpec> TTraverser;
+    return typename ExtensionState<ExtensionFunctor<TFinder, TSpec> >::Type();
+}
 
-    typedef typename ComputeState<TTraverser>::Type TComputeState;
+// ----------------------------------------------------------------------------
+// Function setExtensionState()
+// ----------------------------------------------------------------------------
 
-    TComputeState state(false, 1);
-    finder._finderFunctor(state, iter);
-    return state;
+template <typename TFinder, typename TSpec, typename TState>
+inline void
+setExtensionState(ExtensionFunctor<TFinder, TSpec> const & /*extensionFunctor*/,
+                  TState const & /*state*/)
+{
+    // no-op function.
+}
+
+// ----------------------------------------------------------------------------
+// Function getState()
+// ----------------------------------------------------------------------------
+
+template <typename TContainer, typename TPattern, typename TSpec>
+inline typename GetState<Finder2<TContainer, TPattern, DataParallel<TSpec> > const>::Type
+getState(Finder2<TContainer, TPattern, DataParallel<TSpec> > const & finder)
+{
+    return getExtensionState(finder._extensionFunctor);  // Delegates to extension functor.
+}
+
+// ----------------------------------------------------------------------------
+// Function setState()
+// ----------------------------------------------------------------------------
+
+template <typename TContainer, typename TPattern, typename TSpec, typename TState>
+inline void
+setState(Finder2<TContainer, TPattern, DataParallel<TSpec> > & finder,
+         TState const & state)
+{
+    setExtensionState(finder._extensionFunctor, state);  // Delegates to extension functor.
+}
+
+// ----------------------------------------------------------------------------
+// Function execute()
+// ----------------------------------------------------------------------------
+
+template <typename TResult, typename TFinder, typename TExtensionSpec, typename TContextIter>
+inline void
+execute(TResult & res,
+        ExtensionFunctor<TFinder, TExtensionSpec> & extensionFunctor,
+        TContextIter & contextIter)
+{
+    extensionFunctor(res, contextIter);
+}
+
+// ----------------------------------------------------------------------------
+// Function deliverContext()
+// ----------------------------------------------------------------------------
+
+// TODO(rmaerker): Change methods name and body. We will pass the traverser itself and give a function to get the begin or end of the current infix.
+template <typename TContainer, typename TPattern, typename TSpec, typename TDelegate, typename TTraverser>
+inline typename Size<TContainer>::Type
+deliverContext(Finder2<TContainer, TPattern, DataParallel<TSpec> > & finder,
+               TDelegate & delegateFunctor,
+               TTraverser const & traverser)
+{
+    typedef Finder2<TContainer, TPattern, DataParallel<TSpec> > TFinder;
+    typedef typename GetJstTraverserForFinder_<TFinder>::Type TTraverser;
+    typedef typename Size<TContainer>::Type TSize;
+
+    register Pair<bool, TSize> res(false, 1);
+    execute(res, finder._finderFunctor, contextIterator(traverser));
+
+    // Interrupt: Call the traverser.
+    if (res.i1)
+        delegateFunctor(traverser);
+    // Return to the traverser and continue.
+    return res.i2;
 }
 
 // ----------------------------------------------------------------------------
 // Function getPattern()
 // ----------------------------------------------------------------------------
-
+// TODO(rmaerker): Where do we need this?
 template <typename TContainer, typename TPattern, typename TSpec, typename TIterator>
 inline TPattern &
 getPattern(Finder2<TContainer, TPattern, DataParallel<TSpec> > & finder)
@@ -231,94 +290,85 @@ container(Finder2<TContainer, TPattern, DataParallel<TSpec> > const & finder)
     return *finder._containerPtr;
 }
 
+// ----------------------------------------------------------------------------
+// Function init()
+// ----------------------------------------------------------------------------
 
-template <typename TContainer, typename TPattern, typename TSpec, typename TScoreLimit>
+template <typename TFinder, typename TExtensionSpec, typename TPattern, typename TScoreLimit>
 inline void
-_init(Finder2<TContainer, TPattern, DataParallel<TSpec> > & finder,
-      TPattern & pattern,
-      TScoreLimit const & scoreLimit,
-      True const & /*errorsSupported*/)
+init(ExtensionFunctor<TFinder, TExtensionSpec> & extensionFunctor,
+     TPattern & pattern,
+     TScoreLimit const & /*scoreLimit*/)
 {
-    _init(finder._finderFunctor, pattern, scoreLimit);
-}
-
-template <typename TContainer, typename TPattern, typename TSpec, typename TScoreLimit>
-inline void
-_init(Finder2<TContainer, TPattern, DataParallel<TSpec> > & finder,
-      TPattern & pattern,
-      TScoreLimit const & /*scoreLimit*/,
-      False const & /*errorsSupported*/)
-{
-    _init(finder._finderFunctor, pattern);
+    init(extensionFunctor, pattern);
 }
 
 // ----------------------------------------------------------------------------
 // Function find()                                              [Parallel case]
 // ----------------------------------------------------------------------------
 
-template <typename TContainer, typename TPattern, typename TSpec, typename TDelegate, typename TParallelTag>
-inline void
-find(Finder2<TContainer, TPattern, DataParallel<TSpec> > & finder,
-     TPattern & pattern,
-     TDelegate & delegate,
-     int scoreLimit = 0,
-     Tag<TParallelTag> tag = Serial())
-{
-
-    typedef Finder2<TContainer, TPattern, DataParallel<TSpec> > TFinder;
-    typedef typename FinderFunctor<TFinder>::Type TFinderFunctor;
-    typedef typename GetTraverserForFinder_<TFinder>::Type TTraverser;
-    typedef typename VariantData<TContainer>::Type TDeltaMap;
-    typedef typename Iterator<TDeltaMap, Rooted>::Type TDeltaIter;
-    typedef typename Position<TContainer>::Type TPosition;
-
-
-    if (finder._needReinit)
-    {
-        // finder._finderFunctor(pattern, initState);
-        _init(finder, pattern, scoreLimit, typename ErrorsSupported<TFinderFunctor>::Type());
-        finder._needReinit = false;
-    }
-
-    requireJournal(container(finder), tag);  // Build the journal set on demand - works in parallel too.
-
-
-
-    // Initialize the traverser.
-    TTraverser traverser(container(finder), length(needle(pattern)) - scoreLimit);
-    // Parallelize over set of branch nodes. -> Maybe not most efficient.
-    Splitter<TDeltaIter> nodeSplitter(begin(variantData(container(finder)), Rooted()), end(variantData(container(finder)), Rooted()), Parallel());
-
-    StringSet<String<TPosition> > mergePointOverlaps;
-    resize(mergePointOverlaps, length(nodeSplitter));
-
-    SEQAN_OMP_PRAGMA(parallel for firstprivate(traverser))
-    for (unsigned jobId = 0; jobId < length(nodeSplitter); ++jobId)
-    {
-        TFinder threadFinder = finder;  // Copy basic initialized finder.  // NOTE(rmaerker): Copying the states is probably much faster than do a initialization for each finder per thread.
-
-//        printf("In thread: %i of %i\n", omp_get_thread_num(), omp_get_num_threads());
-        TPosition hostBeginPos = 0;
-        if (jobId != 0u)
-            hostBeginPos = *nodeSplitter[jobId] - (windowSize(traverser) - 1);
-        TPosition hostEndPos = *nodeSplitter[jobId + 1];
-        if (jobId == static_cast<unsigned>(omp_get_num_threads() - 1))
-            hostEndPos = length(host(container(finder)));
-
-        _initSegment(traverser, nodeSplitter[jobId], nodeSplitter[jobId + 1], hostBeginPos, hostEndPos);
-        traverse(traverser, threadFinder, delegate);
-
-        // TODO(rmaerker): Smooth the results in case we found a hit that was deleted through a deletion of a previous delta.
-        if (length(traverser._mergePointStack._mergePoints) > 1u)
-            mergePointOverlaps[jobId] = traverser._mergePointStack._mergePoints;
-    }
-
-    // We might need to update some hits here.
-    // How can we return this?
-}
+//template <typename TContainer, typename TPattern, typename TSpec, typename TDelegate, typename TParallelTag>
+//inline void
+//find(Finder2<TContainer, TPattern, DataParallel<TSpec> > & finder,
+//     TPattern & pattern,
+//     TDelegate & delegate,
+//     int scoreLimit = 0,
+//     Tag<TParallelTag> tag = Serial())
+//{
+//
+//    typedef Finder2<TContainer, TPattern, DataParallel<TSpec> > TFinder;
+//    typedef typename FinderExtension<TFinder>::Type TFinderFunctor;
+//    typedef typename GetJstTraverserForFinder_<TFinder>::Type TTraverser;
+//    typedef typename VariantData<TContainer>::Type TDeltaMap;
+//    typedef typename Iterator<TDeltaMap, Rooted>::Type TDeltaIter;
+//    typedef typename Position<TContainer>::Type TPosition;
+//
+//
+//    if (finder._needReinit)
+//    {
+//        // finder._finderFunctor(pattern, initState);
+//        init(finder._finderFunctor, pattern, scoreLimit);
+//        finder._needReinit = false;
+//    }
+//
+//    requireJournal(container(finder), tag);  // Build the journal set on demand - works in parallel too.
+//
+//
+//    // Initialize the traverser.
+//    TTraverser traverser(container(finder), length(needle(pattern)) - scoreLimit);
+//    // Parallelize over set of branch nodes. -> Maybe not most efficient.
+//    Splitter<TDeltaIter> nodeSplitter(begin(variantData(container(finder)), Rooted()), end(variantData(container(finder)), Rooted()), Parallel());
+//
+//    StringSet<String<TPosition> > mergePointOverlaps;
+//    resize(mergePointOverlaps, length(nodeSplitter));
+//
+//    SEQAN_OMP_PRAGMA(parallel for firstprivate(traverser))
+//    for (unsigned jobId = 0; jobId < length(nodeSplitter); ++jobId)
+//    {
+//        TFinder threadFinder = finder;  // Copy basic initialized finder.  // NOTE(rmaerker): Copying the states is probably much faster than do a initialization for each finder per thread.
+//
+////        printf("In thread: %i of %i\n", omp_get_thread_num(), omp_get_num_threads());
+//        TPosition hostBeginPos = 0;
+//        if (jobId != 0u)
+//            hostBeginPos = *nodeSplitter[jobId] - (windowSize(traverser) - 1);
+//        TPosition hostEndPos = *nodeSplitter[jobId + 1];
+//        if (jobId == static_cast<unsigned>(omp_get_num_threads() - 1))
+//            hostEndPos = length(host(container(finder)));
+//
+//        _initSegment(traverser, nodeSplitter[jobId], nodeSplitter[jobId + 1], hostBeginPos, hostEndPos);
+//        traverse(traverser, threadFinder, delegate);
+//
+//        // TODO(rmaerker): Smooth the results in case we found a hit that was deleted through a deletion of a previous delta.
+//        if (length(traverser._mergePointStack._mergePoints) > 1u)
+//            mergePointOverlaps[jobId] = traverser._mergePointStack._mergePoints;
+//    }
+//
+//    // We might need to update some hits here.
+//    // How can we return this?
+//}
 
 // ----------------------------------------------------------------------------
-// Function find()                                                [Serial case]
+// Function find()                                                     [Serial]
 // ----------------------------------------------------------------------------
 
 template <typename TContainer, typename TPattern, typename TSpec, typename TDelegate>
@@ -326,24 +376,23 @@ inline void
 find(Finder2<TContainer, TPattern, DataParallel<TSpec> > & finder,
      TPattern & pattern,
      TDelegate & delegate,
-     int scoreLimit = 0)                // Use default all threads available.
+     int scoreLimit = 0)
 {
     typedef Finder2<TContainer, TPattern, DataParallel<TSpec> > TFinder;
-    typedef typename FinderFunctor<TFinder>::Type TFinderFunctor;
-    typedef typename GetTraverserForFinder_<TFinder>::Type TTraverser;
+    typedef typename GetJstTraverserForFinder_<TFinder>::Type TTraverser;
 
-    if (finder._needReinit)
-    {
-        // finder._finderFunctor(pattern, initState);
-        _init(finder, pattern, scoreLimit, typename ErrorsSupported<TFinderFunctor>::Type());
-        finder._needReinit = false;
-    }
-
-    requireJournal(container(finder), Serial());
-
-    // Set up the string tree traversal.
+    // Set up the journaled string tree traversal.
     TTraverser traverser(container(finder), length(needle(pattern)) - scoreLimit);
-    traverse(traverser, finder, delegate);
+
+    while (journalNextBlock(container(finder), windowSize(traverser)))  // Generating the journal index for the next block.
+    {
+        if (finder._needReinit)
+        {
+            init(finder._finderFunctor, pattern, scoreLimit);
+            finder._needReinit = false;
+        }
+        traverse(traverser, finder, delegate);
+    }
 }
 
 }

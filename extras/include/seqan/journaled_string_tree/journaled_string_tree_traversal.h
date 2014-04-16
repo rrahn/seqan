@@ -47,11 +47,11 @@ namespace seqan {
 // Tags, Classes, Enums
 // ============================================================================
 
-enum TraversalState
+enum JstTraversalState
 {
-    TRAVERSAL_STATE_NULL,
-    TRAVERSAL_STATE_MASTER,
-    TRAVERSAL_STATE_BRANCH
+    JST_TRAVERSAL_STATE_NULL,
+    JST_TRAVERSAL_STATE_MASTER,
+    JST_TRAVERSAL_STATE_BRANCH
 };
 
 // TODO(rmaerker): Check if we can reduce this!
@@ -69,21 +69,16 @@ struct BranchStackNode
     int             _varSize;
     int             _insSize;
 
-    // TODO(rmaerker): Only necessary in the context of sparse virtual string tree.
-    unsigned _steps;
-    unsigned _currentMasterPos;
-
     // Properties of the current branch window.
     unsigned        _windowEndPosition;
     int             _beginOffset;
     TProxyIterator_ _windowDeltaBeginIt;
     TCoverage_      _branchCoverage;
-//    TCoverage_      _delBranchCoverage;
 
     TBranchNodeIterator _contextBranchNode;
     TCallerState _callerState;
 
-    BranchStackNode() : _mappedHostPos(0), _proxyId(0), _varSize(0), _insSize(0), _steps(0), _currentMasterPos(0), _windowEndPosition(0), _beginOffset(0), _callerState()
+    BranchStackNode() : _mappedHostPos(0), _proxyId(0), _varSize(0), _insSize(0), _windowEndPosition(0), _beginOffset(0), _callerState()
     {}
 
     template <typename TProxyId, typename TPos, typename TVarSize, typename TInsSize, typename TOffset, typename TWindowSize>
@@ -99,11 +94,8 @@ struct BranchStackNode
         _proxyId(proxyId),
         _varSize(varSize),
         _insSize(insSize),
-        _steps(0),
-        _currentMasterPos(0),
         _windowEndPosition(0),
         _branchCoverage(branchCoverage),
-//        _delBranchCoverage(),
         _callerState()
 
     {
@@ -146,9 +138,8 @@ public:
     typedef typename Size<TJournalSet>::Type TSize;
 
     typedef typename Position<TContainer>::Type TPosition;
-//    typedef VirtualPositionManager<TPosition, TTreeSpec> TVPManager;
 
-    TraversalState _traversalState;
+    JstTraversalState _traversalState;
     TContainer * _haystackPtr;  // Pointer to the underlying data parallel facade.
 
     // Iterator over the master sequence.
@@ -162,7 +153,7 @@ public:
     TBitVector _delCoverage;  // Coverage of the recorded deletion.
 
     TBitVector _activeBranchCoverage;  // Active coverage of the branch.
-    TBitVector _delBranchCoverage;  // Probably don't need this.
+//    TBitVector _delBranchCoverage;  // Probably don't need this.
 
     // Iterator over the branch nodes.
     TBranchNodeIterator _branchNodeIt;
@@ -179,17 +170,14 @@ public:
     TSize _windowSize;
     bool _needInit;
 
-    // Managing virtual positions - This is necessary for the sparse string tree.
-//    TVPManager _vpManager;
-
-    JstTraverser() : _traversalState(TRAVERSAL_STATE_NULL),
+    JstTraverser() : _traversalState(JST_TRAVERSAL_STATE_NULL),
                   _haystackPtr((TContainer*) 0),
                   _windowSize(1),
                   _needInit(true)
     {}
 
     JstTraverser(TContainer & haystack, TSize windowSize) :
-        _traversalState(TRAVERSAL_STATE_NULL),
+        _traversalState(JST_TRAVERSAL_STATE_NULL),
         _windowSize(windowSize),
         _needInit(false)
     {
@@ -525,23 +513,24 @@ refresh(JstTraverser<TContainer, TSpec> & traverser,
         TDelegate & delegate,
         StateTraverseMaster const & /*tag*/)
 {
-    typedef JstTraverser<TContainer, TSpec> TJstTraverser;
-    typedef typename ComputeState<TJstTraverser>::Type TComputeState;
+//    typedef JstTraverser<TContainer, TSpec> TJstTraverser;
+//    typedef typename ComputeState<TJstTraverser>::Type TComputeState;
 
-    TComputeState res = compute(traversalCaller, traverser._masterIt);
-    if (res.i1)
-    {
-        // Check if we passed some merge points until here.
-        _syncAndUpdateCoverage(traverser, StateTraverseMaster());
-//        _syncToMergePoint(traverser._activeMasterCoverage, traverser._mergePointStack,
-//                          position(windowBegin(traverser, StateTraverseMaster())),
-//                          MergePointSyncResize());
-        delegate(traverser);  // Calls the option that should be executed if the response evaluates to true.
-    }
-    traverser._masterIt += res.i2;  // Move iterator to the right.
+//    TComputeState res = compute(traversalCaller, traverser._masterIt);
+//    if (res.i1)
+//    {
+//        // Check if we passed some merge points until here.
+//        _syncAndUpdateCoverage(traverser, StateTraverseMaster());
+////        _syncToMergePoint(traverser._activeMasterCoverage, traverser._mergePointStack,
+////                          position(windowBegin(traverser, StateTraverseMaster())),
+////                          MergePointSyncResize());
+//        delegate(traverser);  // Calls the option that should be executed if the response evaluates to true.
+//    }
+    traverser._masterIt += deliverContext(traversalCaller, delegate, traverser);
 }
 
 
+// TODO(rmaerker): Deprecated!
 template <typename TContainer, typename TSpec, typename TOperator, typename TDelegate, typename TBranchStackNode>
 inline typename Size<JstTraverser<TContainer, TSpec> >::Type
 refresh(JstTraverser<TContainer, TSpec> & traverser,
@@ -551,17 +540,17 @@ refresh(JstTraverser<TContainer, TSpec> & traverser,
         StateTraverseBranch const & /*tag*/)
 {
     typedef JstTraverser<TContainer, TSpec> TJstTraverser;
-    typedef typename ComputeState<TJstTraverser>::Type TComputeState;
+    typedef typename Size<TContainer>::Type TSize;
 
-    TComputeState res = compute(traversalCaller, traverser._branchIt);
-    if (res.i1)
-    {
-        traverser._activeBranchCoverage = branchStackNode._branchCoverage;
-        _syncAndUpdateCoverage(traverser, branchStackNode, StateTraverseBranch());
-        delegate(traverser);  // Calls the option that should be executed if the response evaluates to true.
-    }
-    traverser._branchIt += res.i2;
-    return res.i2;
+    TSize shiftLength = deliverContext(traversalCaller, delegate, traverser);
+//    if (res.i1)
+//    {
+//        traverser._activeBranchCoverage = branchStackNode._branchCoverage;
+//        _syncAndUpdateCoverage(traverser, branchStackNode, StateTraverseBranch());
+//        delegate(traverser);  // Calls the option that should be executed if the response evaluates to true.
+//    }
+    traverser._branchIt += shiftLength;
+    return shiftLength;
 }
 
 // ----------------------------------------------------------------------------
@@ -580,7 +569,7 @@ _globalInit(JstTraverser<TContainer, TSpec> & traverser)
 
     resize(traverser._activeMasterCoverage, journalSize(container(traverser)), true, Exact());  // Set all seq active.
     traverser._delCoverage = traverser._activeMasterCoverage;  // Set the current master coverage.
-    traverser._delBranchCoverage = traverser._delCoverage;  // Set the current master coverage.
+//    traverser._delBranchCoverage = traverser._delCoverage;  // Set the current master coverage.
 
 //    init(traverser._vpManager, journalSize(container(traverser)));
     // NOTE(rmaerker): We add a dummy value to the stack, such that it is never empty.
@@ -589,7 +578,7 @@ _globalInit(JstTraverser<TContainer, TSpec> & traverser)
     // TODO(rmaerker): We probably don't need this for initialization.
     if (windowEndPosition(traverser, StateTraverseMaster()) < *traverser._branchNodeIt)
     {
-        traverser._traversalState = TRAVERSAL_STATE_MASTER;
+        traverser._traversalState = JST_TRAVERSAL_STATE_MASTER;
     }
     else
     {  // We set the active branch state to the delta branch.
@@ -601,7 +590,7 @@ _globalInit(JstTraverser<TContainer, TSpec> & traverser)
             if (deltaType(res) != DeltaType::DELTA_TYPE_DEL)
             {
                 ++tmpIt;
-                traverser._traversalState = TRAVERSAL_STATE_BRANCH;
+                traverser._traversalState = JST_TRAVERSAL_STATE_BRANCH;
                 continue;
             }
 
@@ -620,44 +609,44 @@ _globalInit(JstTraverser<TContainer, TSpec> & traverser)
 // Function position()
 // ----------------------------------------------------------------------------
 
-template <typename TContainer, typename TSpec>
-inline typename Position<JstTraverser<JournaledStringTree<TContainer, StringTreeSparse>, TSpec> const >::Type
-_position(JstTraverser<JournaledStringTree<TContainer, StringTreeSparse>, TSpec> const & traverser)
-{
-    typedef JournaledStringTree<TContainer, StringTreeDefault> TStringTree;
-    typedef JstTraverser<TStringTree, TSpec> const TJstTraverser;
-    typedef typename Position<TJstTraverser>::Type TPosition;
-    typedef typename Value<TPosition>::Type TPositionValue;
-
-    typedef typename VariantData<TStringTree>::Type TDeltaMap;
-    typedef typename MappedCoverage<TDeltaMap>::Type TCoverage;
-    typedef typename Iterator<TCoverage const, Standard>::Type TIterator;
-
-    TPosition posVec;
-    TIterator itBegin;
-    TIterator itEnd;
-    if (traverser._traversalState == TRAVERSAL_STATE_MASTER)
-    {
-        itBegin = begin(traverser._activeMasterCoverage, Standard());
-        itEnd = end(traverser._activeMasterCoverage, Standard());
-    }
-    else
-    {
-        SEQAN_ASSERT_EQ(traverser._traversalState, TRAVERSAL_STATE_BRANCH);
-        itBegin = begin(traverser._activeBranchCoverage, Standard());
-        itEnd = end(traverser._activeBranchCoverage, Standard());
-    }
-    // Return the virtual position of all selected sequences.
-    for (TIterator it = itBegin; it != itEnd; ++it)
-    {
-        if (*it)
-        {
-            unsigned seqId = it - itBegin;
-            appendValue(posVec, TPositionValue(seqId, value(traverser._vpManager, seqId)));
-        }
-    }
-    return posVec;
-}
+//template <typename TContainer, typename TSpec>
+//inline typename Position<JstTraverser<JournaledStringTree<TContainer, StringTreeSparse>, TSpec> const >::Type
+//_position(JstTraverser<JournaledStringTree<TContainer, StringTreeSparse>, TSpec> const & traverser)
+//{
+//    typedef JournaledStringTree<TContainer, StringTreeDefault> TStringTree;
+//    typedef JstTraverser<TStringTree, TSpec> const TJstTraverser;
+//    typedef typename Position<TJstTraverser>::Type TPosition;
+//    typedef typename Value<TPosition>::Type TPositionValue;
+//
+//    typedef typename VariantData<TStringTree>::Type TDeltaMap;
+//    typedef typename MappedCoverage<TDeltaMap>::Type TCoverage;
+//    typedef typename Iterator<TCoverage const, Standard>::Type TIterator;
+//
+//    TPosition posVec;
+//    TIterator itBegin;
+//    TIterator itEnd;
+//    if (traverser._traversalState == JST_TRAVERSAL_STATE_MASTER)
+//    {
+//        itBegin = begin(traverser._activeMasterCoverage, Standard());
+//        itEnd = end(traverser._activeMasterCoverage, Standard());
+//    }
+//    else
+//    {
+//        SEQAN_ASSERT_EQ(traverser._traversalState, JST_TRAVERSAL_STATE_BRANCH);
+//        itBegin = begin(traverser._activeBranchCoverage, Standard());
+//        itEnd = end(traverser._activeBranchCoverage, Standard());
+//    }
+//    // Return the virtual position of all selected sequences.
+//    for (TIterator it = itBegin; it != itEnd; ++it)
+//    {
+//        if (*it)
+//        {
+//            unsigned seqId = it - itBegin;
+//            appendValue(posVec, TPositionValue(seqId, value(traverser._vpManager, seqId)));
+//        }
+//    }
+//    return posVec;
+//}
 
 // ----------------------------------------------------------------------------
 // Function position()
@@ -681,7 +670,8 @@ _position(JstTraverser<JournaledStringTree<TContainer, StringTreeDefault>, JstTr
 
     TPosition posVec;
 
-    if (traverser._traversalState == TRAVERSAL_STATE_MASTER)
+    // TODO(rmaerker): synchronize before.
+    if (traverser._traversalState == JST_TRAVERSAL_STATE_MASTER)
     {  // Easy case, since all sequences must be in a original node.
         unsigned hostPos = position(traverser._masterIt); //position(windowBegin(traverser, StateTraverseMaster()));  // Current position within the host.
         TIterator itBegin = begin(traverser._activeMasterCoverage, Standard());
@@ -699,7 +689,7 @@ _position(JstTraverser<JournaledStringTree<TContainer, StringTreeDefault>, JstTr
     }
     else
     {  // Harder case, the virtual positions cannot easily be rebased to a common host pos.
-        SEQAN_ASSERT_EQ(traverser._traversalState, TRAVERSAL_STATE_BRANCH);
+        SEQAN_ASSERT_EQ(traverser._traversalState, JST_TRAVERSAL_STATE_BRANCH);
         TIterator itBegin = begin(traverser._activeBranchCoverage, Standard());
         TIterator itEnd = end(traverser._activeBranchCoverage, Standard());
         if (IsSameType<TContextPos, ContextPositionRight>::VALUE)
@@ -746,7 +736,7 @@ _position(JstTraverser<JournaledStringTree<TContainer, StringTreeDefault>, JstTr
 // ----------------------------------------------------------------------------
 
 template <typename TContainer, typename TSpec>
-inline TraversalState
+inline JstTraversalState
 state(JstTraverser<TContainer, TSpec> const & traverser)
 {
     return traverser._traversalState;
@@ -760,7 +750,7 @@ template <typename TContainer, typename TSpec>
 inline bool
 isMaster(JstTraverser<TContainer, TSpec> const & traverser)
 {
-    return state(traverser) == TRAVERSAL_STATE_MASTER;
+    return state(traverser) == JST_TRAVERSAL_STATE_MASTER;
 }
 
 // ----------------------------------------------------------------------------
@@ -771,7 +761,7 @@ template <typename TContainer, typename TSpec>
 inline bool
 isBranch(JstTraverser<TContainer, TSpec> const & traverser)
 {
-    return state(traverser) == TRAVERSAL_STATE_BRANCH;
+    return state(traverser) == JST_TRAVERSAL_STATE_BRANCH;
 }
 
 
@@ -847,89 +837,6 @@ _selectNextSplitPoint(TBranchStackNode const & proxyWindow,
 }
 
 // ----------------------------------------------------------------------------
-// Function _selectProxy()
-// ----------------------------------------------------------------------------
-
-// TODO(rmaerker): Not needed anymore!
-template <typename TProxyId, typename TOffset, typename TJstTraverser, typename TPosition, typename TCoverage>
-void _selectProxy(TProxyId & proxyId,
-                  TOffset & offset,
-                  TJstTraverser & traverser,
-                  TPosition const & currentMasterPos,
-                  TCoverage const & proxyCoverage)
-{
-    typedef typename TJstTraverser::TMergePointStore TMergePointStack;
-    typedef typename TMergePointStack::TMergePoints TMergePointString;
-    typedef typename Iterator<TMergePointString, Rooted>::Type TMPIterator;
-
-    SEQAN_ASSERT_NOT(testAllZeros(proxyCoverage));
-
-    // Current Iterator is in the patch node -> hence there can't be a deleted area.
-    if (windowBegin(traverser, StateTraverseBranch())._journalEntriesIterator->segmentSource == SOURCE_PATCH ||
-        empty(traverser._mergePointStack._mergePoints))
-    {
-        proxyId = bitScanForward(proxyCoverage);
-        offset = 0;
-        return;
-    }
-
-    TMPIterator it = end(traverser._mergePointStack._mergePoints, Rooted());
-
-    TCoverage tmpCov = proxyCoverage;
-    while(!atBegin(it))///*traverser.*traverser._branchNodeIt*/)
-    {
-        if (*(--it) > currentMasterPos && *it <= *traverser._branchNodeIt)  // Check if the current merge point lies behind the current master position.
-        {
-            // Remove all deleted sequences from coverage.
-            bitwiseAndNot(tmpCov, tmpCov, traverser._mergePointStack._mergePointCoverge[position(it)]);
-            if (testAllZeros(tmpCov))  // We need to move the window to the next merge point.
-            {
-                it = end(traverser._mergePointStack._mergePoints, Rooted());
-                while (!atBegin(it))
-                {
-                    if (*(--it) > currentMasterPos)  // Found first deleted sequence.
-                    {
-                        bitwiseAnd(tmpCov, proxyCoverage, traverser._mergePointStack._mergePointCoverge[position(it)]);
-                        if (!testAllZeros(tmpCov))  // Determine the first merge point that affects the branch.
-                        {
-                            proxyId = bitScanForward(tmpCov);
-                            offset = *it - currentMasterPos;
-                            return;
-                        }
-                    }
-                }
-                SEQAN_ASSERT_FAIL("Should never reach this.");
-            }
-        }
-    }
-
-    offset = 0; //*finder._branchNodeIt - physicalOriginPosition(finder._branchIt);
-    proxyId = bitScanForward(tmpCov);
-}
-
-// ----------------------------------------------------------------------------
-// Function _refreshSegmentBorders()
-// ----------------------------------------------------------------------------
-
-template <typename TIterator, typename TPosition>
-inline void
-_refreshSegmentBorders(TIterator const & /*iter*/,
-                       TPosition const & /*vp*/,
-                       StringTreeDefault const & /*tag*/)
-{
-    // Nothing to do.
-}
-
-template <typename TJournalString, typename TPosition, typename TSpec>
-inline void
-_refreshSegmentBorders(Iter<TJournalString, JournaledStringIterSpec<TSpec> > & iterator,
-                       TPosition const & vp,
-                       StringTreeSparse const & /*tag*/)
-{
-    setPosition(iterator, vp);
-}
-
-// ----------------------------------------------------------------------------
 // Function _traverseBranch()
 // ----------------------------------------------------------------------------
 
@@ -962,7 +869,7 @@ _traverseBranch(JstTraverser<TContainer, JstTraverserSpec<TContextPosition, TCon
         std::cerr << "Coverage: " << traverser._activeBranchCoverage << std::endl;
 #endif
 
-    setCallerState(traversalCaller, deltaWindow._callerState);  // Set the last active state before the branch.
+    setState(traversalCaller, deltaWindow._callerState);  // Set the last active state before the branch.
 
     // Select the next node.
     traverser._proxyBranchNodeIt = traverser._branchNodeIt;
@@ -1030,7 +937,7 @@ _traverseBranch(JstTraverser<TContainer, JstTraverserSpec<TContextPosition, TCon
                 splitProxyWindow._mappedHostPos = *traverser._proxyBranchNodeIt;  // The host position of the split point, where we spawn the search tree.
                 splitProxyWindow._varSize = deltaWindow._varSize;
                 splitProxyWindow._insSize = deltaWindow._insSize;
-                splitProxyWindow._callerState = getCallerState(traversalCaller); // Current state before the split.
+                splitProxyWindow._callerState = getState(traversalCaller); // Current state before the split.
                 splitProxyWindow._contextBranchNode = deltaWindow._contextBranchNode;  // TODO(rmaerker): Do we need this?
 
                 splitProxyWindow._beginOffset = static_cast<int>(position(deltaWindow._windowDeltaBeginIt)) -
@@ -1725,7 +1632,7 @@ _execTraversal(JstTraverser<TContainer, JstTraverserSpec<TContextPosition, TCont
     typedef typename VariantData<TContainer>::Type TDeltaMap;
     typedef typename MappedCoverage<TDeltaMap>::Type TBitVector;
 
-    typedef typename CallerState<TOperator>::Type TCallerState;
+    typedef typename GetState<TOperator>::Type TExtensionState;
 
 #ifdef PROFILE_DATA_PARALLEL_INTERN
     String<double> timeTable;
@@ -1742,7 +1649,7 @@ _execTraversal(JstTraverser<TContainer, JstTraverserSpec<TContextPosition, TCont
     std::cerr << currentPercentage << "% " << std::flush;
 #endif //PROFILE_DATA_PARALLEL
 
-    TCallerState lastActiveState = getCallerState(traversalCaller);
+    TExtensionState lastActiveState = getState(traversalCaller);
 
         // Loop over the branch nodes.
     while (traverser._branchNodeIt != traverser._branchNodeItEnd)
@@ -1759,7 +1666,7 @@ _execTraversal(JstTraverser<TContainer, JstTraverserSpec<TContextPosition, TCont
 #endif
         if (isMaster(traverser))
         {
-            setCallerState(traversalCaller, lastActiveState);  // Reactivate the last state.
+            setState(traversalCaller, lastActiveState);  // Reactivate the last state.
             // Search along the master strand.
             while (windowEndPosition(traverser, StateTraverseMaster()) < *traverser._branchNodeIt)
             {
@@ -1774,7 +1681,7 @@ _execTraversal(JstTraverser<TContainer, JstTraverserSpec<TContextPosition, TCont
         timeTable[0] += sysTime() - timeMaster;
 #endif
 
-        traverser._traversalState = TRAVERSAL_STATE_BRANCH;
+        traverser._traversalState = JST_TRAVERSAL_STATE_BRANCH;
 
         // Processing the current node.
         unsigned branchPosition = *traverser._branchNodeIt;
@@ -1789,7 +1696,7 @@ _execTraversal(JstTraverser<TContainer, JstTraverserSpec<TContextPosition, TCont
         double timeBranchAll = sysTime();
 #endif
         _syncAndUpdateCoverage(traverser, StateTraverseMaster());
-        lastActiveState = getCallerState(traversalCaller);  // Keep the last active caller state.
+        lastActiveState = getState(traversalCaller);  // Keep the last active caller state.
 
         // Search all haplotypes with the alternative allel at this position.
         while(traverser._branchNodeIt != traverser._branchNodeItEnd && *traverser._branchNodeIt == branchPosition)
@@ -1825,7 +1732,7 @@ _execTraversal(JstTraverser<TContainer, JstTraverserSpec<TContextPosition, TCont
             }
 #endif //PROFILE_DATA_PARALLEL
         }
-        traverser._traversalState = TRAVERSAL_STATE_MASTER;
+        traverser._traversalState = JST_TRAVERSAL_STATE_MASTER;
 #ifdef PROFILE_DATA_PARALLEL_INTERN
         timeTable[2] += sysTime() - timeBranchAll;
 #endif
@@ -1833,8 +1740,8 @@ _execTraversal(JstTraverser<TContainer, JstTraverserSpec<TContextPosition, TCont
 #ifdef PROFILE_DATA_PARALLEL_INTERN
     double timeMaster = sysTime();
 #endif
-    traverser._traversalState = TRAVERSAL_STATE_MASTER;
-    setCallerState(traversalCaller, lastActiveState);  // Reactivate the last state.
+    traverser._traversalState = JST_TRAVERSAL_STATE_MASTER;
+    setState(traversalCaller, lastActiveState);  // Reactivate the last state.
 
     // Set end of segment to next breakpoint.
 #ifdef DEBUG_DATA_PARALLEL

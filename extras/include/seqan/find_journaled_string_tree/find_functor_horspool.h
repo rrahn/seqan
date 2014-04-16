@@ -49,24 +49,22 @@ namespace seqan
 // ============================================================================
 
 template <typename TFinder>
-struct HorspoolFunctor_;
-
-template <typename TContainer, typename TNeedle, typename TSpec>
-struct HorspoolFunctor_<Finder2<TContainer, Pattern<TNeedle, Horspool>, TSpec> >
+struct ExtensionFunctor<TFinder,  Horspool>
 {
-
+    typedef typename GetPattern<TFinder>::Type TPattern;
+    typedef typename Needle<TPattern>::Type TNeedle;
     typedef typename Iterator<TNeedle, Rooted>::Type TNeedleIt;
 
     Pattern<TNeedle, Horspool>* _pattern;  // We keep a pointer to the pattern to access its data map.
     TNeedleIt _itBegin;
     TNeedleIt _itEnd;
 
-    HorspoolFunctor_() : _pattern(NULL), _itBegin(), _itEnd()
+    ExtensionFunctor() : _pattern(NULL), _itBegin(), _itEnd()
     {}
 
-    HorspoolFunctor_(Pattern<TNeedle, Horspool> & pattern)
+    ExtensionFunctor(TPattern & pattern)
     {
-        _init(*this, pattern);
+        init(*this, pattern);
     }
 
     template <typename TResult, typename THystkIt>
@@ -94,21 +92,21 @@ struct HorspoolFunctor_<Finder2<TContainer, Pattern<TNeedle, Horspool>, TSpec> >
 // Metafunction PatternSpecificTraversalSpec                         [Horspool]
 // ----------------------------------------------------------------------------
 
-template <typename TNeedle>
-struct PatternSpecificTraversalSpec<Pattern<TNeedle, Horspool> >
+template <typename TFinder>
+struct ContextIteratorPosition<ExtensionFunctor<TFinder, Horspool> >
 {
-    typedef TraverserSpec<ContextPositionRight, ContextBeginRight> Type;
+    typedef ContextPositionRight Type;
 };
 
 // ----------------------------------------------------------------------------
 // Metafunction FinderFunctor                                        [Horspool]
 // ----------------------------------------------------------------------------
 
-template <typename THaystack, typename TNeedle, typename TSpec>
-struct FinderFunctor<Finder2<THaystack, Pattern<TNeedle, Horspool>, TSpec> >
+template <typename TContainer, typename TNeedle, typename TSpec>
+struct FinderExtension<Finder2<TContainer, Pattern<TNeedle, Horspool>, DataParallel<TSpec> > >
 {
-    typedef Finder2<THaystack, Pattern<TNeedle, Horspool>, TSpec> TFinder;
-    typedef HorspoolFunctor_<TFinder> Type;
+    typedef Finder2<TContainer, Pattern<TNeedle, Horspool>, DataParallel<TSpec> > TFinder_;
+    typedef ExtensionFunctor<TFinder_, Horspool> Type;
 };
 
 // ============================================================================
@@ -116,13 +114,13 @@ struct FinderFunctor<Finder2<THaystack, Pattern<TNeedle, Horspool>, TSpec> >
 // ============================================================================
 
 // ----------------------------------------------------------------------------
-// Function _init()
+// Function init()
 // ----------------------------------------------------------------------------
 
-template <typename TFinder, typename TNeedle>
+template <typename TFinder>
 inline void
-_init(HorspoolFunctor_<TFinder> & horspoolFunctor,
-      Pattern<TNeedle, Horspool> & pattern)
+init(ExtensionFunctor<TFinder, Horspool> & horspoolFunctor,
+     typename GetPattern<TFinder>::Type & pattern)
 {
     _patternInit(pattern);  // Initialize the pattern.
     horspoolFunctor._pattern = &pattern;

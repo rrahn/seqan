@@ -47,23 +47,24 @@ namespace seqan {
 // Tags, Classes, Enums
 // ============================================================================
 
-template <typename TFinder>
-struct SimpleFinderFunctor_;
+// ----------------------------------------------------------------------------
+// Class FinderExtensionFunctor
+// ----------------------------------------------------------------------------
 
 template <typename TContainer, typename TNeedle, typename TSpec>
-struct SimpleFinderFunctor_<Finder2<TContainer, Pattern<TNeedle, Simple>, TSpec> >
+class ExtensionFunctor<Finder2<TContainer, Pattern<TNeedle, Simple>, TSpec>, Simple>
 {
     typedef typename Iterator<TNeedle, Standard>::Type TNeedleIt;
 
     TNeedleIt _itBegin;
     TNeedleIt _itEnd;
 
-    SimpleFinderFunctor_()
+    ExtensionFunctor()
     {}
 
-    SimpleFinderFunctor_(Pattern<TNeedle, Simple> & pattern)
+    ExtensionFunctor(Pattern<TNeedle, Simple> & pattern)
     {
-        _init(*this, pattern);
+        init(*this, pattern);
     }
 
     template <typename TResult, typename THystkIt>
@@ -86,11 +87,11 @@ struct SimpleFinderFunctor_<Finder2<TContainer, Pattern<TNeedle, Simple>, TSpec>
 // Metafunction FinderFunctor                                          [Simple]
 // ----------------------------------------------------------------------------
 
-template <typename THaystack, typename TNeedle, typename TSpec>
-struct FinderFunctor<Finder2<THaystack, Pattern<TNeedle, Simple>, TSpec> >
+template <typename TContainer, typename TNeedle, typename TSpec>
+struct FinderExtension<Finder2<TContainer, Pattern<TNeedle, Simple>, DataParallel<TSpec> > >
 {
-    typedef Finder2<THaystack, Pattern<TNeedle, Simple>, TSpec> TFinder;
-    typedef SimpleFinderFunctor_<TFinder> Type;
+    typedef Finder2<TContainer, Pattern<TNeedle, Simple>, DataParallel<TSpec> > TFinder_;
+    typedef ExtensionFunctor<TFinder_, Simple> Type;
 };
 
 // ============================================================================
@@ -98,13 +99,13 @@ struct FinderFunctor<Finder2<THaystack, Pattern<TNeedle, Simple>, TSpec> >
 // ============================================================================
 
 // ----------------------------------------------------------------------------
-// Function _init()
+// Function init()
 // ----------------------------------------------------------------------------
 
-template <typename TFinder, typename TNeedle>
+template <typename TFinder>
 inline void
-_init(SimpleFinderFunctor_<TFinder> & simpleFunctor,
-      Pattern<TNeedle, Simple> & pattern)
+init(ExtensionFunctor<TFinder, Simple> & simpleFunctor,
+     typename GetPattern<TFinder>::Type & pattern)
 {
     simpleFunctor._itBegin = begin(needle(pattern), Standard());
     simpleFunctor._itEnd = end(needle(pattern), Standard());

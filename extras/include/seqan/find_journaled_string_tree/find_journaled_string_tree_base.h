@@ -69,49 +69,58 @@ template <typename TSpec = void>
 struct DataParallel;
 
 // ----------------------------------------------------------------------------
-// Struct FinderFunctor
+// Class ExtensionFunctor
 // ----------------------------------------------------------------------------
 
-template <typename TFinder>
-struct FinderFunctor{};
+template <typename TFinder, typename TSpec>
+struct ExtensionFunctor;
 
 // ============================================================================
 // Metafunctions
 // ============================================================================
 
 // ----------------------------------------------------------------------------
-// Metafunction ContextIteratorPosition
+// Metafunction GetPattern
 // ----------------------------------------------------------------------------
 
+// TODO(rmaerker): Can probably go to finder2_base.h in find module.
 template <typename T>
-struct ContextIteratorPosition
+struct GetPattern;
+
+template <typename TContainer, typename TPattern, typename TSpec>
+struct GetPattern<Finder2<TContainer, TPattern, TSpec> >
 {
-    typedef ContextPositionLeft Type;
+    typedef TPattern Type;
 };
 
 // ----------------------------------------------------------------------------
-// Metafunction RequireFullContext
+// Metafunction GetFinderExtensionFunctor
+// ----------------------------------------------------------------------------
+
+template <typename TFinder>
+struct FinderExtension{};
+
+template <typename TContainer, typename TPattern, typename TSpec>
+struct FinderExtension<Finder2<TContainer, TPattern, TSpec> const > :
+    FinderExtension<Finder2<TContainer, TPattern, TSpec> >{};
+
+// ----------------------------------------------------------------------------
+// Metafunction ExtenstionState
 // ----------------------------------------------------------------------------
 
 template <typename T>
-struct RequireFullContext : True{};
-
-// ----------------------------------------------------------------------------
-// Metafunction TraversalSpec
-// ----------------------------------------------------------------------------
-
-template <typename T>
-struct GetTraverserForFinder
+struct ExtensionState
 {
-    typedef TraverserSpec<> Type;
+    typedef Nothing Type;
 };
+
 
 // ----------------------------------------------------------------------------
 // Metafunction GetTraverserForFinder_
 // ----------------------------------------------------------------------------
 
 template <typename TFinder>
-struct GetTraverserForFinder_;
+struct GetJstTraverserForFinder_;
 
 // ============================================================================
 // Functions

@@ -392,8 +392,14 @@ adaptTo(StringSet<TJournalSequence, Owner<JournaledSet> > & journalSet,
 
     typedef StringSet<TJournalSequence, Owner<JournaledSet> > TJournalSet;
     typedef typename Iterator<TJournalSet, Standard>::Type TJournalSetIter;
+    typedef typename Size<TJournalSet>::Type TSize;
 
+    // Ensure the size of the journal set is sufficient.
     resize(journalSet, coverageSize(deltaCoverageStore(variantMap)), Exact());
+
+    // Temporary string keeping track of the last journaled operation.
+    String<TSize> _lastVisitedNodes;
+    resize(_lastVisitedNodes, length(journalSet), 0, Exact());
 
     Splitter<TJournalSetIter> jSetSplitter(begin(journalSet, Standard()), end(journalSet, Standard()), parallelTag);
     SEQAN_OMP_PRAGMA(parallel for)
@@ -429,6 +435,7 @@ adaptTo(StringSet<TJournalSequence, Owner<JournaledSet> > & journalSet,
                 if (!(*itVec))
                     continue;
 
+                _lastVisitedNodes[itVec - itVecBegin] = itMap - itMapBegin;
                 switch(deltaType(varKey))
                 {
                     case DeltaType::DELTA_TYPE_SNP:
@@ -446,6 +453,8 @@ adaptTo(StringSet<TJournalSequence, Owner<JournaledSet> > & journalSet,
         }
 
     }
+
+    // Now we have journaled all variants in the current block.
 
 //    {
 //        unsigned jobBegin = 0; //jSetSplitter[jobId] - begin(journalSet, Standard());
