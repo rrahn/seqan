@@ -60,8 +60,10 @@ struct Spec<Pattern<TNeedle, Myers<TSpec, THasState, TFindBeginPatternSpec> > co
 // ============================================================================
 
 template <typename TFinder>
-struct ExtensionFunctor<TFinder, MyersBitVector>
+class ExtensionFunctor<TFinder, MyersBitVector>
 {
+public:
+
     typedef typename GetPattern<TFinder>::Type TPattern;
     typedef typename PatternState<TPattern>::Type TPatternState;
     typedef typename Needle<TPattern>::Type TNeedle;
@@ -248,7 +250,7 @@ template <typename TContainer, typename TNeedle, typename TSpec, typename THasSt
           typename TFinderSpec>
 struct FinderExtension<Finder2<TContainer, Pattern<TNeedle, Myers<TSpec, THasState, TFindBeginPatternSpec> >, DataParallel<TFinderSpec> > >
 {
-    typedef Pattern<TNeedle, Myers<TSpec, THasState, TFindBeginPatternSpec> TPattern_;
+    typedef Pattern<TNeedle, Myers<TSpec, THasState, TFindBeginPatternSpec> > TPattern_;
     typedef Finder2<TContainer, TPattern_, DataParallel<TSpec> > TFinder_;
     typedef ExtensionFunctor<TFinder_, MyersBitVector> Type;
 };
@@ -285,11 +287,10 @@ execute(TResult & res,
         ExtensionFunctor<TFinder, MyersBitVector> & extensionFunctor,
         TContextIter & contextIter)
 {
-    if (extensionFunctor._isSmallNeedle)
+    if (extensionFunctor._isSmallPattern)
         extensionFunctor(res, contextIter, BitAlgorithmSmallNeedle());
     else
         extensionFunctor(res, contextIter, BitAlgorithmLongNeedle());
-    return res;
 }
 
 // ----------------------------------------------------------------------------

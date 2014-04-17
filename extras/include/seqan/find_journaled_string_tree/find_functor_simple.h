@@ -54,6 +54,8 @@ namespace seqan {
 template <typename TContainer, typename TNeedle, typename TSpec>
 class ExtensionFunctor<Finder2<TContainer, Pattern<TNeedle, Simple>, TSpec>, Simple>
 {
+public:
+
     typedef typename Iterator<TNeedle, Standard>::Type TNeedleIt;
 
     TNeedleIt _itBegin;

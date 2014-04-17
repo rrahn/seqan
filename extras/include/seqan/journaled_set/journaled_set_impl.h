@@ -205,6 +205,24 @@ erase(StringSet<TString, Owner<JournaledSet> > & journalSet, TPos pos, TPosEnd p
     return length(journalSet);
 }
 
+// ----------------------------------------------------------------------------
+// Function resize()
+// ----------------------------------------------------------------------------
+
+template <typename TString, typename TSize, typename TValue, typename TExpandTag>
+inline typename Size<StringSet<TString, Owner<JournaledSet> > >::Type
+resize(StringSet<TString, Owner<JournaledSet> > & journalSet,
+       TSize const & newSize,
+       TValue const & fillValue,
+       Tag<TExpandTag> const & expansionTag)
+{
+    resize(journalSet.strings, newSize, fillValue, expansionTag);
+    resize(journalSet.limits, newSize + 1);
+    journalSet.limitsValid = true;
+    return length(journalSet);
+}
+
+
 // --------------------------------------------------------------------------
 // Function assignValue()
 // --------------------------------------------------------------------------

@@ -119,12 +119,11 @@ struct MockGenerator_
 
 	TJournalSet _seqData;
 	TDeltaMap _varStore;
-	TStringTree _mock;
+//	TStringTree _mock;
 
-	MockGenerator_() : _seqData(), _varStore(), _mock()
+	MockGenerator_() : _seqData(), _varStore()
 	{
-		setValue(_mock._journalData,  _seqData);
-		setValue(_mock._variantData, _varStore);
+//		setValue(_mock._variantData, _varStore);
 	}
 
 	template <typename TVar, typename TCov, typename TSize2>
@@ -195,10 +194,7 @@ struct MockGenerator_
 			}
 		}
 
-		_mock._journalSize = length(_seqData);
-		setBlockBegin(_mock, 0);
-		setBlockEnd(_mock, length(varData));
-
+//		_mock._journalSize = length(_seqData);
 	}
 };
 

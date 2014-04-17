@@ -68,7 +68,7 @@ struct Finder2<TContainer, TPattern, DataParallel<TSpec> >
 
     // Copy constructor.
     Finder2(Finder2 const & other) : _containerPtr(other._containerPtr),
-                                     _extensionFunctor(other._finderFunctor),
+                                     _extensionFunctor(other._extensionFunctor),
                                      _needReinit(other._needReinit)
     {}
 
@@ -78,7 +78,7 @@ struct Finder2<TContainer, TPattern, DataParallel<TSpec> >
         if (this != &other)
         {
             _containerPtr = other._containerPtr;
-            _extensionFunctor = other._finderFunctor;
+            _extensionFunctor = other._extensionFunctor;
             _needReinit = other._needReinit;
         }
         return *this;
@@ -122,19 +122,6 @@ struct RequireFullContext<Finder2<TContainer, TPattern, TSpec> const > :
     RequireFullContext<Finder2<TContainer, TPattern, TSpec> >{};
 
 // ----------------------------------------------------------------------------
-// Metafunction GetTraverserForFinder_
-// ----------------------------------------------------------------------------
-
-template <typename TContainer, typename TPattern, typename TSpec>
-struct GetJstTraverserForFinder_<Finder2<TContainer, TPattern, TSpec> >
-{
-    typedef Finder2<TContainer, TPattern, TSpec> TFinder_;
-    typedef typename ContextIteratorPosition<TFinder_>::Type TContextPosition_;
-    typedef typename RequireFullContext<TFinder_>::Type TRequireContext_;
-    typedef JstTraverser<TContainer const, JstTraverserSpec<TContextPosition_, TRequireContext_> > Type;
-};
-
-// ----------------------------------------------------------------------------
 // Metafunction Container
 // ----------------------------------------------------------------------------
 
@@ -165,6 +152,20 @@ struct GetState<Finder2<TContainer, TPattern, DataParallel<TSpec> > >
 template <typename TContainer, typename TPattern, typename TSpec>
 struct GetState<Finder2<TContainer, TPattern, DataParallel<TSpec> > const> :
     GetState<Finder2<TContainer, TPattern, DataParallel<TSpec> > >{};
+
+// ----------------------------------------------------------------------------
+// Metafunction GetTraverserForFinder_
+// ----------------------------------------------------------------------------
+
+template <typename TContainer, typename TPattern, typename TSpec>
+struct GetJstTraverserForFinder_<Finder2<TContainer, TPattern, TSpec> >
+{
+    typedef Finder2<TContainer, TPattern, TSpec> TFinder_;
+    typedef typename ContextIteratorPosition<TFinder_>::Type TContextPosition_;
+    typedef typename RequireFullContext<TFinder_>::Type TRequireContext_;
+    typedef typename GetState<TFinder_>::Type TState;
+    typedef JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosition_, TRequireContext_> > Type;
+};
 
 // ============================================================================
 // Functions
@@ -233,23 +234,22 @@ execute(TResult & res,
 // Function deliverContext()
 // ----------------------------------------------------------------------------
 
-// TODO(rmaerker): Change methods name and body. We will pass the traverser itself and give a function to get the begin or end of the current infix.
-template <typename TContainer, typename TPattern, typename TSpec, typename TDelegate, typename TTraverser>
+template <typename TContainer, typename TPattern, typename TSpec, typename TDelegate, typename TTraverser, typename TTag>
 inline typename Size<TContainer>::Type
 deliverContext(Finder2<TContainer, TPattern, DataParallel<TSpec> > & finder,
                TDelegate & delegateFunctor,
-               TTraverser const & traverser)
+               TTraverser & traverser,
+               TTag const & /*traverserState*/)
 {
-    typedef Finder2<TContainer, TPattern, DataParallel<TSpec> > TFinder;
-    typedef typename GetJstTraverserForFinder_<TFinder>::Type TTraverser;
+//    typedef Finder2<TContainer, TPattern, DataParallel<TSpec> > TFinder;
     typedef typename Size<TContainer>::Type TSize;
 
-    register Pair<bool, TSize> res(false, 1);
-    execute(res, finder._finderFunctor, contextIterator(traverser));
+    Pair<bool, TSize> res(false, 1);
+    execute(res, finder._extensionFunctor, contextIterator(traverser, TTag()));
 
-    // Interrupt: Call the traverser.
-    if (res.i1)
+    if (res.i1)  // Interrupt: Call the DelegateFunctor.
         delegateFunctor(traverser);
+
     // Return to the traverser and continue.
     return res.i2;
 }
@@ -262,14 +262,14 @@ template <typename TContainer, typename TPattern, typename TSpec, typename TIter
 inline TPattern &
 getPattern(Finder2<TContainer, TPattern, DataParallel<TSpec> > & finder)
 {
-    return finder._finderFunctor._pattern;
+    return finder._extensionFunctor._pattern;
 }
 
 template <typename TContainer, typename TPattern, typename TSpec, typename TIterator>
 inline TPattern const &
 getPattern(Finder2<TContainer, TPattern, DataParallel<TSpec> > const & finder)
 {
-    return finder._finderFunctor._pattern;
+    return finder._extensionFunctor._pattern;
 }
 
 // ----------------------------------------------------------------------------
@@ -388,7 +388,7 @@ find(Finder2<TContainer, TPattern, DataParallel<TSpec> > & finder,
     {
         if (finder._needReinit)
         {
-            init(finder._finderFunctor, pattern, scoreLimit);
+            init(finder._extensionFunctor, pattern, scoreLimit);
             finder._needReinit = false;
         }
         traverse(traverser, finder, delegate);

@@ -73,7 +73,7 @@ struct DataParallel;
 // ----------------------------------------------------------------------------
 
 template <typename TFinder, typename TSpec>
-struct ExtensionFunctor;
+class ExtensionFunctor;
 
 // ============================================================================
 // Metafunctions

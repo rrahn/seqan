@@ -49,8 +49,10 @@ namespace seqan
 // ============================================================================
 
 template <typename TFinder>
-struct ExtensionFunctor<TFinder,  Horspool>
+class ExtensionFunctor<TFinder,  Horspool>
 {
+public:
+
     typedef typename GetPattern<TFinder>::Type TPattern;
     typedef typename Needle<TPattern>::Type TNeedle;
     typedef typename Iterator<TNeedle, Rooted>::Type TNeedleIt;

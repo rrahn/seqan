@@ -53,10 +53,12 @@ namespace seqan
 // ----------------------------------------------------------------------------
 
 template <typename TFinder>
-struct ExtensionFunctor<TFinder, ShiftAnd >
+class ExtensionFunctor<TFinder, ShiftAnd >
 {
+public:
+
     typedef typename GetPattern<TFinder>::Type TPattern;
-    typedef typename Needle<TFinder>::Type TNeedle;
+    typedef typename Needle<TPattern>::Type TNeedle;
     typedef unsigned int TWord;
 
     TPattern  _state;
@@ -207,7 +209,6 @@ execute(TResult & res,
         extensionFunctor(res, contextIter, BitAlgorithmSmallNeedle());
     else
         extensionFunctor(res, contextIter, BitAlgorithmLongNeedle());
-    return res;
 }
 
 // ----------------------------------------------------------------------------

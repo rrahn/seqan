@@ -55,8 +55,6 @@ typedef Tag<WindowTraversalForward_> WindowTraversalForward;
 struct ContextPositionLeft_;
 typedef Tag<ContextPositionLeft_> ContextPositionLeft;
 
-struct ContextBeginLeft_;
-typedef Tag<ContextBeginLeft_> ContextBeginLeft;
 
 // ----------------------------------------------------------------------------
 // Tag WindowTraversalBackward
@@ -68,14 +66,11 @@ typedef Tag<WindowTraversalBackward_> WindowTraversalBackward;
 struct ContextPositionRight_;
 typedef Tag<ContextPositionRight_> ContextPositionRight;
 
-struct ContextBeginRight_;
-typedef Tag<ContextBeginRight_> ContextBeginRight;
-
 // ----------------------------------------------------------------------------
 // Struct JstTraverserSpec
 // ----------------------------------------------------------------------------
 
-template <typename TContextPosition = ContextPositionLeft, typename TContextBegin = ContextBeginLeft>
+template <typename TContextPosition = ContextPositionLeft, typename RequireFullContext = True>
 struct JstTraverserSpec;
 
 // ----------------------------------------------------------------------------
@@ -110,16 +105,6 @@ class JournaledStringTree;
 template <typename T>
 struct GetState;
 
-// ----------------------------------------------------------------------------
-// Metafunction ComputeState
-// ----------------------------------------------------------------------------
-
-template <typename TContainer>
-struct ComputeState
-{
-    typedef typename Size<TContainer>::Type TSize_;
-    typedef Pair<bool, TSize_> Type;
-};
 
 // ----------------------------------------------------------------------------
 // Metafunction ContextIteratorPosition

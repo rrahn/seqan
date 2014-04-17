@@ -67,9 +67,9 @@ struct FindResultsTester_
     }
 
     template <typename TTraverser>
-    inline void operator()(TTraverser const & traverser)
+    inline void operator()(TTraverser & traverser)
     {
-        typedef typename seqan::Position<TTraverser const>::Type TPositionVec;
+        typedef typename seqan::Position<TTraverser>::Type TPositionVec;
 
         TPositionVec posVec = position(traverser);
         for (unsigned i = 0; i < length(posVec); ++i)
@@ -99,28 +99,36 @@ bool _runTest(TMockGenerator & mockGen,
 
     typedef typename TMockGenerator::TJournalSet TJournalSet;
     typedef typename Value<TJournalSet>::Type TJournalString;
-    typedef typename Iterator<TJournalString, Standard>::Type TJournalIter;
+//    typedef typename Iterator<TJournalString, Standard>::Type TJournalIter;
 
     typedef ContainerView<TJournalString> TJournalView;
     typedef Finder<TJournalView> TStandardFinder;
 
     TNeedle ndl;
     if (seqBase == -1)
-        ndl = infix(host(journalData(mockGen._mock)), patternPos, patternPos + patternLength);
+        ndl = infix(host(mockGen._seqData), patternPos, patternPos + patternLength);
     else
-        ndl = infix(journalData(mockGen._mock)[seqBase], patternPos, patternPos + patternLength);
+        ndl = infix(mockGen._seqData[seqBase], patternPos, patternPos + patternLength);
 
     TPattern pattern;
     setHost(pattern, ndl);
 
-    FindResultsTester_<TPosition> delegate(journalSize(mockGen._mock));
-    TFinder finder(mockGen._mock);
+    FindResultsTester_<TPosition> delegate(length(mockGen._seqData));
+    TContainer jst(host(mockGen._seqData), mockGen._varStore);
+    TFinder finder(jst);
     find(finder, pattern, delegate);
 
+//    std::cout << "Ref: " << host(mockGen._seqData) << std::endl;
+//    for (unsigned i = 0; i < length(mockGen._seqData); ++i)
+//        std::cout << "Gen: " << mockGen._seqData[i] << std::endl;
+//
+//    for (unsigned i = 0; i < length(mockGen._seqData); ++i)
+//        std::cout << "JST: " << journalData(jst)[i] << std::endl;
+
     // Search over each sequence separately and find the pattern.
-    for (unsigned i = 0; i < journalSize(mockGen._mock); ++i)
+    for (unsigned i = 0; i < length(mockGen._seqData); ++i)
     {
-        TJournalView jView(journalData(mockGen._mock)[i]);
+        TJournalView jView(mockGen._seqData[i]);
         TStandardFinder stdFinder(jView);
         String<unsigned> compareHits;
         while (find(stdFinder, pattern))
@@ -165,7 +173,7 @@ bool _runTest(TMockGenerator & mockGen,
 
     typedef typename TMockGenerator::TJournalSet TJournalSet;
     typedef typename Value<TJournalSet>::Type TJournalString;
-    typedef typename Iterator<TJournalString, Standard>::Type TJournalIter;
+//    typedef typename Iterator<TJournalString, Standard>::Type TJournalIter;
 
     typedef ContainerView<TJournalString> TJournalView;
     typedef Finder<TJournalView> TStandardFinder;
@@ -174,9 +182,9 @@ bool _runTest(TMockGenerator & mockGen,
 
     TNeedle ndl;
     if (seqBase == -1)
-        ndl = infix(host(journalData(mockGen._mock)), patternPos, patternPos + patternLength);
+        ndl = infix(host(mockGen._seqData), patternPos, patternPos + patternLength);
     else
-        ndl = infix(journalData(mockGen._mock)[seqBase], patternPos, patternPos + patternLength);
+        ndl = infix(mockGen._seqData[seqBase], patternPos, patternPos + patternLength);
 
     // Alter the needle to search approximatively.
     for (int i = 0; i < std::abs(numErrors); ++i)
@@ -200,14 +208,15 @@ bool _runTest(TMockGenerator & mockGen,
     TPattern pattern;
     setHost(pattern, ndl);
 
-    FindResultsTester_<TPosition> delegate(length(journalData(mockGen._mock)));
-    TFinder finder(mockGen._mock);
+    FindResultsTester_<TPosition> delegate(length(mockGen._seqData));
+    TContainer jst(host(mockGen._seqData), mockGen._varStore);
+    TFinder finder(jst);
     find(finder, pattern, delegate, numErrors);
 
     // Search over each sequence separately and find the pattern.
-    for (unsigned i = 0; i < length(journalData(mockGen._mock)); ++i)
+    for (unsigned i = 0; i < length(mockGen._seqData); ++i)
     {
-        TJournalView jView(journalData(mockGen._mock)[i]);
+        TJournalView jView(mockGen._seqData[i]);
 
         TStandardFinder standardFinder(jView);
 
@@ -238,8 +247,8 @@ bool _configureTest(seqan::Dna /*alphabet*/,
 {
     using namespace seqan;
 
-    typedef String<Dna, Journaled<Alloc<>, SortedArray > > TJournalString;
-    typedef Host<TJournalString>::Type THost;
+//    typedef String<Dna, Journaled<Alloc<>, SortedArray > > TJournalString;
+//    typedef Host<TJournalString>::Type THost;
     typedef String<MockVariantData<Dna> > TVarData;
     typedef String<String<bool, Packed<> > > TCovData;
 
@@ -270,8 +279,8 @@ bool _configureTest(char /*alphabet*/,
 {
     using namespace seqan;
 
-    typedef String<char, Journaled<Alloc<>, SortedArray > > TJournalString;
-    typedef Host<TJournalString>::Type THost;
+//    typedef String<char, Journaled<Alloc<>, SortedArray > > TJournalString;
+//    typedef Host<TJournalString>::Type THost;
     typedef String<MockVariantData<char> > TVarData;
     typedef String<String<bool, Packed<> > > TCovData;
 
