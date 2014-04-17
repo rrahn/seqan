@@ -859,7 +859,7 @@ _updateAuxiliaryBranchStructures(TBranchStackEntry & branchEntry,
     if (deltaType(varKey) == DeltaType::DELTA_TYPE_DEL)
     {
         branchEntry._proxyEndPosDiff += deltaDel(variantData(container(traverser)), deltaPosition(varKey));
-        branchEntry._mappedHostPos += deltaDel(variantData(container(traverser)), deltaPosition(varKey));
+        branchEntry._mappedHostPos += deltaDel(variantData(container(traverser)), deltaPosition(varKey)) - 1;
 //        while(nodeItEnd != traverser._proxyBranchNodeIt && *(traverser._proxyBranchNodeIt + 1) < branchEntry._mappedHostPos)
 //            ++traverser._proxyBranchNodeIt;
     }
