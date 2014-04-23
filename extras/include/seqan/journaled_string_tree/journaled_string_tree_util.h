@@ -59,15 +59,28 @@ typedef Tag<MergePointSyncReadOnly_> MergePointSyncReadOnly;
 // Class MergePointMap_
 // ----------------------------------------------------------------------------
 
-template <typename TPosition, typename TCoverage>
+template <typename TVariantMap>
 class MergePointMap_
 {
 public:
-    typedef String<TPosition> TMergePoints;
-    typedef String<TCoverage> TCoverageString;
+    typedef typename Value<MergePointMap_>::Type TValue;
+    typedef typename MappedCoverage<TVariantMap>::Type TMappedCoverage;
+    typedef String<TValue> TMergePoints;
+//    typedef String<TCoverage> TCoverageString;
 
-    TMergePoints _mergePoints;  // Stores the reference position of the merge point
-    TCoverageString _mergePointCoverage;  // Stores the sequences that are merged back at this point.
+    TVariantMap*    _varMapPtr;
+    TMappedCoverage _mergeCoverage;
+    TMergePoints    _mergePoints;  // Stores the reference position of the merge point
+
+
+//    TCoverageString _mergePointCoverage;  // Stores the sequences that are merged back at this point.
+    MergePointMap_() : _varMapPtr(NULL), _mergeCoverage(), _mergePoints()
+    {}
+
+    MergePointMap_(TVariantMap & map) : _varMapPtr(&map), _mergeCoverage(), _mergePoints()
+    {
+        resize(_mergeCoverage, coverageSize(deltaCoverageStore(map)), false, Exact());
+    }
 
 };
 
@@ -75,18 +88,52 @@ public:
 // Class MergePointComparator_
 // ----------------------------------------------------------------------------
 
-template <typename TPos>
+template <typename TMergePoint>
 struct MergePointComparator_
 {
-    inline bool operator()(TPos const & lhs, TPos const & rhs)
+    inline bool operator()(TMergePoint const & lhs, TMergePoint const & rhs)
     {
-        return !(lhs < rhs);
+        return !(lhs.i1 < rhs.i1);
     }
 };
 
 // ============================================================================
 // Metafunctions
 // ============================================================================
+
+// ----------------------------------------------------------------------------
+// Metafunction Value
+// ----------------------------------------------------------------------------
+
+template <typename TVariantMap>
+struct Value<MergePointMap_<TVariantMap> >
+{
+    typedef typename Position<TVariantMap>::Type TPosition_;
+    typedef Pair<TPosition_, TPosition_> Type;
+};
+
+template <typename TVariantMap>
+struct Value<MergePointMap_<TVariantMap> const>
+{
+    typedef typename Position<TVariantMap>::Type TPosition_;
+    typedef Pair<TPosition_, TPosition_> const Type;
+};
+
+// ----------------------------------------------------------------------------
+// Metafunction Reference
+// ----------------------------------------------------------------------------
+
+template <typename TVariantMap>
+struct Reference<MergePointMap_<TVariantMap> >
+{
+    typedef typename Value<MergePointMap_<TVariantMap> >::Type & Type;
+};
+
+template <typename TVariantMap>
+struct Reference<MergePointMap_<TVariantMap> const>
+{
+    typedef typename Value<MergePointMap_<TVariantMap> const>::Type & Type;
+};
 
 // ============================================================================
 // Functions
@@ -96,72 +143,130 @@ struct MergePointComparator_
 // Function clear()
 // ----------------------------------------------------------------------------
 
-template <typename TPosition, typename TCoverage>
-inline void clear(MergePointMap_<TPosition, TCoverage> & mergePointStore)
+template <typename TVariantMap>
+inline void clear(MergePointMap_<TVariantMap> & mergePointStore)
 {
     clear(mergePointStore._mergePoints);
-    clear(mergePointStore._mergePointCoverage);
+//    clear(mergePointStore._mergePointCoverage);
 }
 
 // ----------------------------------------------------------------------------
 // Function push()
 // ----------------------------------------------------------------------------
 
-template <typename TPosition, typename TCoverage, typename TPos2>
-inline void push(MergePointMap_<TPosition, TCoverage> & mergePointStore,
-                 TPos2 const & pos,
-                 TCoverage const & coverage)
+template <typename TVariantMap, typename TPos, typename TId>
+inline void push(MergePointMap_<TVariantMap> & mergePointStore,
+                 TPos const & pos,
+                 TId const & branchNodeId)
 {
-    typedef MergePointMap_<TPosition, TCoverage> TMergePointStore;
+    typedef MergePointMap_<TVariantMap> TMergePointStore;
     typedef typename TMergePointStore::TMergePoints TMergePoints;
     typedef typename Iterator<TMergePoints, Rooted>::Type TIterator;
+    typedef typename Value<TMergePointStore>::Type TValue;
 
+
+    TValue tmp(pos, branchNodeId);
     if (empty(mergePointStore._mergePoints))
     {
-        insertValue(mergePointStore._mergePoints, 0, pos);
-        insertValue(mergePointStore._mergePointCoverage, 0, coverage);
+        insertValue(mergePointStore._mergePoints, 0, tmp);
+//        insertValue(mergePointStore._mergePointCoverage, 0, coverage);
         return;
     }
 
     TIterator it = std::upper_bound(begin(mergePointStore._mergePoints, Rooted()),
                                     end(mergePointStore._mergePoints, Rooted()),
-                                    pos,
-                                    MergePointComparator_<TPosition>());
-    insertValue(mergePointStore._mergePoints, position(it), pos);
-    insertValue(mergePointStore._mergePointCoverage, position(it), coverage);
+                                    tmp,
+                                    MergePointComparator_<TValue>());
+    insertValue(mergePointStore._mergePoints, position(it), tmp);
+    // Record the new merge point character.
+    mergePointStore._mergeCoverage |= mappedCoverage(*mergePointStore._varMapPtr, branchNodeId);
 
+//    insertValue(mergePointStore._mergePointCoverage, position(it), coverage);
 }
 
-template <typename TPosition, typename TCoverage>
-inline void pop(MergePointMap_<TPosition, TCoverage> & mergePointStore)
+template <typename TVariantMap>
+inline void pop(MergePointMap_<TVariantMap> & mergePointStore)
 {
     eraseBack(mergePointStore._mergePoints);
-    eraseBack(mergePointStore._mergePointCoverage);
+//    eraseBack(mergePointStore._mergePointCoverage);
 }
 
-template <typename TPosition, typename TCoverage>
-inline TPosition & topMergePoint(MergePointMap_<TPosition, TCoverage> & mergePointStore)
+template <typename TVariantMap>
+inline typename Reference<MergePointMap_<TVariantMap> >::Type
+topMergePoint(MergePointMap_<TVariantMap> & mergePointStore)
 {
     return back(mergePointStore._mergePoints);
 }
 
-template <typename TPosition, typename TCoverage>
-inline TPosition const & topMergePoint(MergePointMap_<TPosition, TCoverage> const & mergePointStore)
+template <typename TVariantMap>
+inline typename Reference<MergePointMap_<TVariantMap> const>::Type
+topMergePoint(MergePointMap_<TVariantMap> const & mergePointStore)
 {
     return back(mergePointStore._mergePoints);
 }
 
-template <typename TPosition, typename TCoverage>
-inline TCoverage & topMergePointCoverage(MergePointMap_<TPosition, TCoverage> & mergePointStore)
+template <typename TVariantMap>
+inline typename MappedCoverage<TVariantMap>::Type &
+topMergeCoverage(MergePointMap_<TVariantMap> & mergePointStore)
 {
-    return back(mergePointStore._mergePointCoverage);
+    return mappedCoverage(*mergePointStore._varMapPtr, back(mergePointStore._mergePoints).i2);
+}
+
+template <typename TVariantMap>
+inline typename MappedCoverage<TVariantMap>::Type const &
+topMergeCoverage(MergePointMap_<TVariantMap> const & mergePointStore)
+{
+    return mappedCoverage(*mergePointStore._varMapPtr, back(mergePointStore._mergePoints).i2);
 }
 
 
-template <typename TPosition, typename TCoverage>
-inline TCoverage const & topMergePointCoverage(MergePointMap_<TPosition, TCoverage> const & mergePointStore)
+template <typename TVariantMap, typename TPosition>
+inline typename MappedCoverage<TVariantMap>::Type &
+getMergeCoverage(MergePointMap_<TVariantMap> & mergePointStore,
+                 TPosition const & pos)
 {
-    return back(mergePointStore._mergePointCoverage);
+    return mappedCoverage(*mergePointStore._varMapPtr, mergePointStore._mergePoints[pos].i2);
+}
+
+template <typename TVariantMap, typename TPosition>
+inline typename MappedCoverage<TVariantMap>::Type const &
+getMergeCoverage(MergePointMap_<TVariantMap> const & mergePointStore,
+                 TPosition const & pos)
+{
+    return mappedCoverage(*mergePointStore._varMapPtr, mergePointStore._mergePoints[pos].i2);
+}
+
+
+template <typename TVariantMap, typename TPosition>
+inline bool
+_updateMergePoints(MergePointMap_<TVariantMap> & mergePointStack,
+                   TPosition const & pos)
+{
+    typedef MergePointMap_<TVariantMap> TMergePointStack;
+    typedef typename Value<TMergePointStack>::Type TMergePoint;
+    typedef typename TMergePointStack::TMergePoints const TMergePoints;
+    typedef typename Iterator<TMergePoints const, Standard>::Type TMergePointIt;
+
+    if (length(mergePointStack._mergePoints) == 1u)
+        return false;
+
+    TMergePoint tmp(pos, 0);
+    TMergePointIt itEnd = std::upper_bound(begin(mergePointStack._mergePoints, Standard()),
+                                           end(mergePointStack._mergePoints, Standard()), tmp,
+                                           MergePointComparator_<TMergePoint>());
+    --itEnd;
+    if (position(itEnd, mergePointStack._mergePoints) + 1 != length(mergePointStack._mergePoints))
+    {
+        erase(mergePointStack._mergePoints, position(itEnd, mergePointStack._mergePoints) + 1,
+              length(mergePointStack._mergePoints));
+        arrayFill(begin(mergePointStack._mergeCoverage, Standard()), end(mergePointStack._mergeCoverage, Standard()),
+                  false);
+        for (TMergePointIt it = begin(mergePointStack._mergePoints, Standard()) + 1;
+             it != end(mergePointStack._mergePoints, Standard()); ++it)
+            mergePointStack._mergeCoverage |= mappedCoverage(*mergePointStack._varMapPtr, it->i2);
+        return true;
+    }
+    return false;
 }
 
 // ----------------------------------------------------------------------------
@@ -175,22 +280,23 @@ _syncToMergePoint(TCoverage & target,
                   TPosition const & pos,
                   MergePointSyncReadOnly const & /*tag*/)
 {
+    typedef typename Value<TMergePointStack>::Type TMergePoint;
     typedef typename TMergePointStack::TMergePoints const TMergePoints;
-    typedef typename Value<TMergePoints>::Type TMergePoint;
     typedef typename Iterator<TMergePoints const, Rooted>::Type TMergePointIt;
 
     if (length(mergePointStack._mergePoints) == 1u)
         return 1u;
 
+    TMergePoint tmp(pos, 0);
     TMergePointIt itEnd = std::upper_bound(begin(mergePointStack._mergePoints, Rooted()),
-                                        end(mergePointStack._mergePoints, Rooted()),
-                                        pos,
-                                        MergePointComparator_<TMergePoint>());
+                                           end(mergePointStack._mergePoints, Rooted()), tmp,
+                                           MergePointComparator_<TMergePoint>());
     --itEnd;
     TMergePointIt it = end(mergePointStack._mergePoints, Rooted()) -1;
 
+    SEQAN_ASSERT(mergePointStack._varMapPtr != NULL);  // Check if the pointer is initialized.
     for (; it != itEnd; --it)
-        transform(target, target, mergePointStack._mergePointCoverage[position(it)], FunctorBitwiseOr());
+        transform(target, target, mappedCoverage(*mergePointStack._varMapPtr, it->i2), FunctorBitwiseOr());
 //        bitwiseOr(target, target, mergePointStack._mergePointCoverage[position(it)]);
 
     return position(itEnd) + 1;
@@ -207,10 +313,7 @@ _syncToMergePoint(TCoverage & target,
     SEQAN_ASSERT_LEQ(newLength, length(mergePointStack._mergePoints));
 
     if (newLength != length(mergePointStack._mergePoints))
-    {
         erase(mergePointStack._mergePoints, newLength, length(mergePointStack._mergePoints));
-        erase(mergePointStack._mergePointCoverage, newLength, length(mergePointStack._mergePointCoverage));
-    }
     return newLength;
 }
 

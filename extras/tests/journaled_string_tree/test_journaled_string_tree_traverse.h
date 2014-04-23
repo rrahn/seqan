@@ -40,7 +40,7 @@
 #include <seqan/sequence.h>
 
 #include <seqan/journaled_string_tree.h>
-#include <seqan/find_journaled_string_tree.h>
+//#include <seqan/find_journaled_string_tree.h>
 
 #include "test_journaled_string_tree_mock_generator.h"
 
@@ -50,57 +50,48 @@ seqan::DataParallelTestConfig<char> testConfig;
 namespace seqan
 {
 
-struct TestDataParallel_;
-typedef Tag<TestDataParallel_> TestDummy;
-
-template <typename TNeedle>
-class Pattern<TNeedle, TestDummy>
-{
-public:
-    TNeedle _needle;
-
-    // TODO(rmaerker): Test different pattern sizes.
-    Pattern() : _needle("xxx")
-    {}
-};
-
-template <typename TNeedle>
-inline TNeedle & needle(Pattern<TNeedle, TestDummy> & pattern)
-{
-    return pattern._needle;
-}
-
-template <typename TNeedle>
-inline TNeedle const & needle(Pattern<TNeedle, TestDummy> const & pattern)
-{
-    return pattern._needle;
-}
+//struct TestDataParallel_;
+//typedef Tag<TestDataParallel_> TestDummy;
+//
+//template <typename TNeedle>
+//class Pattern<TNeedle, TestDummy>
+//{
+//public:
+//    TNeedle _needle;
+//
+//    // TODO(rmaerker): Test different pattern sizes.
+//    Pattern() : _needle("xxx")
+//    {}
+//};
+//
+//template <typename TNeedle>
+//inline TNeedle & needle(Pattern<TNeedle, TestDummy> & pattern)
+//{
+//    return pattern._needle;
+//}
+//
+//template <typename TNeedle>
+//inline TNeedle const & needle(Pattern<TNeedle, TestDummy> const & pattern)
+//{
+//    return pattern._needle;
+//}
 
 template <typename TTraverser>
-struct StringTreeTraversalTester
+struct DummyCaller_
 {
     TTraverser * _traverserPtr;
 
-    StringTreeTraversalTester(TTraverser & other) : _traverserPtr(&other)
+    DummyCaller_(TTraverser & other) : _traverserPtr(&other)
     {}
 };
 
-template <typename TTraverser, typename TTag>
-inline typename ComputeState<TTraverser>::Type
-compute(StringTreeTraversalTester<TTraverser> & /*tester*/,
-        TTag const & /*tag*/)
-{
-    typedef typename ComputeState<TTraverser>::Type TCallState;
-    return TCallState(true, 1);
-}
-
 template <typename TValue>
-struct SequenceAppender
+struct DummyDelegator_
 {
 
     StringSet<String<TValue> > _processedSeq;
 
-    SequenceAppender(unsigned size)
+    DummyDelegator_(unsigned size)
     {
         resize(_processedSeq, size, Exact());
     }
@@ -127,6 +118,32 @@ struct SequenceAppender
     }
 };
 
+template <typename TTraverser, typename TValue, typename TContainer, typename TState, typename TSpec, typename TTag>
+inline size_t
+deliverContext(DummyCaller_<TTraverser> & /*dummy*/,
+               DummyDelegator_<TValue> & delegator,
+               JstTraverser<TContainer, TState, TSpec> & traverser,
+               TTag const & /*tag*/)
+{
+    delegator(traverser);
+    return 1;
+}
+
+template <typename TTraverser>
+inline Nothing
+getState(DummyCaller_<TTraverser> & /*dummy*/)
+{
+    return Nothing();
+}
+
+template <typename TTraverser, typename TState>
+inline void
+setState(DummyCaller_<TTraverser> & /*dummy*/,
+         TState const & /*state*/)
+{
+    // no-op.
+}
+
 }
 
 template <typename TTestSeq, typename TCompareSeq, typename TSize>
@@ -143,11 +160,10 @@ bool compareResults(TTestSeq const & testSeq, TCompareSeq const & compSeq, TSize
 template <typename TMock, typename TTester, typename TSize>
 void _printDebugInfo(TMock const & mockGen, TTester const & dpTester, TSize const & windowSize)
 {
-    std::cerr << "Host: " << host(journalData(mockGen._mock)) << std::endl;
+    std::cerr << "Host: " << host(mockGen._seqData) << std::endl;
     for (unsigned i = 0; i < length(dpTester._processedSeq); ++i)
         std::cerr << "Compare 1: " << dpTester._processedSeq[i] << "\nCompare 2: "
-        << prefix(journalData(mockGen._mock)[i], length(mockGen._seqData[i]) - (windowSize - 1)) << "\n"
-        << std::endl;
+        << prefix(mockGen._seqData[i], length(mockGen._seqData[i]) - (windowSize - 1)) << "\n" << std::endl;
 }
 
 bool _runTestForConfiguration(unsigned posConf,
@@ -159,15 +175,15 @@ bool _runTestForConfiguration(unsigned posConf,
 {
     using namespace seqan;
 
-    typedef String<char, Journaled<Alloc<>, SortedArray > > TJournalString;
-    typedef Host<TJournalString>::Type THost;
+    typedef DummyDelegator_<char> TSequenceAppender;
+
     typedef String<MockVariantData<char> > TVarData;
     typedef String<String<bool, Packed<> > > TCovData;
-    typedef SequenceAppender<char> TSequenceAppender;
     typedef MockGenerator_<unsigned, char> TMockGenerator;
+
     typedef TMockGenerator::TStringTree TStringTree;
-    typedef Traverser<TStringTree, TraverserSpec<> > TTraverser;
-    typedef StringTreeTraversalTester<TTraverser> TDummyCaller;
+    typedef JstTraverser<TStringTree, Nothing, JstTraverserSpec<> > TTraverser;
+    typedef DummyCaller_<TTraverser> TDummyCaller;
 
     TVarData varData;
     TCovData covData;
@@ -178,8 +194,11 @@ bool _runTestForConfiguration(unsigned posConf,
     // Generate the mock for the current configuration.
     mockGen.generate(varData, covData, refLength);
 
-    TSequenceAppender seqAppender(length(journalData(mockGen._mock)));
-    TTraverser traverser(mockGen._mock, windowSize);
+    TStringTree jst(host(mockGen._seqData), mockGen._varStore);
+    journalNextBlock(jst, windowSize);
+
+    TSequenceAppender seqAppender(length(mockGen._seqData));
+    TTraverser traverser(jst, windowSize);
     TDummyCaller dummyCaller(traverser);
     traverse(traverser, dummyCaller, seqAppender);
 
@@ -889,63 +908,63 @@ SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_finder_config_9_5_5_journ
 
 SEQAN_DEFINE_TEST(test_journaled_string_tree_merge_point_stack)
 {
-    using namespace seqan;
-
-    typedef String<bool, Packed<> > TCoverage;
-    typedef MergePointMap_<unsigned, TCoverage> TMergePointStore;
-
-
-    TMergePointStore store;
-    TCoverage test1;
-    resize(test1, 10, false, Exact());
-    test1[0] = true;
-    test1[5] = true;
-    TCoverage test2;
-    resize(test2, 10, false, Exact());
-    test2[0] = true;
-    test2[6] = true;
-    test2[8] = true;
-    TCoverage test3;
-    resize(test3, 10, false, Exact());
-    test3[1] = true;
-    test3[4] = true;
-    test3[9] = true;
-
-    push(store, 10, test1);
-    push(store, 30, test2);
-    push(store, 20, test3);
-    push(store, 25, test2);
-
-    TCoverage result;
-    resize(result, 10, false, Exact());
-
-    for (unsigned i = 0; i < length(store._mergePoints); ++i)
-        std::cerr << "What: " << store._mergePoints[i] << std::endl;
-
-    _syncToMergePoint(result, store, 5, MergePointSyncResize());
-    std::cerr << result << std::endl;
-
-    for (unsigned i = 0; i < length(store._mergePoints); ++i)
-        std::cerr << "What: " << store._mergePoints[i] << std::endl;
-
-    _syncToMergePoint(result, store, 15, MergePointSyncResize());
-    std::cerr << result << std::endl;
-
-    for (unsigned i = 0; i < length(store._mergePoints); ++i)
-        std::cerr << "What: " << store._mergePoints[i] << std::endl;
-
-    _syncToMergePoint(result, store, 25, MergePointSyncResize());
-    std::cerr << result << std::endl;
-
-    for (unsigned i = 0; i < length(store._mergePoints); ++i)
-        std::cerr << "What: " << store._mergePoints[i] << std::endl;
-
-    _syncToMergePoint(result, store, 60, MergePointSyncResize());
-    std::cerr << result << std::endl;
-
-    for (unsigned i = 0; i < length(store._mergePoints); ++i)
-
-        std::cerr << "What: " << store._mergePoints[i] << std::endl;
+//    using namespace seqan;
+//
+//    typedef String<bool, Packed<> > TCoverage;
+//    typedef MergePointMap_<unsigned, TCoverage> TMergePointStore;
+//
+//
+//    TMergePointStore store;
+//    TCoverage test1;
+//    resize(test1, 10, false, Exact());
+//    test1[0] = true;
+//    test1[5] = true;
+//    TCoverage test2;
+//    resize(test2, 10, false, Exact());
+//    test2[0] = true;
+//    test2[6] = true;
+//    test2[8] = true;
+//    TCoverage test3;
+//    resize(test3, 10, false, Exact());
+//    test3[1] = true;
+//    test3[4] = true;
+//    test3[9] = true;
+//
+//    push(store, 10, test1);
+//    push(store, 30, test2);
+//    push(store, 20, test3);
+//    push(store, 25, test2);
+//
+//    TCoverage result;
+//    resize(result, 10, false, Exact());
+//
+//    for (unsigned i = 0; i < length(store._mergePoints); ++i)
+//        std::cerr << "What: " << store._mergePoints[i] << std::endl;
+//
+//    _syncToMergePoint(result, store, 5, MergePointSyncResize());
+//    std::cerr << result << std::endl;
+//
+//    for (unsigned i = 0; i < length(store._mergePoints); ++i)
+//        std::cerr << "What: " << store._mergePoints[i] << std::endl;
+//
+//    _syncToMergePoint(result, store, 15, MergePointSyncResize());
+//    std::cerr << result << std::endl;
+//
+//    for (unsigned i = 0; i < length(store._mergePoints); ++i)
+//        std::cerr << "What: " << store._mergePoints[i] << std::endl;
+//
+//    _syncToMergePoint(result, store, 25, MergePointSyncResize());
+//    std::cerr << result << std::endl;
+//
+//    for (unsigned i = 0; i < length(store._mergePoints); ++i)
+//        std::cerr << "What: " << store._mergePoints[i] << std::endl;
+//
+//    _syncToMergePoint(result, store, 60, MergePointSyncResize());
+//    std::cerr << result << std::endl;
+//
+//    for (unsigned i = 0; i < length(store._mergePoints); ++i)
+//
+//        std::cerr << "What: " << store._mergePoints[i] << std::endl;
 }
 
 #endif  // EXTRAS_TESTS_DATA_PARALLEL_TEST_DATA_PARALLEL_FIND_H_
