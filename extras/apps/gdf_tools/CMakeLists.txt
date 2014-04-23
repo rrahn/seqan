@@ -32,8 +32,7 @@ add_definitions (${SEQAN_DEFINITIONS})
 								  
 add_executable (gdf_converter gdf_converter.cpp
 						      gdf_converter_vcf.h
-							  gdf_tools_io.h
-						      gdf_tools_io_vcf.h)
+							  gdf_tools_io.h)
 									  
 # Add dependencies found by find_package (SeqAn).
 target_link_libraries (gdf_converter ${SEQAN_LIBRARIES})
