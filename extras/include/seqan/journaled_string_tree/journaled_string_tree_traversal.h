@@ -961,7 +961,7 @@ _selectValidBeginAndProxy(TProxyId & proxyId,
             }
             ++itMp;
         }
-        if (*itBp >= itMp->i1)
+        else if (*itBp >= itMp->i1)
         {
             transform(tmp, mappedCoverage(variantData(container(traverser)), position(itBp)), seenVariants,
                       FunctorNested<FunctorBitwiseAnd, FunctorIdentity, FunctorBitwiseNot>());
