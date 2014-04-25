@@ -110,7 +110,7 @@ struct DummyDelegator_
             std::cerr << "("<< posVec[i].i1 << ", " <<  posVec[i].i2 << ")" << "; ";
 #endif
             appendValue(_processedSeq[posVec[i].i1],
-                        value(journalData(container(traverser)), posVec[i].i1)[posVec[i].i2]);
+                        value(stringSet(container(traverser)), posVec[i].i1)[posVec[i].i2]);
         }
 #ifdef TEST_DEBUG_OUTPUT
         std::cerr << std::endl;

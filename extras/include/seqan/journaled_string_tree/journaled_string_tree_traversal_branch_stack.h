@@ -57,11 +57,11 @@ class JstBranchStackEntry_
 {
 public:
 
-    typedef typename JournalData<TJst>::Type TJournaledSet;
+    typedef typename GetStringSet<TJst>::Type TJournaledSet;
     typedef typename Value<TJournaledSet>::Type TJournaledString;
     typedef typename Iterator<TJournaledString, Standard>::Type TJSIterator;
 
-    typedef typename VariantData<TJst>::Type TDeltaMap;
+    typedef typename GetBranchNodeMap<TJst>::Type TDeltaMap;
     typedef typename MappedCoverage<TDeltaMap>::Type TCoverage;
     typedef typename Iterator<TDeltaMap, Rooted>::Type TBranchNodeIterator;
 

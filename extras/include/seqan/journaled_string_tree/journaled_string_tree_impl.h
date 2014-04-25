@@ -51,13 +51,13 @@ namespace seqan
 // ============================================================================
 
 template <typename T>
-struct JournalData{};
+struct GetStringSet{};
 
 template <typename T>
-struct VariantData{};
+struct GetBranchNodeMap{};
 
 // ----------------------------------------------------------------------------
-// Class JournaledStringTree                                  [StringTreeDefault]
+// Class JournaledStringTree                                [StringTreeDefault]
 // ----------------------------------------------------------------------------
 
 template <typename TDeltaStore, typename TDeltaCoverageStore>
@@ -65,27 +65,27 @@ class JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageStore>, StringTree
 {
 public:
     typedef DeltaMap<TDeltaStore, TDeltaCoverageStore> TDeltaMap;
-    typedef typename JournalData<JournaledStringTree>::Type TJournalData;
+    typedef typename GetStringSet<JournaledStringTree>::Type TJournalData;
     typedef typename Value<TJournalData>::Type TJournaledString;
     typedef typename Size<TJournalData>::Type TSize;
     typedef typename MakeSigned<TSize>::Type TSignedSize;
 
     // TODO(rmaerker): Maybe no holder.
-    Holder<TDeltaMap> _variantData;
-    Holder<TJournalData>  _journalData;
-    String<TSignedSize> _blockVPOffset;  // Virtual position offset for each sequence visited so far.
-    String<TSignedSize> _activeBlockVPOffset;  // Virtual position offset for each sequence visited so far.
+    Holder<TDeltaMap> _branchNodeMap;
+
+    // NOTE(rmaerker): We use this as an internal data structure, which is not set from outside.
+    mutable TJournalData  _journalSet;
+    mutable String<TSignedSize> _blockVPOffset;  // Virtual position offset for each sequence visited so far.
+    mutable String<TSignedSize> _activeBlockVPOffset;  // Virtual position offset for each sequence visited so far.
 
     static const TSize REQUIRE_FULL_JOURNAL = MaxValue<unsigned>::VALUE;
-    TSize _journalSize;
     TSize _blockSize;
-    TSize _activeBlock;
+    mutable TSize _activeBlock;
     TSize _numBlocks;
-    bool _emptyJournal;
+    mutable bool _emptyJournal;
 
-    JournaledStringTree() : _variantData(),
-                            _journalData(),
-                            _journalSize(0),
+    JournaledStringTree() : _branchNodeMap(),
+                            _journalSet(),
                             _blockSize(REQUIRE_FULL_JOURNAL),
                             _activeBlock(0),
                             _numBlocks(1),
@@ -99,14 +99,7 @@ public:
                                                                         _emptyJournal(true)
 
     {
-        _journalSize = coverageSize(deltaCoverageStore(varData));
-        setValue(_variantData, varData);
-        setHost(*this, reference);
-        TJournaledString tmp;
-        setHost(tmp, host(*this));
-        resize(journalData(*this), _journalSize, tmp);  // Initialize the journaled set.
-        resize(_blockVPOffset, _journalSize, 0, Exact());
-        resize(_activeBlockVPOffset, _journalSize, 0, Exact());
+        init(*this, reference, varData);
     }
 };
 
@@ -160,7 +153,7 @@ template <typename TDeltaMap, typename TSpec>
 struct Host<JournaledStringTree<TDeltaMap, TSpec> >
 {
     typedef JournaledStringTree<TDeltaMap, TSpec> TVStringTree_;
-    typedef typename JournalData<TVStringTree_>::Type TJournalData_;
+    typedef typename GetStringSet<TVStringTree_>::Type TJournalData_;
     typedef typename Host<TJournalData_>::Type Type;
 };
 
@@ -172,27 +165,27 @@ struct Host<JournaledStringTree<TDeltaMap, TSpec> const>
 };
 
 // ----------------------------------------------------------------------------
-// Metafunction VariantData
+// Metafunction GetBranchNodeMap
 // ----------------------------------------------------------------------------
 
 template <typename TDeltaStore, typename TDeltaCoverageStore, typename TMapSpec, typename TSpec>
-struct VariantData<JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageStore, TMapSpec>, TSpec> >
+struct GetBranchNodeMap<JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageStore, TMapSpec>, TSpec> >
 {
     typedef DeltaMap<TDeltaStore, TDeltaCoverageStore, TMapSpec> Type;
 };
 
 template <typename TDeltaStore, typename TDeltaCoverageStore, typename TMapSpec, typename TSpec>
-struct VariantData<JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageStore, TMapSpec>, TSpec> const>
+struct GetBranchNodeMap<JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageStore, TMapSpec>, TSpec> const>
 {
     typedef DeltaMap<TDeltaStore, TDeltaCoverageStore, TMapSpec> const Type;
 };
 
 // ----------------------------------------------------------------------------
-// Metafunction Container
+// Metafunction GetStringSet
 // ----------------------------------------------------------------------------
 
 template <typename TDeltaStore, typename TDeltaCoverageStore, typename TSpec>
-struct JournalData<JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageStore>, TSpec> >
+struct GetStringSet<JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageStore>, TSpec> >
 {
     typedef typename DeltaValue<TDeltaStore, DeltaType::DELTA_TYPE_SNP>::Type TAlphabet_;
     typedef typename DeltaValue<TDeltaStore, DeltaType::DELTA_TYPE_DEL>::Type TSize_;
@@ -202,7 +195,7 @@ struct JournalData<JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageStore
 };
 
 template <typename TDeltaStore, typename TDeltaCoverageStore, typename TSpec>
-struct JournalData<JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageStore>, TSpec> const>
+struct GetStringSet<JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageStore>, TSpec> const>
 {
     typedef typename DeltaValue<TDeltaStore, DeltaType::DELTA_TYPE_SNP>::Type TAlphabet_;
     typedef typename DeltaValue<TDeltaStore, DeltaType::DELTA_TYPE_DEL>::Type TSize_;
@@ -215,6 +208,10 @@ struct JournalData<JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageStore
 // ============================================================================
 // Functions
 // ============================================================================
+
+// ----------------------------------------------------------------------------
+// Function _journalNextVariant()
+// ----------------------------------------------------------------------------
 
 template <typename TJournalString, typename TVariantMap, typename TVarKey, typename TPosition>
 void _journalNextVariant(TJournalString & jString,
@@ -248,7 +245,7 @@ _doJournalBlock(JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverage, TMapSp
                 Tag<TParallelTag> parallelTag = Serial())
 {
     typedef JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverage, TMapSpec>, TSpec > TJst;
-    typedef typename VariantData<TJst>::Type TDeltaMap;
+    typedef typename GetBranchNodeMap<TJst>::Type TDeltaMap;
     typedef typename Iterator<TDeltaMap, Standard>::Type TMapIterator;
     typedef typename MappedDelta<TDeltaMap>::Type TMappedDelta;
 
@@ -256,28 +253,28 @@ _doJournalBlock(JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverage, TMapSp
     typedef typename Value<TDeltaCoverage>::Type TBitVec;
     typedef typename Iterator<TBitVec, Standard>::Type TBitVecIter;
 
-    typedef typename JournalData<TJst>::Type TJournalSet;
+    typedef typename GetStringSet<TJst>::Type TJournalSet;
     typedef typename Iterator<TJournalSet, Standard>::Type TJournalSetIter;
     typedef typename Size<TJournalSet>::Type TSize;
 
     // Define the block limits.
     TSize blockBegin = jst._activeBlock * jst._blockSize;
-    TSize blockEnd = _min(length(keys(variantData(jst))), (jst._activeBlock + 1) * jst._blockSize);
+    TSize blockEnd = _min(length(keys(branchNodeMap(jst))), (jst._activeBlock + 1) * jst._blockSize);
 
     // Auxiliary variables.
-    TDeltaMap & variantMap = variantData(jst);
-    TJournalSet & journalSet = journalData(jst);
+    TDeltaMap & variantMap = branchNodeMap(jst);
+    TJournalSet & journalSet = stringSet(jst);
     String<int> _lastVisitedNodes;
-    if (getBlockSize(jst) != TJst::REQUIRE_FULL_JOURNAL)
-        resize(_lastVisitedNodes, journalSize(jst), -1, Exact());
+    if (!allVariantsJournaled(jst))
+        resize(_lastVisitedNodes, length(stringSet(jst)), -1, Exact());
 
     // Check whether there is enough space.
-    SEQAN_ASSERT_EQ(length(journalSet), journalSize(jst));
+    SEQAN_ASSERT_EQ(length(journalSet), length(stringSet(jst)));
 
     // Use parallel processing.
     // TODO(rmaerker): Consider more general Master-Worker design for parallelization?
     Splitter<TJournalSetIter> jSetSplitter(begin(journalSet, Standard()), end(journalSet, Standard()), parallelTag);
-    SEQAN_OMP_PRAGMA(parallel for if (journalSize(jst) > 1000));
+    SEQAN_OMP_PRAGMA(parallel for if (length(stringSet(jst)) > 1000));
     for (unsigned jobId = 0; jobId < length(jSetSplitter); ++jobId)
     {
 
@@ -286,7 +283,7 @@ _doJournalBlock(JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverage, TMapSp
         unsigned jobEnd = jSetSplitter[jobId + 1] - begin(journalSet, Standard());
 
         // Pre-processing: Update VPs for last block.
-        if (getBlockSize(jst) != TJst::REQUIRE_FULL_JOURNAL)
+        if (!allVariantsJournaled(jst))
             for (unsigned i = jobBegin; i < jobEnd; ++i)
             {
                 clear(journalSet[i]);  // Reinitialize the journal strings.
@@ -315,14 +312,14 @@ _doJournalBlock(JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverage, TMapSp
                     continue;
 
                 // Store last visited node for current journaled string.
-                if (getBlockSize(jst) != TJst::REQUIRE_FULL_JOURNAL)
+                if (!allVariantsJournaled(jst))
                     _lastVisitedNodes[itVec - itVecBegin] = itMap - itMapBegin;
                 _journalNextVariant(journalSet[itVec - itVecBegin], variantMap, varKey, *itMap);
             }
         }
 
         // Post-processing: Store VPs for current block.
-        if (getBlockSize(jst) != TJst::REQUIRE_FULL_JOURNAL)
+        if (!allVariantsJournaled(jst))
         {
             // Buffer the next branch nodes depending on the context size.
             for (unsigned i = jobBegin; i < jobEnd; ++i)
@@ -363,18 +360,6 @@ _doJournalBlock(JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverage, TMapSp
 }
 
 // ----------------------------------------------------------------------------
-// Function setHost()
-// ----------------------------------------------------------------------------
-
-template <typename TDeltaMap, typename TSpec, typename THost>
-inline void
-setHost(JournaledStringTree<TDeltaMap, TSpec> & stringTree,
-        THost & newHost)
-{
-    setHost(journalData(stringTree), newHost);
-}
-
-// ----------------------------------------------------------------------------
 // Function host()
 // ----------------------------------------------------------------------------
 
@@ -382,14 +367,14 @@ template <typename TDeltaMap, typename TSpec>
 inline typename Host<JournaledStringTree<TDeltaMap, TSpec> >::Type &
 host(JournaledStringTree<TDeltaMap, TSpec> & stringTree)
 {
-    return host(journalData(stringTree));
+    return host(stringSet(stringTree));
 }
 
 template <typename TDeltaMap, typename TSpec>
 inline typename Host<JournaledStringTree<TDeltaMap, TSpec> const>::Type &
 host(JournaledStringTree<TDeltaMap, TSpec> const & stringTree)
 {
-    return host(journalData(stringTree));
+    return host(stringSet(stringTree));
 }
 
 // ----------------------------------------------------------------------------
@@ -405,45 +390,16 @@ getBlockOffset(JournaledStringTree<TDeltaMap, TSpec> const & stringTree,
 }
 
 // ----------------------------------------------------------------------------
-// Function setDeltaMap()
+// Function allVariantsJournaled()
 // ----------------------------------------------------------------------------
-
-template <typename TDeltaStore, typename TDeltaCoverageStore>
-void setDeltaMap(JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageStore>, StringTreeDefault> & stringTree,
-                 DeltaMap<TDeltaStore, TDeltaCoverageStore> const & deltaMap)
-{
-    setValue(stringTree._variantData, deltaMap);
-    stringTree._blockBegin = 0;
-    stringTree._blockEnd = length(keys(deltaMap));
-}
 
 template <typename TDeltaStore, typename TDeltaCoverageStore, typename TSpec>
 inline bool
-requiresFullJournal(JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageStore>, TSpec> const & stringTree)
+allVariantsJournaled(JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageStore>, TSpec> const & stringTree)
 {
     typedef JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageStore>, TSpec> TJst;
 
     return stringTree._blockSize == TJst::REQUIRE_FULL_JOURNAL;
-}
-
-// ----------------------------------------------------------------------------
-// Function requireJournal()
-// ----------------------------------------------------------------------------
-
-// TODO(rmaerker): Deprecated!
-template <typename TDeltaStore, typename TDeltaCoverageStore, typename TParallelTag>
-void requireJournal(JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageStore>, StringTreeDefault> & stringTree,
-                    Tag<TParallelTag> tag)
-{
-    SEQAN_ASSERT_NOT(empty(host(stringTree)));  // The host must be set before.
-    if (stringTree._emptyJournal)
-        _doJournalBlock(stringTree, tag);
-}
-
-template <typename TDeltaStore, typename TDeltaCoverageStore, typename TSpec>
-void requireJournal(JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageStore>, TSpec> & stringTree)
-{
-    requireJournal(stringTree, Serial());
 }
 
 // ----------------------------------------------------------------------------
@@ -470,7 +426,6 @@ bool journalNextBlock(JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageSt
         ++stringTree._activeBlock;
         return true;
     }
-    stringTree._activeBlock = 0;  // Reset the active block when all blocks are loaded.
     return false;
 }
 
@@ -482,28 +437,44 @@ bool journalNextBlock(JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageSt
 }
 
 // ----------------------------------------------------------------------------
-// Function reinitJournal()
+// Function reinit()
 // ----------------------------------------------------------------------------
 
-template <typename TDeltaStore, typename TDeltaCoverageStore, typename TSpec, typename TParallelTag>
-void reinitJournal(JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageStore>, TSpec> & jst,
-                   Tag<TParallelTag> tag = Serial())
+// Keeps the journal strings alive, if the full block has loaded.
+template <typename TDeltaStore, typename TDeltaCoverageStore, typename TSpec>
+inline void
+reinit(JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageStore>, TSpec> & jst)
+{
+    // Reset all positions to 0.
+    arrayFill(begin(jst._activeBlockVPOffset, Standard()), end(jst._activeBlockVPOffset, Standard()), 0);
+    arrayFill(begin(jst._blockVPOffset, Standard()), end(jst._activeBlockVPOffset, Standard()), 0);
+    jst._activeBlock = 0;
+    if (!allVariantsJournaled(jst))
+        jst._emptyJournal = true;
+}
+
+// ----------------------------------------------------------------------------
+// Function init()
+// ----------------------------------------------------------------------------
+
+template <typename TDeltaStore, typename TDeltaCoverageStore, typename TSpec, typename THost>
+inline void
+init(JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageStore>, TSpec> & jst,
+     THost & referenceSeq,
+     DeltaMap<TDeltaStore, TDeltaCoverageStore> const & varData)
 {
     typedef JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageStore>, TSpec> TJst;
-    typedef typename JournalData<TJst>::Type TJournaledSet;
-    typedef typename Iterator<TJournaledSet, Standard>::Type TJournaledSetIterator;
+    typedef typename GetStringSet<TJst>::Type TStringSet;
+    typedef typename Value<TStringSet>::Type TString;
 
-    Splitter<TJournaledSetIterator> jsSplitter(begin(journalData(jst), Standard()), end(journalData(jst), Standard()), tag);
-    SEQAN_OMP_PRAGMA(parallel for if (journalSize(jst) > 500))
-    for (unsigned jobId = 0; jobId < length(jsSplitter); ++jobId)
-    {
-        for (TJournaledSetIterator threadIter = jsSplitter[jobId]; threadIter != jsSplitter[jobId+1]; ++threadIter)
-            clear(*threadIter);
-    }
-//    clear(journalData(stringTree).strings);
-//    clear(journalData(stringTree).limits);
-//    journalData(stringTree).limitsValid = true;
-//    createJournal(stringTree, tag);
+    setValue(jst._branchNodeMap, varData);
+    setHost(stringSet(jst), referenceSeq);
+
+    TString tmp;
+    setHost(tmp, host(stringSet(jst)));
+    resize(stringSet(jst), coverageSize(deltaCoverageStore(varData)), tmp, Exact());
+    resize(jst._blockVPOffset, length(stringSet(jst)), 0, Exact());
+    resize(jst._activeBlockVPOffset, length(stringSet(jst)), 0, Exact());
 }
 
 // ----------------------------------------------------------------------------
@@ -511,16 +482,17 @@ void reinitJournal(JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageStore
 // ----------------------------------------------------------------------------
 
 template <typename TDeltaStore, typename TDeltaCoverageStore, typename TSpec, typename TPosition>
-void setBlockSize(JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageStore>, TSpec> & stringTree,
-                  TPosition const & newBlockSize)
+inline void
+setBlockSize(JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageStore>, TSpec> & stringTree,
+             TPosition const & newBlockSize)
 {
-    SEQAN_ASSERT_NOT(empty(stringTree._variantData));  // The delta map needs to be set before.
+    SEQAN_ASSERT_NOT(empty(stringTree._branchNodeMap));  // The delta map needs to be set before.
 
     stringTree._blockSize = newBlockSize;
     stringTree._activeBlock = 0;
-    stringTree._numBlocks = static_cast<unsigned>(std::ceil(static_cast<double>(length(keys(variantData(stringTree)))) /
+    stringTree._numBlocks = static_cast<unsigned>(std::ceil(static_cast<double>(length(keys(branchNodeMap(stringTree)))) /
                                                             static_cast<double>(newBlockSize)));
-    resize(stringTree._blockVPOffset, journalSize(stringTree), 0, Exact());
+    resize(stringTree._blockVPOffset, length(stringSet(stringTree)), 0, Exact());
 }
 
 // ----------------------------------------------------------------------------
@@ -528,127 +500,46 @@ void setBlockSize(JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageStore>
 // ----------------------------------------------------------------------------
 
 template <typename TDeltaStore, typename TDeltaCoverageStore, typename TSpec>
-unsigned getBlockSize(JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageStore>, TSpec> const & stringTree)
+inline typename Size<JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageStore>, TSpec> >::Type
+getBlockSize(JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageStore>, TSpec> const & stringTree)
 {
     return stringTree._blockSize;
 }
 
 // ----------------------------------------------------------------------------
-// Function variantData()
+// Function branchNodeMap()
 // ----------------------------------------------------------------------------
 
 template <typename TDeltaMap, typename TSpec>
-inline typename VariantData<JournaledStringTree<TDeltaMap, TSpec> >::Type &
-variantData(JournaledStringTree<TDeltaMap, TSpec> & stringTree)
+inline typename GetBranchNodeMap<JournaledStringTree<TDeltaMap, TSpec> >::Type &
+branchNodeMap(JournaledStringTree<TDeltaMap, TSpec> & stringTree)
 {
-    return value(stringTree._variantData);
+    return value(stringTree._branchNodeMap);
 }
 
 template <typename TDeltaMap, typename TSpec>
-inline typename VariantData<JournaledStringTree<TDeltaMap, TSpec> const>::Type &
-variantData(JournaledStringTree<TDeltaMap, TSpec> const & stringTree)
+inline typename GetBranchNodeMap<JournaledStringTree<TDeltaMap, TSpec> const>::Type &
+branchNodeMap(JournaledStringTree<TDeltaMap, TSpec> const & stringTree)
 {
-    return value(stringTree._variantData);
+    return value(stringTree._branchNodeMap);
 }
 
 // ----------------------------------------------------------------------------
-// Function journalData()
+// Function stringSet()
 // ----------------------------------------------------------------------------
 
 template <typename TDeltaMap, typename TSpec>
-inline typename JournalData<JournaledStringTree<TDeltaMap, TSpec> >::Type &
-journalData(JournaledStringTree<TDeltaMap, TSpec> & stringTree)
+inline typename GetStringSet<JournaledStringTree<TDeltaMap, TSpec> >::Type &
+stringSet(JournaledStringTree<TDeltaMap, TSpec> & stringTree)
 {
-    return value(stringTree._journalData);
+    return stringTree._journalSet;
 }
 
 template <typename TDeltaMap, typename TSpec>
-inline typename JournalData<JournaledStringTree<TDeltaMap, TSpec> const>::Type &
-journalData(JournaledStringTree<TDeltaMap, TSpec> const & stringTree)
+inline typename GetStringSet<JournaledStringTree<TDeltaMap, TSpec> const>::Type &
+stringSet(JournaledStringTree<TDeltaMap, TSpec> const & stringTree)
 {
-    return value(stringTree._journalData);
-}
-
-// ----------------------------------------------------------------------------
-// Function keys()
-// ----------------------------------------------------------------------------
-
-template <typename TDeltaMap, typename TSpec>
-inline typename Keys<typename VariantData<JournaledStringTree<TDeltaMap, TSpec> >::Type>::Type &
-keys(JournaledStringTree<TDeltaMap, TSpec> & stringTree)
-{
-    return keys(variantData(stringTree));
-}
-
-template <typename TDeltaMap, typename TSpec>
-inline typename Keys<typename VariantData<JournaledStringTree<TDeltaMap, TSpec> const>::Type >::Type &
-keys(JournaledStringTree<TDeltaMap, TSpec> const & stringTree)
-{
-    return keys(variantData(stringTree));
-}
-
-// ----------------------------------------------------------------------------
-// Function proxyId()
-// ----------------------------------------------------------------------------
-
-template <typename TDeltaMap, typename TSpec, typename TPosition>
-inline typename Position<JournaledStringTree<TDeltaMap, TSpec> const>::Type
-proxyId(JournaledStringTree<TDeltaMap, TSpec> const & stringTree,
-        TPosition  pos)
-{
-    SEQAN_ASSERT_GEQ(pos, static_cast<TPosition>(0));
-    SEQAN_ASSERT_LT(pos, length(keys(variantData(stringTree))));
-
-    return bitScanForward(mappedCoverage(variantData(stringTree), pos));
-}
-
-// ----------------------------------------------------------------------------
-// Function checkProxyId()
-// ----------------------------------------------------------------------------
-
-template <typename TDeltaMap, typename TSpec, typename TPosition>
-inline bool
-checkProxyId(JournaledStringTree<TDeltaMap, TSpec> const & stringTree,
-             TPosition const & proxyId)
-{
-    return (proxyId > 0) && (proxyId < lenght(value(stringTree._journalData)));
-}
-
-// ----------------------------------------------------------------------------
-// Function getProxy()
-// ----------------------------------------------------------------------------
-
-template <typename TDeltaMap, typename TSpec, typename TPosition>
-inline typename Value<typename JournalData<JournaledStringTree<TDeltaMap, TSpec> >::Type >::Type &
-getProxy(JournaledStringTree<TDeltaMap, TSpec> & stringTree,
-         TPosition const & proxyId)
-{
-    SEQAN_ASSERT_GEQ(proxyId, static_cast<TPosition>(0));
-    SEQAN_ASSERT_LT(proxyId, static_cast<TPosition>(length(value(stringTree._journalData))));
-
-    return value(value(stringTree._journalData), proxyId);
-}
-
-template <typename TDeltaMap, typename TSpec, typename TPosition>
-inline typename Value<typename JournalData<JournaledStringTree<TDeltaMap, TSpec> const>::Type >::Type &
-getProxy(JournaledStringTree<TDeltaMap, TSpec> const & stringTree,
-         TPosition const & proxyId)
-{
-    SEQAN_ASSERT_GEQ(proxyId, static_cast<TPosition>(0));
-    SEQAN_ASSERT_LT(proxyId, static_cast<TPosition>(length(value(stringTree._journalData))));
-
-    return value(value(stringTree._journalData), proxyId);
-}
-
-// ----------------------------------------------------------------------------
-// Function journalSize()
-// ----------------------------------------------------------------------------
-
-template <typename TDeltaMap, typename TSpec>
-inline typename Size<JournaledStringTree<TDeltaMap, TSpec> const>::Type
-journalSize(JournaledStringTree<TDeltaMap, TSpec> const & stringTree)
-{
-    return stringTree._journalSize;
+    return stringTree._journalSet;
 }
 
 }

@@ -68,10 +68,10 @@ class JstTraverser<JournaledStringTree<TDeltaMap, TTreeSpec>, TState, TSpec>
 {
 public:
     typedef JournaledStringTree<TDeltaMap, TTreeSpec> TContainer;
-    typedef typename JournalData<TContainer>::Type TJournalSet;
+    typedef typename GetStringSet<TContainer>::Type TJournalSet;
     typedef typename Host<TJournalSet>::Type TReference;
     typedef typename Iterator<TReference, Rooted>::Type TMasterBranchIterator;
-    typedef typename VariantData<TContainer>::Type TVariantData;
+    typedef typename GetBranchNodeMap<TContainer>::Type TVariantData;
 
     typedef typename Value<TJournalSet>::Type TJournalString;
     typedef typename Iterator<TJournalString>::Type TJournalIterator;
@@ -119,7 +119,7 @@ public:
 
     JstTraverser(TContainer & haystack, TSize windowSize) :
         _traversalState(JST_TRAVERSAL_STATE_NULL),
-        _mergePointStack(variantData(haystack)),
+        _mergePointStack(branchNodeMap(haystack)),
         _windowSize(windowSize),
         _needInit(false)
     {
@@ -154,7 +154,7 @@ struct Container<JstTraverser<TContainer, TState, TSpec> const>
 template <typename TContainer, typename TState, typename TSpec>
 struct Position<JstTraverser<TContainer, TState, TSpec> >
 {
-    typedef typename JournalData<TContainer>::Type TJournalSet_;
+    typedef typename GetStringSet<TContainer>::Type TJournalSet_;
     typedef typename Value<TJournalSet_>::Type TJournalString_;
     typedef typename Position<TJournalString_>::Type TPosition_;
     typedef Pair<TPosition_, TPosition_> TValue_;
@@ -187,14 +187,14 @@ struct BranchNode;
 template <typename TContainer, typename TState, typename TSpec>
 struct BranchNode<JstTraverser<TContainer, TState, TSpec> >
 {
-    typedef typename VariantData<TContainer>::Type TDeltaMap_;
+    typedef typename GetBranchNodeMap<TContainer>::Type TDeltaMap_;
     typedef typename Iterator<TDeltaMap_, Rooted>::Type Type;
 };
 
 template <typename TContainer, typename TState, typename TSpec>
 struct BranchNode<JstTraverser<TContainer, TState, TSpec> const>
 {
-    typedef typename VariantData<TContainer>::Type TDeltaMap_;
+    typedef typename GetBranchNodeMap<TContainer>::Type TDeltaMap_;
     typedef typename Iterator<TDeltaMap_ const, Rooted>::Type Type;
 };
 
@@ -421,12 +421,12 @@ inline void
 _globalInit(JstTraverser<TContainer, TState, TSpec> & traverser)
 {
     typedef JstTraverser<TContainer, TState, TSpec> TJstTraverser;
-    typedef typename VariantData<TContainer>::Type TDeltaMap;
+    typedef typename GetBranchNodeMap<TContainer>::Type TDeltaMap;
     typedef typename MappedDelta<TDeltaMap>::Type TMappedDelta;
     typedef typename TJstTraverser::TBranchNodeIterator TBranchNodeIt;
 
-    resize(traverser._activeMasterCoverage, journalSize(container(traverser)), true, Exact());  // Set all seq active.
-    push(traverser._mergePointStack, length(host(container(traverser))) + 1, length(keys(variantData(container(traverser)))));
+    resize(traverser._activeMasterCoverage, length(stringSet(container(traverser))), true, Exact());  // Set all seq active.
+    push(traverser._mergePointStack, length(host(container(traverser))) + 1, length(keys(branchNodeMap(container(traverser)))));
 
     // TODO(rmaerker): We probably don't need this for initialization.
     if (_windowEndPosition(traverser, StateTraverseMaster()) < *traverser._branchNodeIt)
@@ -438,7 +438,7 @@ _globalInit(JstTraverser<TContainer, TState, TSpec> & traverser)
         TBranchNodeIt tmpIt = traverser._branchNodeIt;
         while(tmpIt != traverser._branchNodeItEnd && *tmpIt == 0)
         {
-            TMappedDelta res = mappedDelta(variantData(container(traverser)), position(traverser._branchNodeIt));
+            TMappedDelta res = mappedDelta(branchNodeMap(container(traverser)), position(traverser._branchNodeIt));
             // TODO(rmaerker): Add case for INDEL
             if (deltaType(res) != DeltaType::DELTA_TYPE_DEL)
             {
@@ -446,7 +446,7 @@ _globalInit(JstTraverser<TContainer, TState, TSpec> & traverser)
                 traverser._traversalState = JST_TRAVERSAL_STATE_BRANCH;
                 continue;
             }
-            push(traverser._mergePointStack, deltaDel(variantData(container(traverser)), deltaPosition(res)),
+            push(traverser._mergePointStack, deltaDel(branchNodeMap(container(traverser)), deltaPosition(res)),
                  position(tmpIt));
             ++tmpIt;
         }
@@ -467,10 +467,10 @@ position(JstTraverser<JournaledStringTree<TContainer, StringTreeDefault>, TState
     typedef typename Position<TJstTraverser>::Type TPosition;
     typedef typename Value<TPosition>::Type TPositionValue;
 
-    typedef typename JournalData<THaystack>::Type TJournalSet;
+    typedef typename GetStringSet<THaystack>::Type TJournalSet;
     typedef typename Value<TJournalSet>::Type TJournalString;
     typedef typename Iterator<TJournalString, Standard>::Type TJournalStringIt;
-    typedef typename VariantData<THaystack>::Type TDeltaMap;
+    typedef typename GetBranchNodeMap<THaystack>::Type TDeltaMap;
     typedef typename MappedCoverage<TDeltaMap>::Type TCoverage;
     typedef typename Iterator<TCoverage, Standard>::Type TIterator;
 
@@ -491,7 +491,7 @@ position(JstTraverser<JournaledStringTree<TContainer, StringTreeDefault>, TState
                 unsigned seqId = it - itBegin;
                 appendValue(posVec,
                             TPositionValue(seqId,
-                                           hostToVirtualPosition(value(journalData(container(traverser)), seqId),
+                                           hostToVirtualPosition(value(stringSet(container(traverser)), seqId),
                                                                  hostPos) + getBlockOffset(container(traverser), seqId)));
             }
         }
@@ -515,10 +515,10 @@ position(JstTraverser<JournaledStringTree<TContainer, StringTreeDefault>, TState
                     unsigned seqId = it - itBegin;
                     TJournalStringIt journalIt;
                     // This is ok, since we guarantee not to change anything in this function.
-                    journalIt._journalStringPtr = const_cast<TJournalString*>(&value(journalData(container(traverser)), seqId));
+                    journalIt._journalStringPtr = const_cast<TJournalString*>(&value(stringSet(container(traverser)), seqId));
                     // We now need to figure out a way to map the end positions!!!! Maybe we need some diner for this.
                     // Maybe but just maybe, we need the last break point here.
-                    _mapVirtualToVirtual(journalIt, traverser._branchIt, (traverser._proxyBranchNodeIt - 1), variantData(container(traverser)), seqId);
+                    _mapVirtualToVirtual(journalIt, traverser._branchIt, (traverser._proxyBranchNodeIt - 1), branchNodeMap(container(traverser)), seqId);
                     appendValue(posVec, TPositionValue(seqId, position(journalIt) + getBlockOffset(container(traverser), seqId)));
                 }
             }
@@ -532,8 +532,8 @@ position(JstTraverser<JournaledStringTree<TContainer, StringTreeDefault>, TState
                     unsigned seqId = it - itBegin;
                     TJournalStringIt journalIt;
                     // This is ok, since we guarantee not to change anything in this function.
-                    journalIt._journalStringPtr = const_cast<TJournalString*>(&value(journalData(container(traverser)), seqId));
-                    _mapVirtualToVirtual(journalIt, windowBegin(traverser, StateTraverseBranch()), traverser._branchNodeIt, variantData(container(traverser)), seqId);
+                    journalIt._journalStringPtr = const_cast<TJournalString*>(&value(stringSet(container(traverser)), seqId));
+                    _mapVirtualToVirtual(journalIt, windowBegin(traverser, StateTraverseBranch()), traverser._branchNodeIt, branchNodeMap(container(traverser)), seqId);
                     appendValue(posVec, TPositionValue(seqId, position(journalIt) + getBlockOffset(container(traverser), seqId)));
                 }
             }
@@ -619,7 +619,7 @@ contextIterator(JstTraverser<TContainer, TState, TSpec> const & traverser,
 // ----------------------------------------------------------------------------
 
 template <typename TContainer, typename TState, typename TSpec>
-inline typename MappedCoverage<typename VariantData<TContainer const>::Type> ::Type &
+inline typename MappedCoverage<typename GetBranchNodeMap<TContainer const>::Type> ::Type &
 coverage(JstTraverser<TContainer, TState, TSpec> const & traverser)
 {
     if (isMaster(traverser))
@@ -628,7 +628,7 @@ coverage(JstTraverser<TContainer, TState, TSpec> const & traverser)
 }
 
 template <typename TContainer, typename TState, typename TSpec>
-inline typename MappedCoverage<typename VariantData<TContainer>::Type> ::Type &
+inline typename MappedCoverage<typename GetBranchNodeMap<TContainer>::Type> ::Type &
 coverage(JstTraverser<TContainer, TState, TSpec> & traverser)
 {
     if (isMaster(traverser))
@@ -686,18 +686,18 @@ _updateAuxiliaryBranchStructures(TBranchStackEntry & branchEntry,
 {
     if (deltaType(varKey) == DeltaType::DELTA_TYPE_DEL)
     {
-        branchEntry._proxyEndPosDiff += deltaDel(variantData(container(traverser)), deltaPosition(varKey));
-        branchEntry._mappedHostPos += deltaDel(variantData(container(traverser)), deltaPosition(varKey)) - 1;
+        branchEntry._proxyEndPosDiff += deltaDel(branchNodeMap(container(traverser)), deltaPosition(varKey));
+        branchEntry._mappedHostPos += deltaDel(branchNodeMap(container(traverser)), deltaPosition(varKey)) - 1;
     }
     else if (deltaType(varKey) == DeltaType::DELTA_TYPE_INS)
     {
-        branchEntry._proxyEndPosDiff -= static_cast<int>(length(deltaIns(variantData(container(traverser)), deltaPosition(varKey))));
+        branchEntry._proxyEndPosDiff -= static_cast<int>(length(deltaIns(branchNodeMap(container(traverser)), deltaPosition(varKey))));
     }
     else if (deltaType(varKey) == DeltaType::DELTA_TYPE_INDEL)
     {
-        branchEntry._proxyEndPosDiff += deltaIndel(variantData(container(traverser)), deltaPosition(varKey)).i1;
-        branchEntry._mappedHostPos += deltaIndel(variantData(container(traverser)), deltaPosition(varKey)).i1;
-        branchEntry._proxyEndPosDiff -= static_cast<int>(length(deltaIndel(variantData(container(traverser)), deltaPosition(varKey)).i2));
+        branchEntry._proxyEndPosDiff += deltaIndel(branchNodeMap(container(traverser)), deltaPosition(varKey)).i1;
+        branchEntry._mappedHostPos += deltaIndel(branchNodeMap(container(traverser)), deltaPosition(varKey)).i1;
+        branchEntry._proxyEndPosDiff -= static_cast<int>(length(deltaIndel(branchNodeMap(container(traverser)), deltaPosition(varKey)).i2));
     }
 }
 
@@ -719,7 +719,7 @@ _traverseBranch(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPositi
     typedef typename TJstTraverser::TBranchStack TBranchStack;
     typedef typename Value<TBranchStack>::Type TBranchStackEntry;
 
-    typedef typename VariantData<TContainer>::Type TVariantMap;
+    typedef typename GetBranchNodeMap<TContainer>::Type TVariantMap;
     typedef typename MappedCoverage<TVariantMap>::Type TBitVector;
     typedef typename MappedDelta<TVariantMap>::Type TMappedDelta;
 
@@ -784,7 +784,7 @@ _traverseBranch(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPositi
         {
             // First check if we need to update the positions first.
             // Get the variant coverage for the split point.
-            TBitVector & varCoverage = mappedCoverage(variantData(container(traverser)), position(traverser._proxyBranchNodeIt));
+            TBitVector & varCoverage = mappedCoverage(branchNodeMap(container(traverser)), position(traverser._proxyBranchNodeIt));
             transform(splitVec, varCoverage, deltaWindow._branchCoverage, FunctorBitwiseAnd());
 
             // Check if found split point effects the current branch.
@@ -814,7 +814,7 @@ _traverseBranch(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPositi
 
                     // Update auxiliary branch structures.
                     _updateAuxiliaryBranchStructures(deltaWindow, traverser,
-                                                     mappedDelta(variantData(container(traverser)),
+                                                     mappedDelta(branchNodeMap(container(traverser)),
                                                                  position(traverser._proxyBranchNodeIt)));
                 }
                 else
@@ -827,7 +827,7 @@ _traverseBranch(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPositi
                     // Get the type of the next variant.
                     ++splitProxyWindow._mappedHostPos;
                     _updateAuxiliaryBranchStructures(splitProxyWindow, traverser,
-                                                     mappedDelta(variantData(container(traverser)),
+                                                     mappedDelta(branchNodeMap(container(traverser)),
                                                                  position(traverser._proxyBranchNodeIt)));
                 }
 
@@ -839,14 +839,14 @@ _traverseBranch(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPositi
             }
             else
             {
-                if (mappedCoverage(variantData(container(traverser)), position(traverser._proxyBranchNodeIt))[deltaWindow._branchProxyId])
+                if (mappedCoverage(branchNodeMap(container(traverser)), position(traverser._proxyBranchNodeIt))[deltaWindow._branchProxyId])
                 {
                     _updateAuxiliaryBranchStructures(deltaWindow, traverser,
-                                                     mappedDelta(variantData(container(traverser)),
+                                                     mappedDelta(branchNodeMap(container(traverser)),
                                                                  position(traverser._proxyBranchNodeIt)));
                 }
             }
-            TMappedDelta varKey = mappedDelta(variantData(container(traverser)), position(traverser._proxyBranchNodeIt ));
+            TMappedDelta varKey = mappedDelta(branchNodeMap(container(traverser)), position(traverser._proxyBranchNodeIt ));
             if (deltaType(varKey) == DeltaType::DELTA_TYPE_DEL || deltaType(varKey) == DeltaType::DELTA_TYPE_INDEL)
                 while(nodeItEnd != traverser._proxyBranchNodeIt && *(traverser._proxyBranchNodeIt + 1) < deltaWindow._mappedHostPos)
                     ++traverser._proxyBranchNodeIt;
@@ -906,7 +906,7 @@ _selectValidBeginAndProxy(TProxyId & proxyId,
 
     // Initialization
     TCoverage seenVariants;
-    resize(seenVariants, journalSize(container(traverser)), false, Exact());
+    resize(seenVariants, length(stringSet(container(traverser))), false, Exact());
 
     // The merge point iter is always valid.
     SEQAN_ASSERT_NOT(empty(traverser._mergePointStack._mergePoints));
@@ -927,7 +927,7 @@ _selectValidBeginAndProxy(TProxyId & proxyId,
     // As long as the value is greater or eqaul to the contecxtBeginPosHost we decrement the branch-node pointer.
     for (; static_cast<TPosition>(*itBpBegin) >= contextBeginPosHost; --itBpBegin)
     {
-        if (itBpBegin == begin(keys(variantData(container(traverser))), Rooted()))
+        if (itBpBegin == begin(keys(branchNodeMap(container(traverser))), Rooted()))
         {
             --itBpBegin;
             break;
@@ -964,7 +964,7 @@ _selectValidBeginAndProxy(TProxyId & proxyId,
         }
         else if (*itBp >= itMp->i1)
         {
-            transform(tmp, mappedCoverage(variantData(container(traverser)), position(itBp)), seenVariants,
+            transform(tmp, mappedCoverage(branchNodeMap(container(traverser)), position(itBp)), seenVariants,
                       FunctorNested<FunctorBitwiseAnd, FunctorIdentity, FunctorBitwiseNot>());
             if (!testAllZeros(tmp))  // Some of this variants are new.
             {
@@ -984,7 +984,7 @@ _selectValidBeginAndProxy(TProxyId & proxyId,
     {
         while (itBp >= itBpBegin)
         {
-            transform(tmp, mappedCoverage(variantData(container(traverser)), position(itBp)), seenVariants,
+            transform(tmp, mappedCoverage(branchNodeMap(container(traverser)), position(itBp)), seenVariants,
                       FunctorNested<FunctorBitwiseAnd, FunctorIdentity, FunctorBitwiseNot>());
             if (!testAllZeros(tmp))  // Some of this variants are new.
             {
@@ -1035,10 +1035,10 @@ _traverseBranchWithAlt(JstTraverser<TContainer, TState, JstTraverserSpec<TContex
 {
     typedef JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosition, TRequireFullContext> > TJstTraverser;
 
-    typedef typename JournalData<TContainer>::Type TJournalSet;
+    typedef typename GetStringSet<TContainer>::Type TJournalSet;
     typedef typename Value<TJournalSet>::Type TJournalString;
     typedef typename Iterator<TJournalString, Standard>::Type TJournalStringIterator;
-    typedef typename VariantData<TContainer>::Type TDeltaMap;
+    typedef typename GetBranchNodeMap<TContainer>::Type TDeltaMap;
     typedef typename MappedDelta<TDeltaMap>::Type TMappedDelta;
     typedef typename TDeltaMap::TDeltaStore_ TDeltaStore;
     typedef typename DeltaValue<TDeltaStore, DeltaType::DELTA_TYPE_INS>::Type TIns;
@@ -1055,7 +1055,7 @@ _traverseBranchWithAlt(JstTraverser<TContainer, TState, JstTraverserSpec<TContex
     TBranchStackEntry & nextBranch = createInitialEntry(traverser._branchStack);
 
     // We start by initializing the branch coverage and the active branch coverage.
-    nextBranch._branchCoverage = mappedCoverage(variantData(container(traverser)), position(traverser._branchNodeIt));
+    nextBranch._branchCoverage = mappedCoverage(branchNodeMap(container(traverser)), position(traverser._branchNodeIt));
 
     if (TRequireFullContext::VALUE)
         nextBranch._prefixOffset = _selectValidBeginAndProxy(nextBranch._branchProxyId, traverser,
@@ -1067,22 +1067,22 @@ _traverseBranchWithAlt(JstTraverser<TContainer, TState, JstTraverserSpec<TContex
 
     // The coverage cannot be empty.
     SEQAN_ASSERT_GEQ(nextBranch._branchProxyId, 0u);
-    SEQAN_ASSERT_LT(nextBranch._branchProxyId, journalSize(container(traverser)));
+    SEQAN_ASSERT_LT(nextBranch._branchProxyId, length(stringSet(container(traverser))));
 
-    TJournalString & proxySeq = getProxy(container(traverser), nextBranch._branchProxyId);
+    TJournalString & proxySeq = value(stringSet(container(traverser)), nextBranch._branchProxyId);
     TJournalStringIterator branchBeginIt;
 
-    _mapHostToVirtual(nextBranch._proxyIter, proxySeq, variantData(container(traverser)), nextBranch._branchProxyId,
+    _mapHostToVirtual(nextBranch._proxyIter, proxySeq, branchNodeMap(container(traverser)), nextBranch._branchProxyId,
                       *traverser._branchNodeIt);  // Maybe this can be simplified.
 
     nextBranch._mappedHostPos = *traverser._branchNodeIt + 1;
     TSize contextSizeRight = windowSize(traverser);
-    TMappedDelta varKey = mappedDelta(variantData(container(traverser)), position(traverser._branchNodeIt));
+    TMappedDelta varKey = mappedDelta(branchNodeMap(container(traverser)), position(traverser._branchNodeIt));
     switch(deltaType(varKey))
     {
         case DeltaType::DELTA_TYPE_DEL:
         {
-            nextBranch._proxyEndPosDiff = deltaDel(variantData(container(traverser)), deltaPosition(varKey));
+            nextBranch._proxyEndPosDiff = deltaDel(branchNodeMap(container(traverser)), deltaPosition(varKey));
             if (nextBranch._proxyEndPosDiff > 1)
             {
                 nextBranch._mappedHostPos += nextBranch._proxyEndPosDiff - 1;  // Moves right by the size of the deletion.
@@ -1101,14 +1101,14 @@ _traverseBranchWithAlt(JstTraverser<TContainer, TState, JstTraverserSpec<TContex
         }
         case DeltaType::DELTA_TYPE_INS:
         {
-            TIns & insVar = deltaIns(variantData(container(traverser)), deltaPosition(varKey));
+            TIns & insVar = deltaIns(branchNodeMap(container(traverser)), deltaPosition(varKey));
             nextBranch._proxyEndPosDiff = -static_cast<int>(length(insVar));
             contextSizeRight += length(insVar);
             break;
         }
         case DeltaType::DELTA_TYPE_INDEL:
         {
-            TIndel & indel = deltaIndel(variantData(container(traverser)), deltaPosition(varKey));
+            TIndel & indel = deltaIndel(branchNodeMap(container(traverser)), deltaPosition(varKey));
             nextBranch._proxyEndPosDiff = indel.i1;
             nextBranch._proxyEndPosDiff -= static_cast<int>(length(indel.i2)) - 1;
             contextSizeRight += length(indel.i2);
@@ -1146,25 +1146,25 @@ _traverseBranchWithAlt(JstTraverser<TContainer, TState, JstTraverserSpec<TContex
             }
 
             if (nextBranch._prefixOffset == 0 &&
-                deltaType(mappedDelta(variantData(container(traverser)), position(traverser._branchNodeIt))) == DeltaType::DELTA_TYPE_DEL)
+                deltaType(mappedDelta(branchNodeMap(container(traverser)), position(traverser._branchNodeIt))) == DeltaType::DELTA_TYPE_DEL)
             {
                 continue;
             }
         }
 
         SEQAN_ASSERT_GEQ(nextBranch._branchProxyId, 0u);
-        SEQAN_ASSERT_LT(nextBranch._branchProxyId, journalSize(container(traverser)));
+        SEQAN_ASSERT_LT(nextBranch._branchProxyId, length(stringSet(container(traverser))));
 
         TJournalStringIterator targetIt;
-        targetIt._journalStringPtr = &getProxy(container(traverser), nextBranch._branchProxyId);
+        targetIt._journalStringPtr = &value(stringSet(container(traverser)), nextBranch._branchProxyId);
 
         // It might be necessary to select from the host position instead of the virtual mapping.
         if (deltaType(varKey) == DeltaType::DELTA_TYPE_DEL)
-            _mapHostToVirtual(targetIt, getProxy(container(traverser), nextBranch._branchProxyId),
-                              variantData(container(traverser)), nextBranch._branchProxyId, *traverser._branchNodeIt);
+            _mapHostToVirtual(targetIt, value(stringSet(container(traverser)), nextBranch._branchProxyId),
+                              branchNodeMap(container(traverser)), nextBranch._branchProxyId, *traverser._branchNodeIt);
         else
             _mapVirtualToVirtual(targetIt, nextBranch._proxyIter, traverser._branchNodeIt,
-                                 variantData(container(traverser)), nextBranch._branchProxyId);
+                                 branchNodeMap(container(traverser)), nextBranch._branchProxyId);
 
         nextBranch._proxyIter = targetIt;  // NOTE(rmaerker): We could do a swap here, because we don't need the target iter no more.
         nextBranch._proxyEndPos = position(nextBranch._proxyIter) + contextSizeRight;
@@ -1181,10 +1181,10 @@ void _traverseBranchWithAlt(JstTraverser<TContainer, TState, JstTraverserSpec<Co
 {
     typedef JstTraverser<TContainer, TState, JstTraverserSpec<ContextPositionRight, False> > TJstTraverser;
 
-    typedef typename JournalData<TContainer>::Type TJournalSet;
+    typedef typename GetStringSet<TContainer>::Type TJournalSet;
     typedef typename Value<TJournalSet>::Type TJournalString;
     typedef typename Iterator<TJournalString, Standard>::Type TJournalStringIterator;
-    typedef typename VariantData<TContainer>::Type TDeltaMap;
+    typedef typename GetBranchNodeMap<TContainer>::Type TDeltaMap;
     typedef typename MappedDelta<TDeltaMap>::Type TMappedDelta;
     typedef typename TDeltaMap::TDeltaStore_ TDeltaStore;
     typedef typename DeltaValue<TDeltaStore, DeltaType::DELTA_TYPE_INS>::Type TIns;
@@ -1200,7 +1200,7 @@ void _traverseBranchWithAlt(JstTraverser<TContainer, TState, JstTraverserSpec<Co
 
     TBranchStackEntry & nextBranch = createInitialEntry(traverser._branchStack);
 
-    nextBranch._branchCoverage = mappedCoverage(variantData(container(traverser)), position(traverser._branchNodeIt));
+    nextBranch._branchCoverage = mappedCoverage(branchNodeMap(container(traverser)), position(traverser._branchNodeIt));
     nextBranch._branchProxyId = bitScanForward(nextBranch._branchCoverage);
     nextBranch._proxyEndPosDiff = 0;
 
@@ -1209,28 +1209,28 @@ void _traverseBranchWithAlt(JstTraverser<TContainer, TState, JstTraverserSpec<Co
 #endif
 
     // Stop looking into the branch because it is invalid.
-    if (nextBranch._branchProxyId >= journalSize(container(traverser)))
+    if (nextBranch._branchProxyId >= length(stringSet(container(traverser))))
         return;
 
     // The coverage cannot be empty.
     SEQAN_ASSERT_GEQ(nextBranch._branchProxyId, 0u);
-    SEQAN_ASSERT_LT(nextBranch._branchProxyId, journalSize(container(traverser)));
+    SEQAN_ASSERT_LT(nextBranch._branchProxyId, length(stringSet(container(traverser))));
 
-    TJournalString & proxySeq = getProxy(container(traverser), nextBranch._branchProxyId);
+    TJournalString & proxySeq = value(stringSet(container(traverser)), nextBranch._branchProxyId);
     TJournalStringIterator branchBeginIt;
 
-    _mapHostToVirtual(nextBranch._proxyIter, proxySeq, variantData(container(traverser)), nextBranch._branchProxyId,
+    _mapHostToVirtual(nextBranch._proxyIter, proxySeq, branchNodeMap(container(traverser)), nextBranch._branchProxyId,
                       *traverser._branchNodeIt);
 
     // nextBranch._windowDeltaBeginIt points to first position within the branch or the first position after the deletion.
     nextBranch._mappedHostPos = *traverser._branchNodeIt + 1;
-    TMappedDelta varKey = mappedDelta(variantData(container(traverser)), position(traverser._branchNodeIt));
+    TMappedDelta varKey = mappedDelta(branchNodeMap(container(traverser)), position(traverser._branchNodeIt));
     TSize contextSizeRight =  windowSize(traverser);
     switch(deltaType(varKey))
     {
         case DeltaType::DELTA_TYPE_DEL:
         {
-            nextBranch._proxyEndPosDiff = deltaDel(variantData(container(traverser)), deltaPosition(varKey));
+            nextBranch._proxyEndPosDiff = deltaDel(branchNodeMap(container(traverser)), deltaPosition(varKey));
 
             // We only consider deletions bigger than 1.
             if (nextBranch._proxyEndPosDiff > 1)
@@ -1244,14 +1244,14 @@ void _traverseBranchWithAlt(JstTraverser<TContainer, TState, JstTraverserSpec<Co
         }
         case DeltaType::DELTA_TYPE_INS:
         {
-            TIns & insVar = deltaIns(variantData(container(traverser)), deltaPosition(varKey));
+            TIns & insVar = deltaIns(branchNodeMap(container(traverser)), deltaPosition(varKey));
             nextBranch._proxyEndPosDiff = -static_cast<int>(length(insVar));
             contextSizeRight += length(insVar);
             break;
         }
         case DeltaType::DELTA_TYPE_INDEL:
         {
-            TIndel & indel = deltaIndel(variantData(container(traverser)), deltaPosition(varKey));
+            TIndel & indel = deltaIndel(branchNodeMap(container(traverser)), deltaPosition(varKey));
             nextBranch._proxyEndPosDiff = indel.i1;
             nextBranch._proxyEndPosDiff -= static_cast<int>(length(indel.i2)) - 1;
             contextSizeRight += length(indel.i2);
@@ -1278,19 +1278,19 @@ void _traverseBranchWithAlt(JstTraverser<TContainer, TState, JstTraverserSpec<Co
         SEQAN_ASSERT(!testAllZeros(nextBranch._branchCoverage));  // The coverage cannot be empty.
 
         nextBranch._branchProxyId = bitScanForward(nextBranch._branchCoverage);
-        if (nextBranch._branchProxyId > journalSize(container(traverser)))  // No valid proxy can be found.
+        if (nextBranch._branchProxyId > length(stringSet(container(traverser))))  // No valid proxy can be found.
             continue;
 
         TJournalStringIterator targetIt;
-        targetIt._journalStringPtr = &getProxy(container(traverser), nextBranch._branchProxyId);
+        targetIt._journalStringPtr = &value(stringSet(container(traverser)), nextBranch._branchProxyId);
 
         // It might be necessary to select from the host position instead of the virtual mapping.
         if (deltaType(varKey) == DeltaType::DELTA_TYPE_DEL)
-            _mapHostToVirtual(targetIt, getProxy(container(traverser), nextBranch._branchProxyId),
-                              variantData(container(traverser)), nextBranch._branchProxyId, *traverser._branchNodeIt);
+            _mapHostToVirtual(targetIt, value(stringSet(container(traverser)), nextBranch._branchProxyId),
+                              branchNodeMap(container(traverser)), nextBranch._branchProxyId, *traverser._branchNodeIt);
         else
             _mapVirtualToVirtual(targetIt, nextBranch._proxyIter, traverser._branchNodeIt,
-                                 variantData(container(traverser)), nextBranch._branchProxyId);
+                                 branchNodeMap(container(traverser)), nextBranch._branchProxyId);
 
         // Now targetIt points to the position of
         nextBranch._proxyIter = targetIt;  // NOTE(rmaerker): We could do a swap here, because we don't need the target iter any more.
@@ -1338,7 +1338,7 @@ _syncAndUpdateCoverage(TJstTraverser & traverser,
         traverser._activeMasterCoverage = ~traverser._mergePointStack._mergeCoverage;
         for(TBranchNodeIterator it = traverser._branchNodeInContextIt; it != traverser._branchNodeIt; ++it)
             transform(traverser._activeMasterCoverage,
-                      traverser._activeMasterCoverage, mappedCoverage(variantData(container(traverser)), position(it)),
+                      traverser._activeMasterCoverage, mappedCoverage(branchNodeMap(container(traverser)), position(it)),
                       FunctorNested<FunctorBitwiseAnd, FunctorIdentity, FunctorBitwiseNot>());
     }
 }
@@ -1407,17 +1407,17 @@ _syncAndUpdateCoverage(TJstTraverser & traverser,
      // Considering previous deltas.
      // For all bp: beginHostPos <= ~*bp < *branchNodeIt
      TBranchNodeIterator tmpIt = traverser._branchNodeIt;
-     TBranchNodeIterator tmpItBegin = begin(variantData(container(traverser)), Rooted());
+     TBranchNodeIterator tmpItBegin = begin(branchNodeMap(container(traverser)), Rooted());
      for (; tmpIt != tmpItBegin && *tmpIt == *traverser._branchNodeIt; --tmpIt);  // Only nodes that are not equal to the current.
 
      for (; tmpIt != tmpItBegin && *tmpIt >= beginHostPos; --tmpIt)
          transform(traverser._activeBranchCoverage, traverser._activeBranchCoverage,
-                   mappedCoverage(variantData(container(traverser)), position(tmpIt)),
+                   mappedCoverage(branchNodeMap(container(traverser)), position(tmpIt)),
                    FunctorNested<FunctorBitwiseAnd, FunctorIdentity, FunctorBitwiseNot>());
 
      if (tmpIt == tmpItBegin && *tmpIt >= beginHostPos  && *tmpIt < *traverser._branchNodeIt)
          transform(traverser._activeBranchCoverage, traverser._activeBranchCoverage,
-                   mappedCoverage(variantData(container(traverser)), position(tmpIt)),
+                   mappedCoverage(branchNodeMap(container(traverser)), position(tmpIt)),
                    FunctorNested<FunctorBitwiseAnd, FunctorIdentity, FunctorBitwiseNot>());
     return false;
 }
@@ -1433,7 +1433,7 @@ _execTraversal(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPositio
                TExternal & externalAlg,
                TDelegate & delegate)
 {
-    typedef typename VariantData<TContainer>::Type TDeltaMap;
+    typedef typename GetBranchNodeMap<TContainer>::Type TDeltaMap;
     typedef typename MappedCoverage<TDeltaMap>::Type TBitVector;
 
 #ifdef PROFILE_DATA_PARALLEL_INTERN
@@ -1495,7 +1495,7 @@ _execTraversal(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPositio
 #ifdef DEBUG_DATA_PARALLEL
             std::cerr << "Coverage: " << traverser._activeBranchCoverage << std::endl;
 #endif
-            TBitVector& mappedCov = mappedCoverage(variantData(container(traverser)), position(traverser._branchNodeIt));
+            TBitVector& mappedCov = mappedCoverage(branchNodeMap(container(traverser)), position(traverser._branchNodeIt));
             if (!testAllZeros(mappedCov))
             {
                 // We know search in the delta until we have reached the end position of this delta: x, if INS/SNP or x-1 if DEL
@@ -1596,10 +1596,10 @@ inline void
 _reinitBlockEnd(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosition, TRequireFullContext> > & traverser)
 {
     // We do not need to update the end if the full tree is journaled.
-    if (requiresFullJournal(container(traverser)))
+    if (allVariantsJournaled(container(traverser)))
         return;
 
-    unsigned maxNum = length(keys(variantData(container(traverser))));
+    unsigned maxNum = length(keys(branchNodeMap(container(traverser))));
     unsigned id = _min((container(traverser)._activeBlock) * container(traverser)._blockSize,
                        maxNum);
 
@@ -1607,9 +1607,9 @@ _reinitBlockEnd(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPositi
         traverser._masterItEnd = end(host(container(traverser)), Rooted());
     else
         traverser._masterItEnd = begin(host(container(traverser)), Rooted()) +
-                                 keys(variantData(container(traverser)))[id];
+                                 keys(branchNodeMap(container(traverser)))[id];
 
-    traverser._branchNodeItEnd = begin(variantData(container(traverser)), Rooted()) + id;
+    traverser._branchNodeItEnd = begin(branchNodeMap(container(traverser)), Rooted()) + id;
 }
 
 // ----------------------------------------------------------------------------
@@ -1622,7 +1622,7 @@ init(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosition, TRequir
      TContainer & obj)
 {
     setContainer(traverser, obj);
-    _initSegment(traverser, begin(variantData(obj), Rooted()), end(variantData(obj), Rooted()), 0, length(host(obj)));
+    _initSegment(traverser, begin(branchNodeMap(obj), Rooted()), end(branchNodeMap(obj), Rooted()), 0, length(host(obj)));
 }
 
 // ----------------------------------------------------------------------------
