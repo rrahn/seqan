@@ -289,7 +289,7 @@ _doJournalBlock(JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverage, TMapSp
         if (getBlockSize(jst) != TJst::REQUIRE_FULL_JOURNAL)
             for (unsigned i = jobBegin; i < jobEnd; ++i)
             {
-                clear(journalSet[i]);  // Reinitialize the journal string.
+                clear(journalSet[i]);  // Reinitialize the journal strings.
                 jst._blockVPOffset[i] += jst._activeBlockVPOffset[i];
             }
 
@@ -393,6 +393,18 @@ host(JournaledStringTree<TDeltaMap, TSpec> const & stringTree)
 }
 
 // ----------------------------------------------------------------------------
+// Function getBlockOffset()
+// ----------------------------------------------------------------------------
+
+template <typename TDeltaMap, typename TSpec, typename TPosition>
+inline typename MakeSigned<typename Size<JournaledStringTree<TDeltaMap, TSpec> const>::Type>::Type &
+getBlockOffset(JournaledStringTree<TDeltaMap, TSpec> const & stringTree,
+               TPosition const & pos)
+{
+    return stringTree._blockVPOffset[pos];
+}
+
+// ----------------------------------------------------------------------------
 // Function setDeltaMap()
 // ----------------------------------------------------------------------------
 
@@ -403,6 +415,15 @@ void setDeltaMap(JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageStore>,
     setValue(stringTree._variantData, deltaMap);
     stringTree._blockBegin = 0;
     stringTree._blockEnd = length(keys(deltaMap));
+}
+
+template <typename TDeltaStore, typename TDeltaCoverageStore, typename TSpec>
+inline bool
+requiresFullJournal(JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageStore>, TSpec> const & stringTree)
+{
+    typedef JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageStore>, TSpec> TJst;
+
+    return stringTree._blockSize == TJst::REQUIRE_FULL_JOURNAL;
 }
 
 // ----------------------------------------------------------------------------
@@ -434,12 +455,22 @@ bool journalNextBlock(JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageSt
                       TSize contextSize,
                       Tag<TParallelTag> tag)
 {
+    typedef JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageStore>, StringTreeDefault> TJst;
+
     if (stringTree._activeBlock < stringTree._numBlocks)
     {
-        _doJournalBlock(stringTree, contextSize, tag);
+        if (stringTree._blockSize == TJst::REQUIRE_FULL_JOURNAL && stringTree._emptyJournal)
+        {
+            _doJournalBlock(stringTree, contextSize, tag);
+            stringTree._emptyJournal = false;
+        }
+        else if (stringTree._blockSize != TJst::REQUIRE_FULL_JOURNAL)
+            _doJournalBlock(stringTree, contextSize, tag);
+
         ++stringTree._activeBlock;
         return true;
     }
+    stringTree._activeBlock = 0;  // Reset the active block when all blocks are loaded.
     return false;
 }
 
@@ -489,7 +520,7 @@ void setBlockSize(JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageStore>
     stringTree._activeBlock = 0;
     stringTree._numBlocks = static_cast<unsigned>(std::ceil(static_cast<double>(length(keys(variantData(stringTree)))) /
                                                             static_cast<double>(newBlockSize)));
-    resize(stringTree._blockVP, journalSize(stringTree), 0, Exact());
+    resize(stringTree._blockVPOffset, journalSize(stringTree), 0, Exact());
 }
 
 // ----------------------------------------------------------------------------

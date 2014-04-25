@@ -490,8 +490,9 @@ position(JstTraverser<JournaledStringTree<TContainer, StringTreeDefault>, TState
             {
                 unsigned seqId = it - itBegin;
                 appendValue(posVec,
-                            TPositionValue(seqId, hostToVirtualPosition(value(journalData(container(traverser)), seqId),
-                                                                        hostPos)));
+                            TPositionValue(seqId,
+                                           hostToVirtualPosition(value(journalData(container(traverser)), seqId),
+                                                                 hostPos) + getBlockOffset(container(traverser), seqId)));
             }
         }
     }
@@ -506,7 +507,7 @@ position(JstTraverser<JournaledStringTree<TContainer, StringTreeDefault>, TState
         if (IsSameType<TContextPos, ContextPositionRight>::VALUE)
         {
             // TODO(rmaerker): Usually we just take the current position branch iterator.
-            int offset = 0; //position(traverser._branchIt) - windowBeginPositionClipped(traverser, StateTraverseBranch());
+//            int offset = 0; //position(traverser._branchIt) - windowBeginPositionClipped(traverser, StateTraverseBranch());
             for (TIterator it = itBegin; it != itEnd; ++it)
             {
                 if (*it)
@@ -518,7 +519,7 @@ position(JstTraverser<JournaledStringTree<TContainer, StringTreeDefault>, TState
                     // We now need to figure out a way to map the end positions!!!! Maybe we need some diner for this.
                     // Maybe but just maybe, we need the last break point here.
                     _mapVirtualToVirtual(journalIt, traverser._branchIt, (traverser._proxyBranchNodeIt - 1), variantData(container(traverser)), seqId);
-                    appendValue(posVec, TPositionValue(seqId, position(journalIt) + offset));
+                    appendValue(posVec, TPositionValue(seqId, position(journalIt) + getBlockOffset(container(traverser), seqId)));
                 }
             }
         }
@@ -533,7 +534,7 @@ position(JstTraverser<JournaledStringTree<TContainer, StringTreeDefault>, TState
                     // This is ok, since we guarantee not to change anything in this function.
                     journalIt._journalStringPtr = const_cast<TJournalString*>(&value(journalData(container(traverser)), seqId));
                     _mapVirtualToVirtual(journalIt, windowBegin(traverser, StateTraverseBranch()), traverser._branchNodeIt, variantData(container(traverser)), seqId);
-                    appendValue(posVec, TPositionValue(seqId, position(journalIt)));
+                    appendValue(posVec, TPositionValue(seqId, position(journalIt) + getBlockOffset(container(traverser), seqId)));
                 }
             }
         }
@@ -1584,6 +1585,31 @@ _initSegment(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosition,
     traverser._branchNodeInContextIt = traverser._branchNodeIt = nodeItBegin;
     traverser._branchNodeItEnd = nodeItEnd;
     _globalInit(traverser);
+}
+
+// ----------------------------------------------------------------------------
+// Function _reinitBlockEnd()
+// ----------------------------------------------------------------------------
+
+template <typename TContainer, typename TState, typename TContextPosition, typename TRequireFullContext>
+inline void
+_reinitBlockEnd(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosition, TRequireFullContext> > & traverser)
+{
+    // We do not need to update the end if the full tree is journaled.
+    if (requiresFullJournal(container(traverser)))
+        return;
+
+    unsigned maxNum = length(keys(variantData(container(traverser))));
+    unsigned id = _min((container(traverser)._activeBlock) * container(traverser)._blockSize,
+                       maxNum);
+
+    if (id == maxNum)  // Last block.
+        traverser._masterItEnd = end(host(container(traverser)), Rooted());
+    else
+        traverser._masterItEnd = begin(host(container(traverser)), Rooted()) +
+                                 keys(variantData(container(traverser)))[id];
+
+    traverser._branchNodeItEnd = begin(variantData(container(traverser)), Rooted()) + id;
 }
 
 // ----------------------------------------------------------------------------

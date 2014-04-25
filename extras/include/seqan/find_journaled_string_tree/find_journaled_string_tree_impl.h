@@ -391,6 +391,7 @@ find(Finder2<TContainer, TPattern, DataParallel<TSpec> > & finder,
             init(finder._extensionFunctor, pattern, scoreLimit);
             finder._needReinit = false;
         }
+        _reinitBlockEnd(traverser);
         traverse(traverser, finder, delegate);
     }
 }
