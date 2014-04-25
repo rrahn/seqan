@@ -131,9 +131,6 @@ bool _runTest(TMockGenerator & mockGen,
             else
                 appendValue(compareHits, position(stdFinder) + (length(ndl) - 1));
         }
-
-
-
         if (length(compareHits) != length(delegate._hitStringSet[i]))
             return false;
 

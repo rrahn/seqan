@@ -60,9 +60,9 @@ public:
     typedef TDeltaStore TDeltaStore_;
     typedef typename Keys<DeltaMap>::Type TKeys;
 
-    TKeys               _keys;  // Key string containing the positions within the reference.
+    TKeys                _keys;  // Key string containing the positions within the reference.
     TDeltaStore_         _deltaStore;
-    TDeltaCoverageStore _deltaCoverageStore;
+    TDeltaCoverageStore  _deltaCoverageStore;
 
     DeltaMap() : _deltaStore(), _deltaCoverageStore()
     {}

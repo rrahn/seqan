@@ -112,7 +112,7 @@ struct MockGenerator_
     typedef DeltaStore<TSize, TAlphabet> TDeltaStore;
     typedef DeltaMap<TDeltaStore, DeltaCoverageStore> TDeltaMap;
 	typedef JournaledStringTree<TDeltaMap> TStringTree;
-	typedef typename JournalData<TStringTree>::Type TJournalSet;
+	typedef typename GetStringSet<TStringTree>::Type TJournalSet;
 	typedef typename Value<TJournalSet>::Type TJournalString;
 	typedef typename Host<TJournalSet>::Type THost;
 	typedef typename DeltaValue<TDeltaStore, DeltaType::DELTA_TYPE_DEL>::Type TDel;

@@ -32,7 +32,7 @@
 // Author: Rene Rahn <rene.rahn@fu-berlin.de>
 // ==========================================================================
 
-#define TEST_DEBUG_OUTPUT
+//#define TEST_DEBUG_OUTPUT
 
 
 #include <seqan/basic.h>

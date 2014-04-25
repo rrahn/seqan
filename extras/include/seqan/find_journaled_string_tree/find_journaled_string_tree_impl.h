@@ -319,7 +319,7 @@ init(ExtensionFunctor<TFinder, TExtensionSpec> & extensionFunctor,
 //    typedef Finder2<TContainer, TPattern, DataParallel<TSpec> > TFinder;
 //    typedef typename FinderExtension<TFinder>::Type TFinderFunctor;
 //    typedef typename GetJstTraverserForFinder_<TFinder>::Type TTraverser;
-//    typedef typename VariantData<TContainer>::Type TDeltaMap;
+//    typedef typename GetBranchNodeMap<TContainer>::Type TDeltaMap;
 //    typedef typename Iterator<TDeltaMap, Rooted>::Type TDeltaIter;
 //    typedef typename Position<TContainer>::Type TPosition;
 //
@@ -337,7 +337,7 @@ init(ExtensionFunctor<TFinder, TExtensionSpec> & extensionFunctor,
 //    // Initialize the traverser.
 //    TTraverser traverser(container(finder), length(needle(pattern)) - scoreLimit);
 //    // Parallelize over set of branch nodes. -> Maybe not most efficient.
-//    Splitter<TDeltaIter> nodeSplitter(begin(variantData(container(finder)), Rooted()), end(variantData(container(finder)), Rooted()), Parallel());
+//    Splitter<TDeltaIter> nodeSplitter(begin(branchNodeMap(container(finder)), Rooted()), end(branchNodeMap(container(finder)), Rooted()), Parallel());
 //
 //    StringSet<String<TPosition> > mergePointOverlaps;
 //    resize(mergePointOverlaps, length(nodeSplitter));
@@ -391,6 +391,7 @@ find(Finder2<TContainer, TPattern, DataParallel<TSpec> > & finder,
             init(finder._extensionFunctor, pattern, scoreLimit);
             finder._needReinit = false;
         }
+        _reinitBlockEnd(traverser);
         traverse(traverser, finder, delegate);
     }
 }

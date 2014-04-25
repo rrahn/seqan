@@ -45,7 +45,6 @@ SEQAN_DEFINE_TEST(test_journaled_string_tree_test)
     using namespace seqan;
 
     typedef String<Dna, Journaled<Alloc<>, SortedArray, Alloc<> > > TJournalString;
-    typedef typename Iterator<TJournalString>::Type TJournalStingIterator;
     typedef typename Host<TJournalString>::Type THostString;
 //    unsigned lastEntryId = 0;
 
