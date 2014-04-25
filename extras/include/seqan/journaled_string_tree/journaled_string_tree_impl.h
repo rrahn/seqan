@@ -60,18 +60,34 @@ struct GetBranchNodeMap{};
 // Class JournaledStringTree                                [StringTreeDefault]
 // ----------------------------------------------------------------------------
 
-template <typename TDeltaStore, typename TDeltaCoverageStore>
-class JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageStore>, StringTreeDefault>
+/*!
+ * @class JournaledStringTree Journaled String Tree
+ * @headerfile seqan/journaled_string_tree.h
+ * @brief A succinct data structure that can traverse a set of similar sequences simultaneously.
+ *
+ * @signature template <typename TDelta[, typename TSpec]>
+ *            class JournaledStringTree<TDeltaStore, TSpec>;
+ *
+ * @tparam TDelta Type of the object holding delta information for a set of sequences. @link DeltaMap @endlink
+ * @tparam TSpec The journaled string tree type.
+ *
+ * Internally, the journaled string tree uses referentially compressed strings @link JournaledString @endlink to
+ * represent the sequences encoded by the the delta map. The sequence information is built on-demand and can
+ * be block-wise constructed. Use the function @link JournaledStringTree#journalNextBlock @endlink to force the
+ * creation of the sequence information for the next block.
+ */
+
+template <typename TDeltaStore>
+class JournaledStringTree<TDeltaStore, StringTreeDefault>
 {
 public:
-    typedef DeltaMap<TDeltaStore, TDeltaCoverageStore> TDeltaMap;
     typedef typename GetStringSet<JournaledStringTree>::Type TJournalData;
     typedef typename Value<TJournalData>::Type TJournaledString;
     typedef typename Size<TJournalData>::Type TSize;
     typedef typename MakeSigned<TSize>::Type TSignedSize;
 
     // TODO(rmaerker): Maybe no holder.
-    Holder<TDeltaMap> _branchNodeMap;
+    Holder<TDeltaStore> _branchNodeMap;
 
     // NOTE(rmaerker): We use this as an internal data structure, which is not set from outside.
     mutable TJournalData  _journalSet;
@@ -93,10 +109,10 @@ public:
     {}
 
     template <typename THost>
-    JournaledStringTree(THost & reference, TDeltaMap const & varData) : _blockSize(REQUIRE_FULL_JOURNAL),
-                                                                        _activeBlock(0),
-                                                                        _numBlocks(1),
-                                                                        _emptyJournal(true)
+    JournaledStringTree(THost & reference, TDeltaStore const & varData) : _blockSize(REQUIRE_FULL_JOURNAL),
+                                                                          _activeBlock(0),
+                                                                          _numBlocks(1),
+                                                                          _emptyJournal(true)
 
     {
         init(*this, reference, varData);
@@ -363,6 +379,18 @@ _doJournalBlock(JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverage, TMapSp
 // Function host()
 // ----------------------------------------------------------------------------
 
+/*!
+ * @fn JournaledStringTree#host
+ * @headerfile seqan/journaled_string_tree.h
+ * @brief Returns a reference to the global reference sequence.
+ *
+ * @signature THost host(jst);
+ *
+ * @param[in] jst    The Journal String Tree.
+ *
+ * @return THost A reference to the @link Host @endlink object.
+ */
+
 template <typename TDeltaMap, typename TSpec>
 inline typename Host<JournaledStringTree<TDeltaMap, TSpec> >::Type &
 host(JournaledStringTree<TDeltaMap, TSpec> & stringTree)
@@ -381,6 +409,22 @@ host(JournaledStringTree<TDeltaMap, TSpec> const & stringTree)
 // Function getBlockOffset()
 // ----------------------------------------------------------------------------
 
+/*!
+ * @fn JournaledStringTree#getBlockOffset
+ * @headerfile seqan/journaled_string_tree.h
+ * @brief Returns the virtual offset for the current block for the given sequence.
+ *
+ * @signature TSize getBlockOffset(jst, id);
+ *
+ * @param[in] jst    The Journal String Tree.
+ * @param[in] id     The id of the sequence to get the offset for.
+ *
+ * When constructing the sequence information block-wise, an additional offset is used to determine
+ * the correct virtual position for the current block for each sequence.
+ *
+ * @return TSize Current block offset for the sequence <tt>id<\tt> of type <tt>MakeSigned<Size<Journaled String Tree> ><\tt>.
+ */
+
 template <typename TDeltaMap, typename TSpec, typename TPosition>
 inline typename MakeSigned<typename Size<JournaledStringTree<TDeltaMap, TSpec> const>::Type>::Type &
 getBlockOffset(JournaledStringTree<TDeltaMap, TSpec> const & stringTree,
@@ -392,6 +436,18 @@ getBlockOffset(JournaledStringTree<TDeltaMap, TSpec> const & stringTree,
 // ----------------------------------------------------------------------------
 // Function allVariantsJournaled()
 // ----------------------------------------------------------------------------
+
+/*!
+ * @fn JournaledStringTree#allVariantsJournaled
+ * @headerfile seqan/journaled_string_tree.h
+ * @brief Checks whether the sequences are constructed block-wise or not.
+ *
+ * @signature bool allVariantsJournaled(jst);
+ *
+ * @param[in] jst    The Journal String Tree.
+ *
+ * @return bool Returns <tt>false<\tt> if constructed block-wise, otherwise <tt>true<\tt>.
+ */
 
 template <typename TDeltaStore, typename TDeltaCoverageStore, typename TSpec>
 inline bool
@@ -405,6 +461,21 @@ allVariantsJournaled(JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageSto
 // ----------------------------------------------------------------------------
 // Function journalNextBlock()
 // ----------------------------------------------------------------------------
+
+/*!
+ * @fn JournaledStringTree#journalNextBlock
+ * @headerfile seqan/journaled_string_tree.h
+ * @brief Constructs the sequence content for the next block if available.
+ *
+ * @signature bool journalNextBlock(jst, w[, tag]);
+ *
+ * @param[in|out] jst   The Journal String Tree.
+ * @param[in] w         The size of the context used to stream the Journal String Tree.
+ * @param[in] tag       Tag to enable parallel processing. Defaults to @link Serial @endlink.
+ *
+ *
+ * @return bool Returns <tt>true<\tt> if a new block was generated, otherwise <tt>false<\tt>.
+ */
 
 template <typename TDeltaStore, typename TDeltaCoverageStore, typename TSize, typename TParallelTag>
 bool journalNextBlock(JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageStore>, StringTreeDefault> & stringTree,
@@ -440,22 +511,53 @@ bool journalNextBlock(JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageSt
 // Function reinit()
 // ----------------------------------------------------------------------------
 
+/*!
+ * @fn JournaledStringTree#reinit
+ * @headerfile seqan/journaled_string_tree.h
+ * @brief Reinitializes the journaled string tree.
+ *
+ * @signature void reinit(jst);
+ *
+ * @param[in|out] jst    The Journal String Tree.
+ *
+ * This function resets the tree to the first block. Note, that the journaled strings are not cleard such that in case
+ * of no block-wise generation the journaled strings are not reconstructed.
+ */
+
 // Keeps the journal strings alive, if the full block has loaded.
 template <typename TDeltaStore, typename TDeltaCoverageStore, typename TSpec>
 inline void
 reinit(JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageStore>, TSpec> & jst)
 {
     // Reset all positions to 0.
-    arrayFill(begin(jst._activeBlockVPOffset, Standard()), end(jst._activeBlockVPOffset, Standard()), 0);
-    arrayFill(begin(jst._blockVPOffset, Standard()), end(jst._activeBlockVPOffset, Standard()), 0);
     jst._activeBlock = 0;
     if (!allVariantsJournaled(jst))
+    {
         jst._emptyJournal = true;
+        arrayFill(begin(jst._activeBlockVPOffset, Standard()), end(jst._activeBlockVPOffset, Standard()), 0);
+        arrayFill(begin(jst._blockVPOffset, Standard()), end(jst._activeBlockVPOffset, Standard()), 0);
+    }
+
 }
 
 // ----------------------------------------------------------------------------
 // Function init()
 // ----------------------------------------------------------------------------
+
+/*!
+ * @fn JournaledStringTree#init
+ * @headerfile seqan/journaled_string_tree.h
+ * @brief Initializes the journaled string tree.
+ *
+ * @signature void init(jst, host, delta);
+ *
+ * @param[in|out] jst    The Journal String Tree.
+ * @param[in] host       The reference sequence.
+ * @param[in] delta      The object containing the delta information.
+ *
+ * This function does not construct the sequences. Use the function @link JournaledStringTree#journalNextBlock @endlink
+ * to dynamically generate the sequences on-demand.
+ */
 
 template <typename TDeltaStore, typename TDeltaCoverageStore, typename TSpec, typename THost>
 inline void
@@ -481,6 +583,21 @@ init(JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageStore>, TSpec> & js
 // Function setBlockSize()
 // ----------------------------------------------------------------------------
 
+/*!
+ * @fn JournaledStringTree#setBlockSize
+ * @headerfile seqan/journaled_string_tree.h
+ * @brief Sets the number of variants processed at a time.
+ *
+ * @signature void setBlockSize(jst, block);
+ *
+ * @param[in]   jst     The Journal String Tree.
+ * @param[in]   block   The number of deltas contained in one block.
+ *
+ * Per default all deltas are processed in a single block.
+ *
+ * @see JournaledStringTree#getBlockSize
+ */
+
 template <typename TDeltaStore, typename TDeltaCoverageStore, typename TSpec, typename TPosition>
 inline void
 setBlockSize(JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageStore>, TSpec> & stringTree,
@@ -499,6 +616,20 @@ setBlockSize(JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageStore>, TSp
 // Function getBlockSize()
 // ----------------------------------------------------------------------------
 
+/*!
+ * @fn JournaledStringTree#getBlockSize
+ * @headerfile seqan/journaled_string_tree.h
+ * @brief Returns the size of the blocks.
+ *
+ * @signature TSize getBlockSize(jst);
+ *
+ * @param[in]   jst     The Journal String Tree.
+ *
+ * @return TSize the size of the blocks.
+ *
+ * @see JournaledStringTree#setBlockSize
+ */
+
 template <typename TDeltaStore, typename TDeltaCoverageStore, typename TSpec>
 inline typename Size<JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageStore>, TSpec> >::Type
 getBlockSize(JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageStore>, TSpec> const & stringTree)
@@ -509,6 +640,20 @@ getBlockSize(JournaledStringTree<DeltaMap<TDeltaStore, TDeltaCoverageStore>, TSp
 // ----------------------------------------------------------------------------
 // Function branchNodeMap()
 // ----------------------------------------------------------------------------
+
+/*!
+ * @fn JournaledStringTree#branchNodeMap
+ * @headerfile seqan/journaled_string_tree.h
+ * @brief Returns a reference to the object holding the delta information for a set of sequences.
+ *
+ * @signature TBranchNodeMap branchNodeMap(jst);
+ *
+ * @param[in]   jst     The Journal String Tree.
+ *
+ * @return TBranchNodeMap the object holding the delta information of type @link JournaledStringTree#GetBranchNodeMap @endlink.
+ *
+ * @see JournaledStringTree#stringSet
+ */
 
 template <typename TDeltaMap, typename TSpec>
 inline typename GetBranchNodeMap<JournaledStringTree<TDeltaMap, TSpec> >::Type &
@@ -527,6 +672,20 @@ branchNodeMap(JournaledStringTree<TDeltaMap, TSpec> const & stringTree)
 // ----------------------------------------------------------------------------
 // Function stringSet()
 // ----------------------------------------------------------------------------
+
+/*!
+ * @fn JournaledStringTree#stringSet
+ * @headerfile seqan/journaled_string_tree.h
+ * @brief Returns a reference to the constructed sequences.
+ *
+ * @signature TStringSet stringSet(jst);
+ *
+ * @param[in]   jst     The Journal String Tree.
+ *
+ * @return TStringSet the object containing the compressed strings @link JournaledStringTree#GetStringSet @endlink.
+ *
+ * @see JournaledStringTree#stringSet
+ */
 
 template <typename TDeltaMap, typename TSpec>
 inline typename GetStringSet<JournaledStringTree<TDeltaMap, TSpec> >::Type &
