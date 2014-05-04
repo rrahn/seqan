@@ -62,7 +62,7 @@ public:
     typedef typename Iterator<TJournaledString, Standard>::Type TJSIterator;
 
     typedef typename GetBranchNodeMap<TJst>::Type TDeltaMap;
-    typedef typename MappedCoverage<TDeltaMap>::Type TCoverage;
+    typedef typename DeltaCoverage<TDeltaMap>::Type TCoverage;
     typedef typename Iterator<TDeltaMap, Rooted>::Type TBranchNodeIterator;
 
     typedef typename Position<TJst>::Type TPosition;

@@ -67,8 +67,8 @@ typedef Tag<ReadVariantInformationAndJournalData_> WithLoadingJournalData;
 // Function readJSeqFile()
 // ----------------------------------------------------------------------------
 
-template <typename TDeltaStore, typename TDeltaCoverageStore, typename TSpec, typename TFileLocation>
-inline int readJSeqFile(DeltaMap<TDeltaStore, TDeltaCoverageStore, TSpec> & deltaMap,
+template <typename TValue, typename TAlphabet, typename TSpec, typename TFileLocation>
+inline int readJSeqFile(DeltaMap<TValue, TAlphabet, TSpec> & deltaMap,
                         JSeqHeader & jseqHeader,
                         CharString const & refId,
                         TFileLocation const & filePath)

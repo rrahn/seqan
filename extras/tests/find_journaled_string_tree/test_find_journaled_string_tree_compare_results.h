@@ -90,8 +90,8 @@ bool _runTest(TMockGenerator & mockGen,
     using namespace seqan;
 
     typedef String<TAlphabet> TNeedle;
-    typedef DeltaStore<unsigned, TAlphabet> TDeltaStore;
-    typedef JournaledStringTree<DeltaMap<TDeltaStore, DeltaCoverageStore>, StringTreeDefault> TContainer;
+//    typedef DeltaStore<unsigned, TAlphabet> TDeltaStore;
+    typedef JournaledStringTree<DeltaMap<unsigned, TAlphabet>, StringTreeDefault> TContainer;
 
     typedef Pattern<TNeedle, TAlgorithm> TPattern;
     typedef Finder2<TContainer, TPattern, DataParallel<> > TFinder;
@@ -154,8 +154,8 @@ bool _runTest(TMockGenerator & mockGen,
     using namespace seqan;
 
     typedef String<TAlphabet> TNeedle;
-    typedef DeltaStore<unsigned, TAlphabet> TDeltaStore;
-    typedef JournaledStringTree<DeltaMap<TDeltaStore, DeltaCoverageStore>, StringTreeDefault> TContainer;
+//    typedef DeltaStore<unsigned, TAlphabet> TDeltaStore;
+    typedef JournaledStringTree<DeltaMap<unsigned, TAlphabet>, StringTreeDefault> TContainer;
 
     typedef Pattern<TNeedle, Myers<TMyersSpec, THasState, TBeginSpec> > TPattern;
     typedef Finder2<TContainer, TPattern, DataParallel<> > TFinder;

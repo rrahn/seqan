@@ -294,16 +294,18 @@ _readSnp(TAlphabet & snp,
     return sizeof(__uint32);
 }
 
-template <typename TDeltaStore, typename TDeltaCoverageStore, typename TStream, typename TBoolFlag>
-inline void _readJSeqBlock(DeltaMap<TDeltaStore, TDeltaCoverageStore> & deltaMap,
+template <typename TValue, typename TAlphabet, typename TStream, typename TBoolFlag>
+inline void _readJSeqBlock(DeltaMap<TValue, TAlphabet> & deltaMap,
                            RecordReader<TStream, SinglePass<> > & reader,
                            JSeqHeader & jseqHeader,
                            TBoolFlag isDnaCompressed)
 {
-    typedef typename DeltaValue<TDeltaStore, DeltaType::DELTA_TYPE_SNP>::Type TSnp;
-    typedef typename DeltaValue<TDeltaStore, DeltaType::DELTA_TYPE_DEL>::Type TDel;
-    typedef typename DeltaValue<TDeltaStore, DeltaType::DELTA_TYPE_INS>::Type TIns;
+    typedef DeltaMap<TValue, TAlphabet> TDeltaMap;
+    typedef typename DeltaValue<TDeltaMap, DeltaType::DELTA_TYPE_SNP>::Type TSnp;
+    typedef typename DeltaValue<TDeltaMap, DeltaType::DELTA_TYPE_DEL>::Type TDel;
+    typedef typename DeltaValue<TDeltaMap, DeltaType::DELTA_TYPE_INS>::Type TIns;
 
+    typedef typename GetDeltaCoverageStore_<TDeltaMap>::Type TDeltaCoverageStore;
     typedef typename Iterator<TDeltaCoverageStore, Standard>::Type TCoverageStoreIter;
 
     CharString buffer;
@@ -364,14 +366,14 @@ inline void _readJSeqBlock(DeltaMap<TDeltaStore, TDeltaCoverageStore> & deltaMap
         }
     }
 
-    unsigned oldLength = length(deltaCoverageStore(deltaMap));
-    resize(deltaCoverageStore(deltaMap), length(deltaCoverageStore(deltaMap)) + counter, Exact());
-    TCoverageStoreIter it = begin(deltaCoverageStore(deltaMap), Standard()) + oldLength;
-    TCoverageStoreIter itEnd = end(deltaCoverageStore(deltaMap), Standard());
+    unsigned oldLength = length(deltaMap._deltaCoverageStore);
+    resize(deltaMap._deltaCoverageStore, length(deltaMap._deltaCoverageStore) + counter, Exact());
+    TCoverageStoreIter it = begin(deltaMap._deltaCoverageStore, Standard()) + oldLength;
+    TCoverageStoreIter itEnd = end(deltaMap._deltaCoverageStore, Standard());
 
     for (; it != itEnd; ++it)
     {
-        resize(*it, coverageSize(deltaCoverageStore(deltaMap)), Exact());
+        resize(*it, coverageSize(deltaMap), Exact());
         _readDeltaCoverage(*it, reader);
     }
 }
@@ -422,20 +424,20 @@ _readDeltaCoverage(String<bool, Packed<TSpec> > & bitVector,
     {
         clear(buffer);
         readNChars(buffer, reader, sizeof(TBitVector));
-        it->i = *reinterpret_cast<TBitVector*>(&buffer[0]);  // TODO(rmaerker): Try swap function here? // std::swap(&it->i, &buffer)
+        it->i = *reinterpret_cast<TBitVector*>(&buffer[0]);  // TODO(rmaerker): Try move function here?
     }
     return 0;
 }
 
-template <typename TDeltaStore, typename TDeltaCoverageStore, typename TStream>
+template <typename TValue, typename TAlphabet, typename TStream>
 inline int
-read(DeltaMap<TDeltaStore, TDeltaCoverageStore> & deltaMap,
+read(DeltaMap<TValue, TAlphabet> & deltaMap,
      JSeqHeader & jseqHeader,
      RecordReader<TStream, SinglePass<> > & reader,
      JSeq const & /*tag*/)
 {
     readHeader(jseqHeader, reader, JSeq());
-    setCoverageSize(deltaCoverageStore(deltaMap), length(jseqHeader._nameStore));
+    setCoverageSize(deltaMap, length(jseqHeader._nameStore));
 
     if (jseqHeader._fileInfos._snpCompression)
         _readJSeqData(deltaMap, reader, jseqHeader, True());
@@ -452,15 +454,14 @@ read(StringSet<TJournalSeq, Owner<JournaledSet> > & journalSet,
      JSeq const & /*tag*/)
 {
     typedef typename Value<TJournalSeq>::Type TAlphabet;
-    typedef typename Size<TJournalSeq>::Type TSize;
-    typedef DeltaStore<TSize, TAlphabet> TDeltaStore;
+    typedef typename Position<TJournalSeq>::Type TPosition;
 
     if (empty(host(journalSet)))
         return -1;
 
-    DeltaMap<TDeltaStore, DeltaCoverageStore> deltaMap;
+    DeltaMap<TPosition, TAlphabet> deltaMap;
     read(deltaMap, jseqHeader, reader, JSeq());
-    adaptTo(journalSet, deltaMap, Serial());
+    adaptTo(journalSet, deltaMap, 0, length(deltaMap), Serial());
     return 0;
 }
 

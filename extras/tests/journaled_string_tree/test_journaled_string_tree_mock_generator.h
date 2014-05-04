@@ -109,13 +109,12 @@ struct DataParallelTestConfig
 template <typename TSize, typename TAlphabet>
 struct MockGenerator_
 {
-    typedef DeltaStore<TSize, TAlphabet> TDeltaStore;
-    typedef DeltaMap<TDeltaStore, DeltaCoverageStore> TDeltaMap;
+    typedef DeltaMap<TSize, TAlphabet> TDeltaMap;
 	typedef JournaledStringTree<TDeltaMap> TStringTree;
 	typedef typename GetStringSet<TStringTree>::Type TJournalSet;
 	typedef typename Value<TJournalSet>::Type TJournalString;
 	typedef typename Host<TJournalSet>::Type THost;
-	typedef typename DeltaValue<TDeltaStore, DeltaType::DELTA_TYPE_DEL>::Type TDel;
+	typedef typename DeltaValue<TDeltaMap, DeltaType::DELTA_TYPE_DEL>::Type TDel;
 
 	TJournalSet _seqData;
 	TDeltaMap _varStore;
@@ -134,7 +133,7 @@ struct MockGenerator_
 		SEQAN_ASSERT(!empty(covData));
 
 		unsigned numSeq  = length(covData[0]);
-		setCoverageSize(deltaCoverageStore(_varStore), numSeq);
+		setCoverageSize(_varStore._deltaCoverageStore, numSeq);
 
 		THost ref;
 		generateRef(ref, refSize);

@@ -38,14 +38,34 @@
 #include <seqan/basic.h>
 #include <seqan/file.h>
 
+#include "test_delta_map.h"
 #include "test_journaled_string_tree_util.h"
 #include "test_journaled_string_tree_traverse.h"
 
 SEQAN_BEGIN_TESTSUITE(test_journaled_string_tree)
 {
-    // Call tests.
-//    SEQAN_CALL_TEST(test_journaled_journaled_string_tree_test);
-//	SEQAN_CALL_TEST(test_journaled_journaled_string_tree_util_extract_variant);
+    // Tests for delta map.
+    SEQAN_CALL_TEST(test_delta_map_value_mf);
+    SEQAN_CALL_TEST(test_delta_map_reference_mf);
+    SEQAN_CALL_TEST(test_delta_map_delta_value_mf);
+    SEQAN_CALL_TEST(test_delta_map_delta_coverage_mf);
+    SEQAN_CALL_TEST(test_delta_map_insert);
+    SEQAN_CALL_TEST(test_delta_map_length);
+    SEQAN_CALL_TEST(test_delta_map_empty);
+    SEQAN_CALL_TEST(test_delta_map_coverage_size);
+    SEQAN_CALL_TEST(test_delta_map_set_coverage_size);
+    SEQAN_CALL_TEST(test_delta_map_iterator);
+    SEQAN_CALL_TEST(test_delta_map_iterator_copy_constructor);
+    SEQAN_CALL_TEST(test_delta_map_iterator_assign);
+    SEQAN_CALL_TEST(test_delta_map_iterator_value);
+    SEQAN_CALL_TEST(test_delta_map_iterator_delta_type);
+    SEQAN_CALL_TEST(test_delta_map_iterator_delta_position);
+    SEQAN_CALL_TEST(test_delta_map_iterator_delta_snp);
+    SEQAN_CALL_TEST(test_delta_map_iterator_delta_ins);
+    SEQAN_CALL_TEST(test_delta_map_iterator_delta_del);
+    SEQAN_CALL_TEST(test_delta_map_iterator_delta_indel);
+    SEQAN_CALL_TEST(test_delta_map_iterator_delta_coverage);
+
 //
 //	// Test for finder implementation of data parallel module.
 //	SEQAN_CALL_TEST(test_journaled_journaled_string_tree_merge_point_stack);

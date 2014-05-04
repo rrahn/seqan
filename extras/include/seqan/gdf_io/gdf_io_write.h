@@ -231,14 +231,13 @@ _writeSnp(TTarget & blockBuffer, TPosition deltaPos, Dna snp)
 // Function _writeDataBlock()
 // ----------------------------------------------------------------------------
 
-template <typename TStream, typename TDeltaMapIter, typename TDeltaStore, typename TDeltaCoverageStore>
+template <typename TStream, typename TDeltaMapIter, typename TValue, typename TAlphabet>
 inline int _writeDataBlock(TStream & stream,
                            TDeltaMapIter & it,
                            TDeltaMapIter & itEnd,
-                           DeltaMap<TDeltaStore, TDeltaCoverageStore> const & deltaMap)
+                           DeltaMap<TValue, TAlphabet> const & /*deltaMap*/)
 {
-    typedef DeltaMap<TDeltaStore, TDeltaCoverageStore> TDeltaMap;
-    typedef typename MappedDelta<TDeltaMap>::Type TMappedDelta;
+    typedef DeltaMap<TValue, TAlphabet> TDeltaMap;
 
     CharString blockBuffer;
     typename Iterator<CharString>::Type blockBuffIt;
@@ -246,7 +245,6 @@ inline int _writeDataBlock(TStream & stream,
     // Write the reference offset of the current block.
     streamWriteBlock(stream, reinterpret_cast<char*>(&lastRefPos), sizeof(lastRefPos));
 
-    TDeltaMapIter itBegin = begin(deltaMap, Standard());
     TDeltaMapIter itDelta = it;
 
     while(itDelta != itEnd)
@@ -255,12 +253,12 @@ inline int _writeDataBlock(TStream & stream,
         __uint32 deltaPos = *itDelta - lastRefPos;
 
         // Write SNP Data.
-        TMappedDelta deltaInfo = mappedDelta(deltaMap, itDelta - itBegin);
-        if (deltaType(deltaInfo) == DeltaType::DELTA_TYPE_SNP)
+//        TMappedDelta deltaInfo = mappedDelta(deltaMap, itDelta - itBegin);
+        if (deltaType(itDelta) == DeltaType::DELTA_TYPE_SNP)
         {
 //            resize(blockBuffer, length(blockBuffer) + sizeof(__uint32));
 //            blockBuffIt = end(blockBuffer) - sizeof(__uint32);
-            _writeSnp(blockBuffer, deltaPos, deltaSnp(deltaMap, deltaPosition(deltaInfo)));
+            _writeSnp(blockBuffer, deltaPos, deltaSnp(itDelta));
 //            setBit(deltaPos, BitsPerValue<__uint32>::VALUE -1);
 //            deltaPos |= static_cast<__uint32>(deltaSnp(deltaMap, deltaPosition(deltaInfo))) << (sizeof(__uint32) * 8 - 3);
 //            char* refBuffer = reinterpret_cast<char*>(&deltaPos);
@@ -280,9 +278,9 @@ inline int _writeDataBlock(TStream & stream,
             else
                 arrayMoveForward(refBuffer, refBuffer + sizeof(__uint32), blockBuffIt);
 
-            if (deltaType(deltaInfo) == DeltaType::DELTA_TYPE_DEL)  // Write deletion.
+            if (deltaType(itDelta) == DeltaType::DELTA_TYPE_DEL)  // Write deletion.
             {
-                __uint32 del = static_cast<__uint32>(deltaDel(deltaMap, deltaPosition(deltaInfo)));
+                __uint32 del = static_cast<__uint32>(deltaDel(itDelta));
                 setBit(del, BitsPerValue<__uint32>::VALUE - 1);
                 const char * delBuffer = reinterpret_cast<const char *>(&del);
                 resize(blockBuffer, length(blockBuffer) + sizeof(del));
@@ -294,8 +292,8 @@ inline int _writeDataBlock(TStream & stream,
             }
             else  // Write insertion.
             {
-                typedef typename DeltaValue<TDeltaStore const, DeltaType::DELTA_TYPE_INS>::Type TIns;
-                TIns ins = deltaIns(deltaMap, deltaPosition(deltaInfo));
+                typedef typename DeltaValue<TDeltaMap const, DeltaType::DELTA_TYPE_INS>::Type TIns;
+                TIns ins = deltaIns(itDelta);
                 __uint32 insLength = length(ins);
                 const char * insBuffer = reinterpret_cast<const char *>(&insLength);
                 resize(blockBuffer, length(blockBuffer) + sizeof(insLength) + length(ins));
@@ -320,7 +318,7 @@ inline int _writeDataBlock(TStream & stream,
 
     // Write the coverage of the block
     for (; it != itEnd; ++it)
-        _writeBitVector(stream, mappedCoverage(deltaMap, it - itBegin));
+        _writeBitVector(stream, deltaCoverage(it));
 
     return 0;
 }
@@ -335,7 +333,7 @@ inline int _writeJSeqData(TStream & stream,
     typedef DeltaMap<TDeltaStore, TDeltaCoverageStore> TDeltaMap;
     typedef typename Iterator<TDeltaMap const, Standard>::Type TIterator;
 
-    unsigned maxNumOfNodes = length(keys(deltaMap));
+    unsigned maxNumOfNodes = length(deltaMap);
     unsigned numOfBlocks = std::ceil(static_cast<double>(maxNumOfNodes)/static_cast<double>(blockSize));
 
     // Write the block containing the number of blocks to read.
@@ -350,10 +348,10 @@ inline int _writeJSeqData(TStream & stream,
     return 0;
 }
 
-template <typename TStream, typename TDeltaStore, typename TDeltaCoverageStore>
+template <typename TStream, typename TValue, typename TAlphabet>
 inline int
 write(TStream & stream,
-      DeltaMap<TDeltaStore, TDeltaCoverageStore> const & deltaMap,
+      DeltaMap<TValue, TAlphabet> const & deltaMap,
       JSeqHeader const & jseqHeader,
       JSeq const & /*tag*/)
 {
@@ -370,12 +368,11 @@ write(TStream & stream,
       JSeq const & /*tag*/)
 {
     typedef typename Value<TJournalSequence>::Type TAlphabet;
-    typedef typename Size<TJournalSequence>::Type TSize;
-    typedef DeltaStore<TSize, TAlphabet> TDeltaStore;
+    typedef typename Position<TJournalSequence>::Type TPosition;
 
     if (empty(host(journalSet)))
         return -1;
-    DeltaMap<TDeltaStore, DeltaCoverageStore> deltaMap;
+    DeltaMap<TPosition, TAlphabet> deltaMap;
     adaptTo(deltaMap, journalSet);
     write(stream, deltaMap, jseqHeader, JSeq());
     return 0;

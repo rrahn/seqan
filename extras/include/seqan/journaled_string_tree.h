@@ -52,9 +52,10 @@
 // Basics.
 // ===========================================================================
 
-#include <seqan/journaled_string_tree/variant_store.h>
-#include <seqan/journaled_string_tree/variant_coverage_store.h>
-#include <seqan/journaled_string_tree/variant_map.h>
+#include <seqan/journaled_string_tree/delta_store.h>
+#include <seqan/journaled_string_tree/delta_coverage_store.h>
+#include <seqan/journaled_string_tree/delta_map.h>
+#include <seqan/journaled_string_tree/delta_map_iterator.h>
 
 // ===========================================================================
 // Journaled String Tree.

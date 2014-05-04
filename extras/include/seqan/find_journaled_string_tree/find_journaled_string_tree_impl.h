@@ -247,9 +247,16 @@ deliverContext(Finder2<TContainer, TPattern, DataParallel<TSpec> > & finder,
     Pair<bool, TSize> res(false, 1);
     execute(res, finder._extensionFunctor, contextIterator(traverser, TTag()));
 
+#ifdef DEBUG_DATA_PARALLEL
+    if (res.i1)  // Interrupt: Call the DelegateFunctor.
+    {
+        _printContext(traverser);
+        delegateFunctor(traverser);
+    }
+#else
     if (res.i1)  // Interrupt: Call the DelegateFunctor.
         delegateFunctor(traverser);
-
+#endif
     // Return to the traverser and continue.
     return res.i2;
 }
@@ -304,70 +311,6 @@ init(ExtensionFunctor<TFinder, TExtensionSpec> & extensionFunctor,
 }
 
 // ----------------------------------------------------------------------------
-// Function find()                                              [Parallel case]
-// ----------------------------------------------------------------------------
-
-//template <typename TContainer, typename TPattern, typename TSpec, typename TDelegate, typename TParallelTag>
-//inline void
-//find(Finder2<TContainer, TPattern, DataParallel<TSpec> > & finder,
-//     TPattern & pattern,
-//     TDelegate & delegate,
-//     int scoreLimit = 0,
-//     Tag<TParallelTag> tag = Serial())
-//{
-//
-//    typedef Finder2<TContainer, TPattern, DataParallel<TSpec> > TFinder;
-//    typedef typename FinderExtension<TFinder>::Type TFinderFunctor;
-//    typedef typename GetJstTraverserForFinder_<TFinder>::Type TTraverser;
-//    typedef typename GetBranchNodeMap<TContainer>::Type TDeltaMap;
-//    typedef typename Iterator<TDeltaMap, Rooted>::Type TDeltaIter;
-//    typedef typename Position<TContainer>::Type TPosition;
-//
-//
-//    if (finder._needReinit)
-//    {
-//        // finder._finderFunctor(pattern, initState);
-//        init(finder._finderFunctor, pattern, scoreLimit);
-//        finder._needReinit = false;
-//    }
-//
-//    requireJournal(container(finder), tag);  // Build the journal set on demand - works in parallel too.
-//
-//
-//    // Initialize the traverser.
-//    TTraverser traverser(container(finder), length(needle(pattern)) - scoreLimit);
-//    // Parallelize over set of branch nodes. -> Maybe not most efficient.
-//    Splitter<TDeltaIter> nodeSplitter(begin(branchNodeMap(container(finder)), Rooted()), end(branchNodeMap(container(finder)), Rooted()), Parallel());
-//
-//    StringSet<String<TPosition> > mergePointOverlaps;
-//    resize(mergePointOverlaps, length(nodeSplitter));
-//
-//    SEQAN_OMP_PRAGMA(parallel for firstprivate(traverser))
-//    for (unsigned jobId = 0; jobId < length(nodeSplitter); ++jobId)
-//    {
-//        TFinder threadFinder = finder;  // Copy basic initialized finder.  // NOTE(rmaerker): Copying the states is probably much faster than do a initialization for each finder per thread.
-//
-////        printf("In thread: %i of %i\n", omp_get_thread_num(), omp_get_num_threads());
-//        TPosition hostBeginPos = 0;
-//        if (jobId != 0u)
-//            hostBeginPos = *nodeSplitter[jobId] - (windowSize(traverser) - 1);
-//        TPosition hostEndPos = *nodeSplitter[jobId + 1];
-//        if (jobId == static_cast<unsigned>(omp_get_num_threads() - 1))
-//            hostEndPos = length(host(container(finder)));
-//
-//        _initSegment(traverser, nodeSplitter[jobId], nodeSplitter[jobId + 1], hostBeginPos, hostEndPos);
-//        traverse(traverser, threadFinder, delegate);
-//
-//        // TODO(rmaerker): Smooth the results in case we found a hit that was deleted through a deletion of a previous delta.
-//        if (length(traverser._mergePointStack._mergePoints) > 1u)
-//            mergePointOverlaps[jobId] = traverser._mergePointStack._mergePoints;
-//    }
-//
-//    // We might need to update some hits here.
-//    // How can we return this?
-//}
-
-// ----------------------------------------------------------------------------
 // Function find()                                                     [Serial]
 // ----------------------------------------------------------------------------
 
@@ -383,7 +326,9 @@ find(Finder2<TContainer, TPattern, DataParallel<TSpec> > & finder,
 
     // Set up the journaled string tree traversal.
     TTraverser traverser(container(finder), length(needle(pattern)) - scoreLimit);
-
+#ifdef PROFILE_JST_INTERN
+    double timeBuild = sysTime();
+#endif
     while (journalNextBlock(container(finder), windowSize(traverser)))  // Generating the journal index for the next block.
     {
         if (finder._needReinit)
@@ -391,8 +336,17 @@ find(Finder2<TContainer, TPattern, DataParallel<TSpec> > & finder,
             init(finder._extensionFunctor, pattern, scoreLimit);
             finder._needReinit = false;
         }
+
         _reinitBlockEnd(traverser);
+#ifdef PROFILE_JST_INTERN
+        std::cerr << "Time-C: " << sysTime() - timeBuild << " s" << std::endl;
+        double timeSearch = sysTime();
+#endif
         traverse(traverser, finder, delegate);
+#ifdef PROFILE_JST_INTERN
+        std::cerr << "Time-S: " << sysTime() - timeSearch << " s" << std::endl;
+        timeBuild = sysTime();
+#endif
     }
 }
 

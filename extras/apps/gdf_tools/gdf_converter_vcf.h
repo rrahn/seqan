@@ -54,13 +54,13 @@ namespace seqan
 template <typename T>
 struct VcfRecordTranslator{};
 
-template <typename TDeltaStore, typename TDeltaCoverageStore>
-struct VcfRecordTranslator<DeltaMap<TDeltaStore, TDeltaCoverageStore> >
+template <typename TValue, typename TAlphabet>
+struct VcfRecordTranslator<DeltaMap<TValue, TAlphabet> >
 {
 
-    typedef DeltaMap<TDeltaStore, TDeltaCoverageStore> TDeltaMap;
-    typedef typename DeltaValue<TDeltaStore, DeltaType::DELTA_TYPE_SNP>::Type TSnp;
-    typedef typename DeltaValue<TDeltaStore, DeltaType::DELTA_TYPE_DEL>::Type TDel;
+    typedef DeltaMap<TValue, TAlphabet> TDeltaMap;
+    typedef typename DeltaValue<TDeltaMap, DeltaType::DELTA_TYPE_SNP>::Type TSnp;
+    typedef typename DeltaValue<TDeltaMap, DeltaType::DELTA_TYPE_DEL>::Type TDel;
 
     TDeltaMap * _variantStorePtr;
 
@@ -129,75 +129,69 @@ struct VariantInfo
 // Function _resolveConflicts()
 // ----------------------------------------------------------------------------
 
-template <typename TDeltaStore, typename TDeltaCoverageStore, typename TSpec>
-inline void _resolveConflicts(DeltaMap<TDeltaStore, TDeltaCoverageStore, TSpec> & varStore)
+template <typename TValue, typename TAlphabet, typename TSpec>
+inline void _resolveConflicts(DeltaMap<TValue, TAlphabet, TSpec> & varStore)
 {
-    typedef DeltaMap<TDeltaStore, TDeltaCoverageStore, TSpec> TDeltaMap;
+    typedef DeltaMap<TValue, TAlphabet, TSpec> TDeltaMap;
     typedef typename Iterator<TDeltaMap, Standard>::Type TStoreIter;
-    typedef typename MappedDelta<TDeltaMap>::Type TMappedDelta;
-    typedef typename Value<TDeltaCoverageStore>::Type TBitVector;
+    typedef typename DeltaCoverage<TDeltaMap>::Type TBitVector;
     typedef typename Position<TDeltaMap>::Type TPosition;
-    typedef typename DeltaValue<TDeltaStore, DeltaType::DELTA_TYPE_INS>::Type TIns;
-    typedef typename DeltaValue<TDeltaStore, DeltaType::DELTA_TYPE_INDEL>::Type TIndel;
+    typedef typename DeltaValue<TDeltaMap, DeltaType::DELTA_TYPE_INS>::Type TIns;
+    typedef typename DeltaValue<TDeltaMap, DeltaType::DELTA_TYPE_INDEL>::Type TIndel;
 
     TStoreIter itBegin = begin(varStore, Standard());
     TStoreIter it = itBegin;
     TStoreIter itEnd = end(varStore, Standard());
     for (;it != itEnd; ++it)
     {
-        TMappedDelta deltaInfoOuter = mappedDelta(varStore, it - itBegin);
-        if (deltaType(deltaInfoOuter) == DeltaType::DELTA_TYPE_DEL)
+//        TMappedDelta deltaInfoOuter = mappedDelta(varStore, it - itBegin);
+        if (deltaType(it) == DeltaType::DELTA_TYPE_DEL)
         {  // Resolve all variants that fall into a previously deleted region.
-            TPosition endPoint = deltaDel(varStore, deltaPosition(deltaInfoOuter)) + *it;
+            TPosition endPoint = deltaDel(it) + *it;
             TStoreIter itLocal = it + 1;
             while (*itLocal < endPoint)
             {
-                transform(mappedCoverage(varStore, itLocal - itBegin), mappedCoverage(varStore, itLocal - itBegin),
-                              mappedCoverage(varStore, it - itBegin),
-                              FunctorNested<FunctorBitwiseAnd, FunctorIdentity, FunctorBitwiseNot>());
+                transform(deltaCoverage(itLocal), deltaCoverage(itLocal), deltaCoverage(it),
+                          FunctorNested<FunctorBitwiseAnd, FunctorIdentity, FunctorBitwiseNot>());
                 ++itLocal;
             }
         }
-        if (deltaType(deltaInfoOuter) == DeltaType::DELTA_TYPE_INS)
+        if (deltaType(it) == DeltaType::DELTA_TYPE_INS)
         {  // Resolve all insertions that occur immediately before an replacement or deletion.
             TStoreIter itLocal = it + 1;
             while (*itLocal == *it)
             {
-                TMappedDelta deltaInfoInner = mappedDelta(varStore, itLocal - itBegin);
-                if (deltaType(deltaInfoInner) == DeltaType::DELTA_TYPE_DEL ||
-                    deltaType(deltaInfoInner) == DeltaType::DELTA_TYPE_SNP)
+//                TMappedDelta deltaInfoInner = mappedDelta(varStore, itLocal - itBegin);
+                if (deltaType(itLocal) == DeltaType::DELTA_TYPE_DEL || deltaType(itLocal) == DeltaType::DELTA_TYPE_SNP)
                 {
                     TBitVector tmpVec;
-                    transform(tmpVec, mappedCoverage(varStore, it - itBegin), mappedCoverage(varStore, itLocal - itBegin),
-                              FunctorBitwiseAnd());
+                    transform(tmpVec, deltaCoverage(it), deltaCoverage(itLocal), FunctorBitwiseAnd());
                     if (!testAllZeros(tmpVec))  // At least one sequence contains ambiguous variant.
                     {
                         // Update the coverage of the nodes.
-                        transform(mappedCoverage(varStore, it - itBegin), mappedCoverage(varStore, it - itBegin), tmpVec,
+                        transform(deltaCoverage(it), deltaCoverage(it), tmpVec,
                                   FunctorNested<FunctorBitwiseAnd, FunctorIdentity, FunctorBitwiseNot>());
-                        transform(mappedCoverage(varStore, itLocal- itBegin), mappedCoverage(varStore, itLocal - itBegin),
-                                  tmpVec, FunctorNested<FunctorBitwiseAnd, FunctorIdentity, FunctorBitwiseNot>());
+                        transform(deltaCoverage(itLocal), deltaCoverage(itLocal), tmpVec,
+                                  FunctorNested<FunctorBitwiseAnd, FunctorIdentity, FunctorBitwiseNot>());
 
-                        if (deltaType(deltaInfoInner) == DeltaType::DELTA_TYPE_DEL)
+                        if (deltaType(itLocal) == DeltaType::DELTA_TYPE_DEL)
                         {
-                            appendValue(deltaStore(varStore)._indelData,
-                                        TIndel(deltaDel(varStore, deltaPosition(deltaInfoInner)),
-                                               deltaIns(varStore, deltaPosition(deltaInfoOuter))));
+                            appendValue(varStore._deltaStore._indelData, TIndel(deltaDel(itLocal), deltaIns(it)));
                         }
                         else
                         {
-                            TIns tmp = deltaIns(varStore, deltaPosition(deltaInfoOuter));
-                            append(tmp, deltaSnp(varStore, deltaPosition(deltaInfoInner)));
-                            appendValue(deltaStore(varStore)._indelData, TIndel(1, tmp));
+                            TIns tmp = deltaIns(it);
+                            append(tmp, deltaSnp(itLocal));
+                            appendValue(varStore._deltaStore._indelData, TIndel(1, tmp));
                         }
                         // Insert the new coverage and variant info into the variant store.
                         TPosition currPos = it - begin(varStore, Standard());
-                        insertValue(deltaCoverageStore(varStore)._coverageData, currPos, tmpVec);
-                        insertValue(deltaStore(varStore)._varDataMap, currPos,
-                                    (length(deltaStore(varStore)._indelData) -1) | DeltaType::DELTA_TYPE_INDEL);
+                        insertValue(varStore._deltaCoverageStore._coverageData, currPos, tmpVec);
+                        insertValue(varStore._deltaStore._varDataMap, currPos,
+                                    (length(varStore._deltaStore._indelData) -1) | DeltaType::DELTA_TYPE_INDEL);
 
                         // Insert the ref position and synchronize the iterator.
-                        insertValue(keys(varStore), currPos, *it);
+                        insertValue(varStore._keys, currPos, *it);
                         it = begin(varStore, Standard()) + currPos + 1;
                         itEnd = end(varStore, Standard());  // Update end pointer.
                         itLocal = it +1;
@@ -304,27 +298,28 @@ _extractHaplotype(TSource const & source)
 // Function _readVcfRecords
 // ----------------------------------------------------------------------------
 
-template <typename TDeltaStore, typename TDeltaCoverageStore, typename TStream>
+template <typename TValue, typename TAlphabet1, typename TStream>
 inline int
-_readVcfRecords(VcfRecordTranslator<DeltaMap<TDeltaStore, TDeltaCoverageStore> > & delegate,
+_readVcfRecords(VcfRecordTranslator<DeltaMap<TValue, TAlphabet1> > & delegate,
                 VcfIOContext & vcfContext,
                 RecordReader<TStream, SinglePass<> > & vcfReader,
                 JSeqHeader const & jseqHeader,
                 ConverterOptions const & options)
 {
-    typedef typename DeltaValue<TDeltaStore, DeltaType::DELTA_TYPE_INS>::Type TInsBuffer;
-    typedef typename DeltaValue<TDeltaStore, DeltaType::DELTA_TYPE_DEL>::Type TDel;
+    typedef DeltaMap<TValue, TAlphabet1> TDeltaMap;
+    typedef typename DeltaValue<TDeltaMap, DeltaType::DELTA_TYPE_INS>::Type TInsBuffer;
+    typedef typename DeltaValue<TDeltaMap, DeltaType::DELTA_TYPE_DEL>::Type TDel;
     typedef VariantInfo<TDel, TDel, TInsBuffer> TVariantInfo;
     typedef typename Value<TInsBuffer>::Type TAlphabet;
 
 
-#ifdef PRINT_DOTS
-    if (options.verbosity == 3)
-        std::cout << "\n# variants processed: ";
+//#ifdef PRINT_DOTS
+//    if (options.verbosity == 3)
+    std::cerr << "\n# variants processed: ";
     static const unsigned DOT_SIZE = 10000;
     static const unsigned CHUNK_SIZE = 100000;
     unsigned pos = 0;
-#endif //PRINT_DOTS
+//#endif //PRINT_DOTS
 
     unsigned numSeq = length(jseqHeader._nameStore);  // Total number of sequences.
     if (options.includeReference)
@@ -366,10 +361,10 @@ _readVcfRecords(VcfRecordTranslator<DeltaMap<TDeltaStore, TDeltaCoverageStore> >
         }
         timeTable[3] += sysTime() - timeRead;
 
-#ifdef PRINT_DOTS
-        if (options.verbosity == 3 && pos % CHUNK_SIZE == 0)
-            std::cout << " " << pos << " ";
-#endif //PRINT_DOTS
+//#ifdef PRINT_DOTS
+        if (pos % CHUNK_SIZE == 0)
+            std::cerr << " " << pos << " ";
+//#endif //PRINT_DOTS
 
         // Only load records which are passed and have genotype information.
         toUpper(vcfRecord.filter);
@@ -455,10 +450,10 @@ _readVcfRecords(VcfRecordTranslator<DeltaMap<TDeltaStore, TDeltaCoverageStore> >
             timeTable[2] += sysTime() - timeDelegate;
             // Iterates over the variants at this position.
         }
-#ifdef PRINT_DOTS
-        if (options.verbosity == 3 && ++pos % DOT_SIZE == 0)
-            std::cout << ".";
-#endif //PRINT_DOTS
+//#ifdef PRINT_DOTS
+        if (++pos % DOT_SIZE == 0)
+            std::cerr << ".";
+//#endif //PRINT_DOTS
     }
 
     if (options.verbosity >= 2)
@@ -481,8 +476,7 @@ int _writeToBinaryJSeqFormat(JSeqHeader & jseqHeader,
                              TRefAlphabet const & /*refAlphabet*/,
                              TVarAlphabet const & /*snpAlphabet*/)
 {
-    typedef DeltaStore<unsigned, TVarAlphabet> TDeltaStore;
-    typedef DeltaMap<TDeltaStore, DeltaCoverageStore> TDeltaMap;
+    typedef DeltaMap<unsigned, TVarAlphabet> TDeltaMap;
 
     TDeltaMap deltaMap;
 
@@ -509,7 +503,7 @@ int _writeToBinaryJSeqFormat(JSeqHeader & jseqHeader,
     if (converterOptions.verbosity > 1)
     {
         std::cout << "Time for writing: " << sysTime() - start << std::endl;
-        std::cout << "Number of converted nodes: " << length(keys(deltaMap));
+        std::cout << "Number of converted nodes: " << length(deltaMap);
     }
 
     outputStream.close();

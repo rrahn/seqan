@@ -324,48 +324,6 @@ _transformJournalCoverage(DeltaMap<TSize, TAlphabet, TSpec> & variantMap,
     }
 }
 
-// ----------------------------------------------------------------------------
-// Function journalVariants()
-// ----------------------------------------------------------------------------
-
-template <typename TValue, typename THostSpec, typename TJournalSpec, typename TBuffSpec, typename TDeltaStore,
-          typename TDeltaCoverage, typename TSpec, typename TBitVector>
-inline void
-journalVariants(String<TValue, Journaled<THostSpec, TJournalSpec, TBuffSpec> > & journalSeq,
-                DeltaMap<TDeltaStore, TDeltaCoverage, TSpec> & variantMap,
-                TBitVector const & bitVec)
-{
-    typedef DeltaMap<TDeltaStore, TDeltaCoverage, TSpec> TDeltaMap;
-    typedef typename Iterator<TDeltaMap, Standard>::Type TMapIterator;
-    typedef typename MappedDelta<TDeltaMap>::Type TMappedDelta;
-    typedef typename Iterator<TBitVector const, Standard>::Type TBitVectorIter;
-
-    _transformJournalCoverage(variantMap, bitVec);
-
-    TMapIterator itMapBegin = begin(variantMap, Standard());
-    TMapIterator itMap = itMapBegin;
-
-    for (TBitVectorIter it = begin(bitVec, Standard()); it != end(bitVec, Standard()); ++it, ++itMap)
-    {
-        if (getValue(it) == true)
-        {
-            TMappedDelta varKey = mappedDelta(variantMap, itMap - itMapBegin);
-            switch(deltaType(varKey))
-            {
-                case DeltaType::DELTA_TYPE_SNP:
-                    _journalSnp(journalSeq, *itMap, deltaSnp(variantMap, deltaPosition(varKey)));
-                    break;
-                case DeltaType::DELTA_TYPE_DEL:
-                    _journalDel(journalSeq, *itMap, deltaDel(variantMap, deltaPosition(varKey)));
-                    break;
-                case DeltaType::DELTA_TYPE_INS:
-                    _journalIns(journalSeq, *itMap, deltaIns(variantMap, deltaPosition(varKey)));
-                    break;
-            }
-        }
-    }
-}
-
 /*!
  * @fn adaptTo
  * @brief Transforms delta map into journal string set.
@@ -373,21 +331,20 @@ journalVariants(String<TValue, Journaled<THostSpec, TJournalSpec, TBuffSpec> > &
  * @signature adaptTo(target, src, tag)
  */
 
-template <typename TJournalSequence, typename TDeltaStore, typename TDeltaCoverage, typename TSpec,
+template <typename TJournalSequence, typename TValue, typename TAlphabet, typename TSpec,
           typename TBlockBegin, typename TBlockEnd, typename TParallelTag>
 inline void
 adaptTo(StringSet<TJournalSequence, Owner<JournaledSet> > & journalSet,
-        DeltaMap<TDeltaStore, TDeltaCoverage, TSpec> & variantMap,
+        DeltaMap<TValue, TAlphabet, TSpec> & variantMap,
         TBlockBegin blockBegin,
         TBlockEnd blockEnd,
         Tag<TParallelTag> parallelTag = Serial())
 {
-    typedef DeltaMap<TDeltaStore, TDeltaCoverage, TSpec> TDeltaMap;
+    typedef DeltaMap<TValue, TAlphabet, TSpec> TDeltaMap;
     typedef typename Iterator<TDeltaMap, Standard>::Type TMapIterator;
-    typedef typename MappedDelta<TDeltaMap>::Type TMappedDelta;
 
-    typedef typename Iterator<TDeltaCoverage, Standard>::Type TCoverageIterator;
-    typedef typename Value<TDeltaCoverage>::Type TBitVec;
+    typedef typename GetDeltaCoverageStore_<TDeltaMap>::Type TDeltaCoverageStore;
+    typedef typename Value<TDeltaCoverageStore>::Type TBitVec;
     typedef typename Iterator<TBitVec, Standard>::Type TBitVecIter;
 
     typedef StringSet<TJournalSequence, Owner<JournaledSet> > TJournalSet;
@@ -395,7 +352,7 @@ adaptTo(StringSet<TJournalSequence, Owner<JournaledSet> > & journalSet,
     typedef typename Size<TJournalSet>::Type TSize;
 
     // Ensure the size of the journal set is sufficient.
-    resize(journalSet, coverageSize(deltaCoverageStore(variantMap)), Exact());
+    resize(journalSet, coverageSize(variantMap), Exact());
 
     // Temporary string keeping track of the last journaled operation.
     String<TSize> _lastVisitedNodes;
@@ -418,15 +375,15 @@ adaptTo(StringSet<TJournalSequence, Owner<JournaledSet> > & journalSet,
         TMapIterator itMapBegin = begin(variantMap, Standard());
         TMapIterator itMap = itMapBegin + blockBegin;
         TMapIterator itMapEnd = begin(variantMap, Standard()) + blockEnd;
-        TCoverageIterator it = begin(deltaCoverageStore(variantMap), Standard()) + blockBegin;
+//        TCoverageIterator it = begin(deltaCoverageStore(variantMap), Standard()) + blockBegin;
 
-        for (; itMap != itMapEnd; ++it, ++itMap)
+        for (; itMap != itMapEnd; ++itMap)
         {
-            TMappedDelta varKey = mappedDelta(variantMap, itMap - itMapBegin);
+//            TMappedDelta varKey = mappedDelta(variantMap, itMap - itMapBegin);
 
-            TBitVecIter itVecBegin = begin(*it, Standard());
+            TBitVecIter itVecBegin = begin(deltaCoverage(itMap), Standard());
             TBitVecIter itVec = itVecBegin + jobBegin;
-            TBitVecIter itVecEnd = begin(*it, Standard()) + jobEnd;
+            TBitVecIter itVecEnd = begin(deltaCoverage(itMap), Standard()) + jobEnd;
             for (;itVec != itVecEnd; ++itVec)
             {
 //                printf("Thread %i: vecPos %i\n", jobId, (int) (itVec - itVecBegin));
@@ -435,17 +392,17 @@ adaptTo(StringSet<TJournalSequence, Owner<JournaledSet> > & journalSet,
                 if (!(*itVec))
                     continue;
 
-                _lastVisitedNodes[itVec - itVecBegin] = itMap - itMapBegin;
-                switch(deltaType(varKey))
+//                _lastVisitedNodes[itVec - itVecBegin] = itMap - itMapBegin;
+                switch(deltaType(itMap))
                 {
                     case DeltaType::DELTA_TYPE_SNP:
-                        _journalSnp(journalSet[itVec - itVecBegin], *itMap, deltaSnp(variantMap, deltaPosition(varKey)));
+                        _journalSnp(journalSet[itVec - itVecBegin], *itMap, deltaSnp(itMap));
                         break;
                     case DeltaType::DELTA_TYPE_DEL:
-                        _journalDel(journalSet[itVec - itVecBegin], *itMap, deltaDel(variantMap, deltaPosition(varKey)));
+                        _journalDel(journalSet[itVec - itVecBegin], *itMap, deltaDel(itMap));
                         break;
                     case DeltaType::DELTA_TYPE_INS:
-                        _journalIns(journalSet[itVec - itVecBegin], *itMap, deltaIns(variantMap, deltaPosition(varKey)));
+                        _journalIns(journalSet[itVec - itVecBegin], *itMap, deltaIns(itMap));
                         break;
                         // TODO(rmaerker): Add Case for INDEL
                 }
@@ -497,14 +454,17 @@ adaptTo(StringSet<TJournalSequence, Owner<JournaledSet> > & journalSet,
 
 }
 
-template <typename TDeltaStore, typename TDeltaCoverage, typename TSpec, typename TJournalSequence>
+template <typename TValue, typename TAlphabet, typename TSpec, typename TJournalSequence>
 inline void
-adaptTo(DeltaMap<TDeltaStore, TDeltaCoverage, TSpec> & deltaMap,
+adaptTo(DeltaMap<TValue, TAlphabet, TSpec> & deltaMap,
         StringSet<TJournalSequence, Owner<JournaledSet> > const & journalSet)
 {
-    typedef typename Value<TDeltaCoverage>::Type TBitString;
-    typedef typename DeltaValue<TDeltaStore, DeltaType::DELTA_TYPE_SNP>::Type TDeltaAlphabet;
-    typedef typename DeltaValue<TDeltaStore, DeltaType::DELTA_TYPE_DEL>::Type TDeltaDel;
+    typedef DeltaMap<TValue, TAlphabet, TSpec> TDeltaMap;
+
+    typedef typename GetDeltaCoverageStore_<TDeltaMap>::Type TDeltaCoverageStore;
+    typedef typename Value<TDeltaCoverageStore>::Type TBitString;
+    typedef typename DeltaValue<TDeltaMap, DeltaType::DELTA_TYPE_SNP>::Type TDeltaAlphabet;
+    typedef typename DeltaValue<TDeltaMap, DeltaType::DELTA_TYPE_DEL>::Type TDeltaDel;
 
     typedef StringSet<TJournalSequence, Owner<JournaledSet> > const TJournalSet;
     typedef typename Position<TJournalSet>::Type TSetPosition;
@@ -545,7 +505,7 @@ adaptTo(DeltaMap<TDeltaStore, TDeltaCoverage, TSpec> & deltaMap,
                 TInsertionBuff insBuff;
                 for (unsigned j = 0; j < length(tmpInsertionEntries); ++j)
                     append(insBuff, _getInsertion(tmpInsertionEntries[j], journalSeq));
-                TMapInsertType _mapInsValue = TMapInsertType(TMapKey_(currPhysBeginPos,TCompareType(DeltaType::DELTA_TYPE_INS, insBuff)), tmpValue);
+                TMapInsertType _mapInsValue = TMapInsertType(TMapKey_(currPhysBeginPos, TCompareType(DeltaType::DELTA_TYPE_INS, insBuff)), tmpValue);
                 TMapInsertResult res = _map.insert(_mapInsValue);
                 if (!res.second)
                     appendValue(res.first->second, seqId);
@@ -619,7 +579,7 @@ adaptTo(DeltaMap<TDeltaStore, TDeltaCoverage, TSpec> & deltaMap,
 
     //NOTE(rmaerker): We could adapt the delta map to use a binary balanced tree in the background.
     // Fill deltaMap.
-    setCoverageSize(deltaCoverageStore(deltaMap), length(journalSet));
+    setCoverageSize(deltaMap, length(journalSet));
     TMapIterator mapIt = _map.begin();
     TMapIterator mapItEnd = _map.end();
 
@@ -627,7 +587,7 @@ adaptTo(DeltaMap<TDeltaStore, TDeltaCoverage, TSpec> & deltaMap,
     {
         // Transform coverage.
         TBitString cov;
-        resize(cov, coverageSize(deltaCoverageStore(deltaMap)), false, Exact());
+        resize(cov, coverageSize(deltaMap), false, Exact());
         for (unsigned i = 0; i < length(mapIt->second); ++i)
             cov[mapIt->second[i]] = true;
 

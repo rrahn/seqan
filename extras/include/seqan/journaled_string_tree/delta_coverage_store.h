@@ -117,11 +117,8 @@ struct Size<DeltaCoverageStore>
 };
 
 template <>
-struct Size<DeltaCoverageStore const>
-{
-    typedef typename Value<DeltaCoverageStore>::Type TValue_;
-    typedef typename Size<TValue_>::Type const Type;
-};
+struct Size<DeltaCoverageStore const> :
+    Size<DeltaCoverageStore>{};
 
 // ----------------------------------------------------------------------------
 // Metafunction Position
@@ -140,7 +137,7 @@ struct Position<DeltaCoverageStore const> :
 // ----------------------------------------------------------------------------
 
 template <>
-struct Iterator<DeltaCoverageStore>
+struct Iterator<DeltaCoverageStore, Standard>
 {
     typedef typename Value<DeltaCoverageStore>::Type TBitVector;
     typedef String<TBitVector> TCoverage;
@@ -148,7 +145,7 @@ struct Iterator<DeltaCoverageStore>
 };
 
 template <>
-struct Iterator<DeltaCoverageStore const>
+struct Iterator<DeltaCoverageStore const, Standard>
 {
     typedef typename Value<DeltaCoverageStore>::Type TBitVector;
     typedef String<TBitVector> TCoverage;
@@ -192,14 +189,57 @@ end(DeltaCoverageStore const & store, Standard const & /*tag*/)
 }
 
 // ----------------------------------------------------------------------------
+// Function setCoverageSize()
+// ----------------------------------------------------------------------------
+
+template <typename TSize>
+inline void
+setCoverageSize(DeltaCoverageStore & store, TSize newSize)
+{
+    typedef typename Iterator<DeltaCoverageStore, Standard>::Type TIter;
+
+    store._coverageSize = newSize;
+
+    // Update all coverages to the new size.
+    if (empty(store._coverageData))
+        return;
+
+    for (TIter it = begin(store, Standard()); it != end(store, Standard()); ++it)
+        if (length(*it) != store._coverageSize)
+            resize(*it, store._coverageSize, false, Exact());
+}
+
+// ----------------------------------------------------------------------------
+// Function coverageSize()
+// ----------------------------------------------------------------------------
+
+inline Size<DeltaCoverageStore>::Type
+coverageSize(DeltaCoverageStore const & store)
+{
+    return store._coverageSize;
+}
+
+// ----------------------------------------------------------------------------
 // Function addCoverage()
 // ----------------------------------------------------------------------------
+
+template <typename TPosition>
+inline void
+addCoverage(DeltaCoverageStore & store,
+            Value<DeltaCoverageStore>::Type const & coverage,
+            TPosition const & pos)
+{
+    if (length(coverage) != coverageSize(store))
+        setCoverageSize(store, _max(length(coverage), coverageSize(store)));
+
+    insertValue(store._coverageData, pos, coverage);
+}
 
 inline void
 addCoverage(DeltaCoverageStore & store,
             Value<DeltaCoverageStore>::Type const & coverage)
 {
-    appendValue(store._coverageData, coverage);
+    addCoverage(store, coverage, length(store._coverageData));
 }
 
 // ----------------------------------------------------------------------------
@@ -218,6 +258,17 @@ inline typename Reference<DeltaCoverageStore const>::Type
 value(DeltaCoverageStore const & store, TPosition const & pos)
 {
     return value(store._coverageData, pos);
+}
+
+// ----------------------------------------------------------------------------
+// Function clear()
+// ----------------------------------------------------------------------------
+
+inline void
+clear(DeltaCoverageStore & store)
+{
+    return clear(store._coverageData);
+    setCoverageSize(store, 0);
 }
 
 // ----------------------------------------------------------------------------
@@ -249,27 +300,6 @@ inline Size<DeltaCoverageStore>::Type
 length(DeltaCoverageStore const & store)
 {
     return length(store._coverageData);
-}
-
-// ----------------------------------------------------------------------------
-// Function setCoverageSize()
-// ----------------------------------------------------------------------------
-
-template <typename TSize>
-inline void
-setCoverageSize(DeltaCoverageStore & store, TSize newSize)
-{
-    store._coverageSize = newSize;
-}
-
-// ----------------------------------------------------------------------------
-// Function coverageSize()
-// ----------------------------------------------------------------------------
-
-inline Size<DeltaCoverageStore>::Type
-coverageSize(DeltaCoverageStore const & store)
-{
-    return store._coverageSize;
 }
 
 }

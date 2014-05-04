@@ -64,12 +64,12 @@ class MergePointMap_
 {
 public:
     typedef typename Value<MergePointMap_>::Type TValue;
-    typedef typename MappedCoverage<TVariantMap>::Type TMappedCoverage;
+    typedef typename DeltaCoverage<TVariantMap>::Type TDeltaCoverage;
     typedef String<TValue> TMergePoints;
 //    typedef String<TCoverage> TCoverageString;
 
     TVariantMap*    _varMapPtr;
-    TMappedCoverage _mergeCoverage;
+    TDeltaCoverage _mergeCoverage;
     TMergePoints    _mergePoints;  // Stores the reference position of the merge point
 
 
@@ -79,7 +79,7 @@ public:
 
     MergePointMap_(TVariantMap & map) : _varMapPtr(&map), _mergeCoverage(), _mergePoints()
     {
-        resize(_mergeCoverage, coverageSize(deltaCoverageStore(map)), false, Exact());
+        resize(_mergeCoverage, coverageSize(map), false, Exact());
     }
 
 };
@@ -154,18 +154,17 @@ inline void clear(MergePointMap_<TVariantMap> & mergePointStore)
 // Function push()
 // ----------------------------------------------------------------------------
 
-template <typename TVariantMap, typename TPos, typename TId>
+template <typename TVariantMap, typename TPos, typename TIter>
 inline void push(MergePointMap_<TVariantMap> & mergePointStore,
                  TPos const & pos,
-                 TId const & branchNodeId)
+                 TIter const & branchNodeIt)
 {
     typedef MergePointMap_<TVariantMap> TMergePointStore;
     typedef typename TMergePointStore::TMergePoints TMergePoints;
     typedef typename Iterator<TMergePoints, Rooted>::Type TIterator;
     typedef typename Value<TMergePointStore>::Type TValue;
 
-
-    TValue tmp(pos, branchNodeId);
+    TValue tmp(pos, branchNodeIt - begin(*mergePointStore._varMapPtr, Standard()));
     if (empty(mergePointStore._mergePoints))
     {
         insertValue(mergePointStore._mergePoints, 0, tmp);
@@ -179,7 +178,7 @@ inline void push(MergePointMap_<TVariantMap> & mergePointStore,
                                     MergePointComparator_<TValue>());
     insertValue(mergePointStore._mergePoints, position(it), tmp);
     // Record the new merge point character.
-    mergePointStore._mergeCoverage |= mappedCoverage(*mergePointStore._varMapPtr, branchNodeId);
+    mergePointStore._mergeCoverage |= deltaCoverage(branchNodeIt);
 
 //    insertValue(mergePointStore._mergePointCoverage, position(it), coverage);
 }
@@ -206,34 +205,34 @@ topMergePoint(MergePointMap_<TVariantMap> const & mergePointStore)
 }
 
 template <typename TVariantMap>
-inline typename MappedCoverage<TVariantMap>::Type &
+inline typename DeltaCoverage<TVariantMap>::Type &
 topMergeCoverage(MergePointMap_<TVariantMap> & mergePointStore)
 {
-    return mappedCoverage(*mergePointStore._varMapPtr, back(mergePointStore._mergePoints).i2);
+    return deltaCoverage(iter(*mergePointStore._varMapPtr, back(mergePointStore._mergePoints).i2));
 }
 
 template <typename TVariantMap>
-inline typename MappedCoverage<TVariantMap>::Type const &
+inline typename DeltaCoverage<TVariantMap>::Type const &
 topMergeCoverage(MergePointMap_<TVariantMap> const & mergePointStore)
 {
-    return mappedCoverage(*mergePointStore._varMapPtr, back(mergePointStore._mergePoints).i2);
+    return deltaCoverage(iter(*mergePointStore._varMapPtr, back(mergePointStore._mergePoints).i2));
 }
 
 
 template <typename TVariantMap, typename TPosition>
-inline typename MappedCoverage<TVariantMap>::Type &
+inline typename DeltaCoverage<TVariantMap>::Type &
 getMergeCoverage(MergePointMap_<TVariantMap> & mergePointStore,
                  TPosition const & pos)
 {
-    return mappedCoverage(*mergePointStore._varMapPtr, mergePointStore._mergePoints[pos].i2);
+    return deltaCoverage(iter(*mergePointStore._varMapPtr, mergePointStore._mergePoints[pos].i2, Standard()));
 }
 
 template <typename TVariantMap, typename TPosition>
-inline typename MappedCoverage<TVariantMap>::Type const &
+inline typename DeltaCoverage<TVariantMap>::Type const &
 getMergeCoverage(MergePointMap_<TVariantMap> const & mergePointStore,
                  TPosition const & pos)
 {
-    return mappedCoverage(*mergePointStore._varMapPtr, mergePointStore._mergePoints[pos].i2);
+    return deltaCoverage(iter(*mergePointStore._varMapPtr, mergePointStore._mergePoints[pos].i2, Standard()));
 }
 
 
@@ -263,7 +262,7 @@ _updateMergePoints(MergePointMap_<TVariantMap> & mergePointStack,
                   false);
         for (TMergePointIt it = begin(mergePointStack._mergePoints, Standard()) + 1;
              it != end(mergePointStack._mergePoints, Standard()); ++it)
-            mergePointStack._mergeCoverage |= mappedCoverage(*mergePointStack._varMapPtr, it->i2);
+            mergePointStack._mergeCoverage |= deltaCoverage(iter(*mergePointStack._varMapPtr, it->i2, Standard()));
         return true;
     }
     return false;
@@ -330,7 +329,6 @@ _mapVirtualToVirtual(TIter & target,
                      TDeltaMap const & variantStore,
                      TProxyId const & proxyId)
 {
-    typedef typename MappedDelta<TDeltaMap>::Type TMappedDelta;
     // Check if both journals point to the same reference.
     SEQAN_ASSERT_EQ(&host(*target._journalStringPtr), &host(*source._journalStringPtr));
 
@@ -370,16 +368,16 @@ _mapVirtualToVirtual(TIter & target,
 
         TBranchNodeIt tmpIt = const_cast<TBranchNodeIt&>(branchNodeIt);  // We are at this position.
         unsigned virtOffset = target._journalEntriesIterator->length - _localEntryPosition(target) - 1;
-        while (!atBegin(tmpIt) && *(--tmpIt) > hostPos)
+        while (!atBegin(tmpIt, variantStore) && *(--tmpIt) > hostPos)
         {
-            if (mappedCoverage(variantStore, position(tmpIt))[proxyId] != true)  // Irrelevant variant.
+            if (deltaCoverage(tmpIt)[proxyId] != true)  // Irrelevant variant.
                 continue;
 
-            TMappedDelta deltaKey = mappedDelta(variantStore, position(tmpIt));
+//            TMappedDelta deltaKey = mappedDelta(variantStore, position(tmpIt));
             // If between hostPos and breakpoint are any other insertion or deletion, then we keep track of this virtual offset.
-            if (deltaType(deltaKey) == DeltaType::DELTA_TYPE_INS)
-                virtOffset += length(deltaIns(variantStore, deltaPosition(deltaKey)));
-            else if (deltaType(deltaKey) == DeltaType::DELTA_TYPE_SNP)
+            if (deltaType(tmpIt) == DeltaType::DELTA_TYPE_INS)
+                virtOffset += length(deltaIns(tmpIt));
+            else if (deltaType(tmpIt) == DeltaType::DELTA_TYPE_SNP)
                 ++virtOffset;
         }
         target += (1 + virtOffset + _localEntryPosition(source));
@@ -408,10 +406,9 @@ _mapHostToVirtual(TIterator & resultIt,
     typedef typename Position<TCargo>::Type TCargoPos;
     typedef typename Size<TCargo>::Type TCargoSize;
     typedef JournalEntryLtByPhysicalOriginPos<TCargoPos, TCargoSize> TComp;
-    typedef typename MappedDelta<TDeltaMap>::Type TMappedDelta;
 
 //    typedef typename GetDeltaMap<TFinder>::Type TDeltaMap;
-    typedef typename Iterator<TDeltaMap, Rooted>::Type TVarIterator;
+    typedef typename Iterator<TDeltaMap, Standard>::Type TVarIterator;
 
     // We need to set the iterator to the correct position within the proxy sequence given the host pos.
     TJournalEntries & journalEntries = _journalEntries(js);
@@ -443,22 +440,22 @@ _mapHostToVirtual(TIterator & resultIt,
 
     if (it->segmentSource == SOURCE_PATCH)  // The iterator has to be at the beginning.
     {
-        TVarIterator itVar = begin(variantStore, Rooted());
+        TVarIterator itVar = begin(variantStore, Standard());
         SEQAN_ASSERT_LEQ(*itVar, static_cast<unsigned const>(hostPos));
 
         unsigned virtualOffset = 0;
         // Now we move to the right until we find the node that we are looking for and reconstruct the offset of the virtual positions.
-        while(*itVar != static_cast<unsigned const>(hostPos) && !atEnd(itVar))
+        while(*itVar != static_cast<unsigned const>(hostPos) && !atEnd(itVar, variantStore))
         {
-            if (mappedCoverage(variantStore, position(itVar))[proxyId] != true)  // irrelevant variant.
+            if (deltaCoverage(itVar)[proxyId] != true)  // irrelevant variant.
             {
                 ++itVar;
                 continue;
             }
-            TMappedDelta deltaKey = mappedDelta(variantStore, position(itVar));
-            if (deltaType(deltaKey) == DeltaType::DELTA_TYPE_INS)
-                virtualOffset += length(deltaIns(variantStore, deltaPosition(deltaKey)));
-            else if (deltaType(deltaKey) == DeltaType::DELTA_TYPE_SNP)
+//            TMappedDelta deltaKey = mappedDelta(variantStore, position(itVar));
+            if (deltaType(itVar) == DeltaType::DELTA_TYPE_INS)
+                virtualOffset += length(deltaIns(itVar));
+            else if (deltaType(itVar) == DeltaType::DELTA_TYPE_SNP)
                 ++virtualOffset;
             // TODO(rmaerker): Add Ins_Del type!
             ++itVar;
@@ -488,8 +485,8 @@ _mapHostToVirtual(TIterator & resultIt,
 
     // TODO(rmaerker): Can remove the binary Search here!
     // Find the first node that is left or equal to the current physical position!
-    TVarIterator itVar = std::upper_bound(begin(variantStore, Rooted()),
-                                          end(variantStore, Rooted()),
+    TVarIterator itVar = std::upper_bound(begin(variantStore, Standard()),
+                                          end(variantStore, Standard()),
                                           _physicalPosition(resultIt));
 //        if (*itVar, static_cast<unsigned const>(hostPos))
 //        {
@@ -503,18 +500,18 @@ _mapHostToVirtual(TIterator & resultIt,
 
     unsigned virtualOffset = 0;
     // Now we move to the right until we find the node that we are looking for and reconstruct the offset of the virtual positions.
-    while(*itVar != static_cast<unsigned const>(hostPos) && !atEnd(itVar))
+    while(*itVar != static_cast<unsigned const>(hostPos) && !atEnd(itVar, variantStore))
     {
-        if (mappedCoverage(variantStore, position(itVar))[proxyId] != true)  // irrelevant variant.
+        if (deltaCoverage(itVar)[proxyId] != true)  // irrelevant variant.
         {
             ++itVar;
             continue;
         }
 
-        TMappedDelta deltaKey = mappedDelta(variantStore, position(itVar));
-        if (deltaType(deltaKey) == DeltaType::DELTA_TYPE_INS)
-            virtualOffset += length(deltaIns(variantStore, deltaPosition(deltaKey)));
-        else if (deltaType(deltaKey) == DeltaType::DELTA_TYPE_SNP)
+//        TMappedDelta deltaKey = mappedDelta(variantStore, position(itVar));
+        if (deltaType(itVar) == DeltaType::DELTA_TYPE_INS)
+            virtualOffset += length(deltaIns(itVar));
+        else if (deltaType(itVar) == DeltaType::DELTA_TYPE_SNP)
             ++virtualOffset;
         // TODO(rmaerker): Add Ins_Del type!
         ++itVar;

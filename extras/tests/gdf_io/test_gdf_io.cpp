@@ -35,8 +35,8 @@
 #include <seqan/basic.h>
 #include <seqan/file.h>
 
-#include "test_jseq_io_write.h"
-#include "test_jseq_io_read.h"
+#include "test_gdf_io_write.h"
+#include "test_gdf_io_read.h"
 
 SEQAN_BEGIN_TESTSUITE(test_jseq_io)
 {
