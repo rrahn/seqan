@@ -126,13 +126,13 @@ struct GetDeltaStore_<DeltaMap<TValue, TAlphabet, TSpec> const>
 template <typename TValue, typename TAlphabet, typename TSpec>
 struct GetDeltaCoverageStore_<DeltaMap<TValue, TAlphabet, TSpec> >
 {
-    typedef DeltaCoverageStore Type;
+    typedef DeltaCoverageStore<> Type;
 };
 
 template <typename TValue, typename TAlphabet, typename TSpec>
 struct GetDeltaCoverageStore_<DeltaMap<TValue, TAlphabet, TSpec> const>
 {
-    typedef DeltaCoverageStore const Type;
+    typedef DeltaCoverageStore<> const Type;
 };
 
 // ----------------------------------------------------------------------------
@@ -258,13 +258,13 @@ struct DeltaCoverage;
 template <typename TValue, typename TAlphabet, typename TSpec>
 struct DeltaCoverage<DeltaMap<TValue, TAlphabet, TSpec> >
 {
-    typedef typename Value<DeltaCoverageStore>::Type Type;
+    typedef typename Value<DeltaCoverageStore<> >::Type Type;
 };
 
 template <typename TValue, typename TAlphabet, typename TSpec>
 struct DeltaCoverage<DeltaMap<TValue, TAlphabet, TSpec> const>
 {
-    typedef typename Value<DeltaCoverageStore>::Type const Type;
+    typedef typename Value<DeltaCoverageStore<> >::Type const Type;
 };
 
 // ============================================================================

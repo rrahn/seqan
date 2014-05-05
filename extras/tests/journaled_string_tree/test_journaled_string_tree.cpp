@@ -39,6 +39,7 @@
 #include <seqan/file.h>
 
 #include "test_delta_map.h"
+#include "test_journaled_string_tree.h"
 #include "test_journaled_string_tree_util.h"
 #include "test_journaled_string_tree_traverse.h"
 
@@ -66,7 +67,22 @@ SEQAN_BEGIN_TESTSUITE(test_journaled_string_tree)
     SEQAN_CALL_TEST(test_delta_map_iterator_delta_indel);
     SEQAN_CALL_TEST(test_delta_map_iterator_delta_coverage);
 
-//
+    // Tests for journaled string tree
+    SEQAN_CALL_TEST(test_journaled_string_tree_container_mf);
+    SEQAN_CALL_TEST(test_journaled_string_tree_get_string_tree_mf);
+    SEQAN_CALL_TEST(test_journaled_string_tree_host_mf);
+    SEQAN_CALL_TEST(test_journaled_string_tree_constructor);
+    SEQAN_CALL_TEST(test_journaled_string_tree_init);
+    SEQAN_CALL_TEST(test_journaled_string_tree_reinit);
+    SEQAN_CALL_TEST(test_journaled_string_tree_container);
+    SEQAN_CALL_TEST(test_journaled_string_tree_string_set);
+    SEQAN_CALL_TEST(test_journaled_string_tree_full_journal_required);
+    SEQAN_CALL_TEST(test_journaled_string_tree_set_block_size);
+    SEQAN_CALL_TEST(test_journaled_string_tree_block_size);
+    SEQAN_CALL_TEST(test_journaled_string_tree_journal_next_block);
+    SEQAN_CALL_TEST(test_journaled_string_tree_host);
+    SEQAN_CALL_TEST(test_journaled_string_tree_virtual_block_position);
+
 //	// Test for finder implementation of data parallel module.
 //	SEQAN_CALL_TEST(test_journaled_journaled_string_tree_merge_point_stack);
 

@@ -53,9 +53,6 @@ namespace seqan
 template <typename T>
 struct GetStringSet{};
 
-template <typename T>
-struct GetBranchNodeMap{};
-
 // ----------------------------------------------------------------------------
 // Class JournaledStringTree                                [StringTreeDefault]
 // ----------------------------------------------------------------------------
@@ -87,33 +84,34 @@ public:
     typedef typename MakeSigned<TSize>::Type TSignedSize;
 
     // TODO(rmaerker): Maybe no holder.
-    Holder<TDeltaMap> _branchNodeMap;
+    Holder<TDeltaMap> _container;
 
     // NOTE(rmaerker): We use this as an internal data structure, which is not set from outside.
     mutable TJournalData  _journalSet;
     mutable String<TSignedSize> _blockVPOffset;  // Virtual position offset for each sequence visited so far.
     mutable String<TSignedSize> _activeBlockVPOffset;  // Virtual position offset for each sequence visited so far.
-
-    static const TSize REQUIRE_FULL_JOURNAL = MaxValue<unsigned>::VALUE;
-    TSize _blockSize;
     mutable TSize _activeBlock;
-    TSize _numBlocks;
     mutable bool _emptyJournal;
 
-    JournaledStringTree() : _branchNodeMap(),
+    static const TSize REQUIRE_FULL_JOURNAL = MaxValue<TSize>::VALUE;
+    TSize _blockSize;
+    TSize _numBlocks;
+
+    JournaledStringTree() : _container(),
                             _journalSet(),
-                            _blockSize(REQUIRE_FULL_JOURNAL),
                             _activeBlock(0),
-                            _numBlocks(1),
-                            _emptyJournal(true)
-    {}
+                            _emptyJournal(true),
+                            _blockSize(REQUIRE_FULL_JOURNAL),
+                            _numBlocks(1)
+    {
+        create(_container);
+    }
 
     template <typename THost>
-    JournaledStringTree(THost & reference, TDeltaMap & varData) : _blockSize(REQUIRE_FULL_JOURNAL),
-                                                                        _activeBlock(0),
-                                                                        _numBlocks(1),
-                                                                        _emptyJournal(true)
-
+    JournaledStringTree(THost & reference, TDeltaMap & varData) : _activeBlock(0),
+                                                                  _emptyJournal(true),
+                                                                  _blockSize(REQUIRE_FULL_JOURNAL),
+                                                                  _numBlocks(1)
     {
         init(*this, reference, varData);
     }
@@ -229,15 +227,15 @@ struct Host<JournaledStringTree<TDeltaMap, TSpec> const>
 };
 
 // ----------------------------------------------------------------------------
-// Metafunction GetBranchNodeMap
+// Metafunction Container
 // ----------------------------------------------------------------------------
 
 /*!
- * @mfn JournaledStringTree#GetBranchNodeMap
+ * @mfn JournaledStringTree#Container
  * @headerfile seqan/journaled_string_tree.h
  * @brief Returns the type of the branch node map holding the delta information.
  *
- * @signature GetBranchNodeMap<TJst>::Type;
+ * @signature Container<TJst>::Type;
  *
  * @tparam TJst The type of the journal string tree to get the branch node map type for.
  *
@@ -245,13 +243,13 @@ struct Host<JournaledStringTree<TDeltaMap, TSpec> const>
  */
 
 template <typename TDeltaMap, typename TSpec>
-struct GetBranchNodeMap<JournaledStringTree<TDeltaMap, TSpec> >
+struct Container<JournaledStringTree<TDeltaMap, TSpec> >
 {
     typedef TDeltaMap Type;
 };
 
 template <typename TDeltaMap, typename TSpec>
-struct GetBranchNodeMap<JournaledStringTree<TDeltaMap, TSpec> const>
+struct Container<JournaledStringTree<TDeltaMap, TSpec> const>
 {
     typedef TDeltaMap const Type;
 };
@@ -313,7 +311,9 @@ void _journalNextVariant(TJournalString & jString, TMapIter const & it)
         case DeltaType::DELTA_TYPE_INS:
             _journalIns(jString, *it, deltaIns(it));
             break;
-            // TODO(rmaerker): Add Case for INDEL
+        case DeltaType::DELTA_TYPE_INDEL:
+            _journalIndel(jString, *it, deltaIndel(it));
+            break;
     }
 }
 
@@ -330,9 +330,7 @@ _doJournalBlock(JournaledStringTree<TDeltaMap, TSpec> & jst,
     typedef JournaledStringTree<TDeltaMap, TSpec > TJst;
     typedef typename Iterator<TDeltaMap, Standard>::Type TMapIterator;
 
-//    typedef typename Iterator<TDeltaCoverage, Standard>::Type TCoverageIterator;
     typedef typename DeltaCoverage<TDeltaMap>::Type TBitVec;
-//    typedef typename Value<TDeltaCoverage>::Type TBitVec;
     typedef typename Iterator<TBitVec, Standard>::Type TBitVecIter;
 
     typedef typename GetStringSet<TJst>::Type TJournalSet;
@@ -341,13 +339,13 @@ _doJournalBlock(JournaledStringTree<TDeltaMap, TSpec> & jst,
 
     // Define the block limits.
     TSize blockBegin = jst._activeBlock * jst._blockSize;
-    TSize blockEnd = _min(length(branchNodeMap(jst)), (jst._activeBlock + 1) * jst._blockSize);
+    TSize blockEnd = _min(length(container(jst)), (jst._activeBlock + 1) * jst._blockSize);
 
     // Auxiliary variables.
-    TDeltaMap & variantMap = branchNodeMap(jst);
+    TDeltaMap & variantMap = container(jst);
     TJournalSet & journalSet = stringSet(jst);
     String<int> _lastVisitedNodes;
-    if (!allVariantsJournaled(jst))
+    if (!fullJournalRequired(jst))
         resize(_lastVisitedNodes, length(stringSet(jst)), -1, Exact());
 
     // Check whether there is enough space.
@@ -365,7 +363,7 @@ _doJournalBlock(JournaledStringTree<TDeltaMap, TSpec> & jst,
         unsigned jobEnd = jSetSplitter[jobId + 1] - begin(journalSet, Standard());
 
         // Pre-processing: Update VPs for last block.
-        if (!allVariantsJournaled(jst))
+        if (!fullJournalRequired(jst))
             for (unsigned i = jobBegin; i < jobEnd; ++i)
             {
                 clear(journalSet[i]);  // Reinitialize the journal strings.
@@ -394,14 +392,14 @@ _doJournalBlock(JournaledStringTree<TDeltaMap, TSpec> & jst,
                     continue;
 
                 // Store last visited node for current journaled string.
-                if (!allVariantsJournaled(jst))
+                if (!fullJournalRequired(jst))
                     _lastVisitedNodes[itVec - itVecBegin] = itMap - itMapBegin;
                 _journalNextVariant(journalSet[itVec - itVecBegin], itMap);
             }
         }
 
         // Post-processing: Store VPs for current block.
-        if (!allVariantsJournaled(jst))
+        if (!fullJournalRequired(jst))
         {
             // Buffer the next branch nodes depending on the context size.
             for (unsigned i = jobBegin; i < jobEnd; ++i)
@@ -473,15 +471,15 @@ host(JournaledStringTree<TDeltaMap, TSpec> const & stringTree)
 }
 
 // ----------------------------------------------------------------------------
-// Function getBlockOffset()
+// Function virtualBlockPosition()
 // ----------------------------------------------------------------------------
 
 /*!
- * @fn JournaledStringTree#getBlockOffset
+ * @fn JournaledStringTree#virtualBlockPosition
  * @headerfile seqan/journaled_string_tree.h
  * @brief Returns the virtual offset for the current block for the given sequence.
  *
- * @signature TSize getBlockOffset(jst, id);
+ * @signature TSize virtualBlockPosition(jst, id);
  *
  * @param[in] jst    The Journal String Tree.
  * @param[in] id     The id of the sequence to get the offset for.
@@ -494,22 +492,22 @@ host(JournaledStringTree<TDeltaMap, TSpec> const & stringTree)
 
 template <typename TDeltaMap, typename TSpec, typename TPosition>
 inline typename MakeSigned<typename Size<JournaledStringTree<TDeltaMap, TSpec> const>::Type>::Type &
-getBlockOffset(JournaledStringTree<TDeltaMap, TSpec> const & stringTree,
+virtualBlockPosition(JournaledStringTree<TDeltaMap, TSpec> const & stringTree,
                TPosition const & pos)
 {
     return stringTree._blockVPOffset[pos];
 }
 
 // ----------------------------------------------------------------------------
-// Function allVariantsJournaled()
+// Function fullJournalRequired()
 // ----------------------------------------------------------------------------
 
 /*!
- * @fn JournaledStringTree#allVariantsJournaled
+ * @fn JournaledStringTree#fullJournalRequired
  * @headerfile seqan/journaled_string_tree.h
  * @brief Checks whether the sequences are constructed block-wise or not.
  *
- * @signature bool allVariantsJournaled(jst);
+ * @signature bool fullJournalRequired(jst);
  *
  * @param[in] jst    The Journal String Tree.
  *
@@ -518,7 +516,7 @@ getBlockOffset(JournaledStringTree<TDeltaMap, TSpec> const & stringTree,
 
 template <typename TDeltaMap, typename TSpec>
 inline bool
-allVariantsJournaled(JournaledStringTree<TDeltaMap, TSpec> const & stringTree)
+fullJournalRequired(JournaledStringTree<TDeltaMap, TSpec> const & stringTree)
 {
     typedef JournaledStringTree<TDeltaMap, TSpec> TJst;
 
@@ -599,7 +597,7 @@ reinit(JournaledStringTree<TDeltaMap, TSpec> & jst)
 {
     // Reset all positions to 0.
     jst._activeBlock = 0;
-    if (!allVariantsJournaled(jst))
+    if (!fullJournalRequired(jst))
     {
         jst._emptyJournal = true;
         arrayFill(begin(jst._activeBlockVPOffset, Standard()), end(jst._activeBlockVPOffset, Standard()), 0);
@@ -637,7 +635,7 @@ init(JournaledStringTree<TDeltaMap, TSpec> & jst,
     typedef typename GetStringSet<TJst>::Type TStringSet;
     typedef typename Value<TStringSet>::Type TString;
 
-    setValue(jst._branchNodeMap, varData);
+    setValue(jst._container, varData);
     setHost(stringSet(jst), referenceSeq);
 
     TString tmp;
@@ -671,11 +669,11 @@ inline void
 setBlockSize(JournaledStringTree<TDeltaMap, TSpec> & stringTree,
              TPosition const & newBlockSize)
 {
-    SEQAN_ASSERT_NOT(empty(stringTree._branchNodeMap));  // The delta map needs to be set before.
+    SEQAN_ASSERT_NOT(empty(stringTree._container));  // The delta map needs to be set before.
 
     stringTree._blockSize = newBlockSize;
     stringTree._activeBlock = 0;
-    stringTree._numBlocks = static_cast<unsigned>(std::ceil(static_cast<double>(length(branchNodeMap(stringTree))) /
+    stringTree._numBlocks = static_cast<unsigned>(std::ceil(static_cast<double>(length(container(stringTree))) /
                                                             static_cast<double>(newBlockSize)));
     resize(stringTree._blockVPOffset, length(stringSet(stringTree)), 0, Exact());
 }
@@ -706,35 +704,35 @@ getBlockSize(JournaledStringTree<TDeltaMap, TSpec> const & stringTree)
 }
 
 // ----------------------------------------------------------------------------
-// Function branchNodeMap()
+// Function container()
 // ----------------------------------------------------------------------------
 
 /*!
- * @fn JournaledStringTree#branchNodeMap
+ * @fn JournaledStringTree#container
  * @headerfile seqan/journaled_string_tree.h
  * @brief Returns a reference to the object holding the delta information for a set of sequences.
  *
- * @signature TBranchNodeMap branchNodeMap(jst);
+ * @signature TBranchNodeMap container(jst);
  *
  * @param[in]   jst     The Journal String Tree.
  *
- * @return TBranchNodeMap the object holding the delta information of type @link JournaledStringTree#GetBranchNodeMap @endlink.
+ * @return TBranchNodeMap the object holding the delta information of type @link JournaledStringTree#Container @endlink.
  *
  * @see JournaledStringTree#stringSet
  */
 
 template <typename TDeltaMap, typename TSpec>
-inline typename GetBranchNodeMap<JournaledStringTree<TDeltaMap, TSpec> >::Type &
-branchNodeMap(JournaledStringTree<TDeltaMap, TSpec> & stringTree)
+inline typename Container<JournaledStringTree<TDeltaMap, TSpec> >::Type &
+container(JournaledStringTree<TDeltaMap, TSpec> & stringTree)
 {
-    return value(stringTree._branchNodeMap);
+    return value(stringTree._container);
 }
 
 template <typename TDeltaMap, typename TSpec>
-inline typename GetBranchNodeMap<JournaledStringTree<TDeltaMap, TSpec> const>::Type &
-branchNodeMap(JournaledStringTree<TDeltaMap, TSpec> const & stringTree)
+inline typename Container<JournaledStringTree<TDeltaMap, TSpec> const>::Type &
+container(JournaledStringTree<TDeltaMap, TSpec> const & stringTree)
 {
-    return value(stringTree._branchNodeMap);
+    return value(stringTree._container);
 }
 
 // ----------------------------------------------------------------------------
@@ -752,7 +750,7 @@ branchNodeMap(JournaledStringTree<TDeltaMap, TSpec> const & stringTree)
  *
  * @return TStringSet the object containing the compressed strings @link JournaledStringTree#GetStringSet @endlink.
  *
- * @see JournaledStringTree#branchNodeMap
+ * @see JournaledStringTree#container
  */
 
 template <typename TDeltaMap, typename TSpec>

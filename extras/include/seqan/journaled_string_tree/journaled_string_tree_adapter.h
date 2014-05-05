@@ -277,6 +277,67 @@ _journalIns(TTarget & target,
 }
 
 // ----------------------------------------------------------------------------
+// Function _journalIns()
+// ----------------------------------------------------------------------------
+
+template <typename TTarget, typename TPos, typename TIndel>
+inline void
+_journalIndel(TTarget & target,
+              TPos refPos,
+              TIndel const & indel)
+{
+    typedef typename JournalType<TTarget>::Type TJournalEntries;
+    typedef typename Iterator<TJournalEntries, Standard>::Type TEntryIterator;
+    typedef typename Position<TJournalEntries>::Type TEntryPos;
+
+    TEntryIterator entryIt = end(target._journalEntries, Standard()) - 1;
+    SEQAN_ASSERT_EQ(entryIt->segmentSource, SOURCE_ORIGINAL);
+    SEQAN_ASSERT_GEQ(refPos, entryIt->physicalOriginPosition);
+    SEQAN_ASSERT_GT(entryIt->physicalOriginPosition + entryIt->length, refPos);
+
+    target._length -= indel.i1;
+    TEntryPos virtPos = entryIt->virtualPosition + (refPos - entryIt->physicalOriginPosition);
+    _doRecordErase(target._journalEntries, entryIt, virtPos, virtPos + indel.i1);
+
+    entryIt = end(target._journalEntries, Standard()) - 1;
+    SEQAN_ASSERT_EQ(entryIt->segmentSource, SOURCE_ORIGINAL);
+    SEQAN_ASSERT_EQ(refPos + indel.i1, entryIt->physicalOriginPosition);
+
+    target._length += length(indel.i2);
+    TEntryPos physPos = length(target._insertionBuffer);
+    append(target._insertionBuffer, indel.i2);
+    _doRecordInsertion(target._journalEntries, entryIt, virtPos, physPos, length(indel.i2));
+}
+
+// ----------------------------------------------------------------------------
+// Function _journalIns()
+// ----------------------------------------------------------------------------
+
+template <typename TTarget, typename TPos, typename TCoverage, typename TIndel>
+inline void
+_journalIndel(TTarget & target,
+              TPos refPos,
+              TCoverage const & coverage,
+              TIndel const & ins)
+{
+    typedef typename Value<TTarget>::Type TJournalSeq;
+    typedef typename Iterator<TCoverage const>::Type TCoverageIterator;
+
+    TCoverageIterator itBegin = begin(coverage);
+    TCoverageIterator it = begin(coverage);
+    TCoverageIterator itEnd = end(coverage);
+
+    for (; it != itEnd; ++it)
+    {
+        if (getValue(it) == true)
+        {
+            TJournalSeq & journal = value(target, it - itBegin);
+            insert(journal, hostToVirtualPosition(journal, refPos), ins);
+        }
+    }
+}
+
+// ----------------------------------------------------------------------------
 // Function _getInsertion()
 // ----------------------------------------------------------------------------
 

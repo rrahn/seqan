@@ -61,7 +61,7 @@ public:
     typedef typename Value<TJournaledSet>::Type TJournaledString;
     typedef typename Iterator<TJournaledString, Standard>::Type TJSIterator;
 
-    typedef typename GetBranchNodeMap<TJst>::Type TDeltaMap;
+    typedef typename Container<TJst>::Type TDeltaMap;
     typedef typename DeltaCoverage<TDeltaMap>::Type TCoverage;
     typedef typename Iterator<TDeltaMap, Rooted>::Type TBranchNodeIterator;
 
