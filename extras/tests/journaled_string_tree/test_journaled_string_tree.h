@@ -371,20 +371,61 @@ void _testJournaledStringTreeJournalNextBlock(TJst & jst)
     }
 
     {  // Journal in blocks
-//        setBlockSize(jst, 3);
-//        reinit(jst);
-//
-//        SEQAN_ASSERT_EQ(journalNextBlock(jst, 5, Serial()), true);
-//
-//        TString test0 = stringSet(jst)[0];
-//        TString test1 = stringSet(jst)[1];
-//        TString test2 = stringSet(jst)[2];
-//        TString test3 = stringSet(jst)[3];
-//
-//        SEQAN_ASSERT_EQ(set[0], test0);
-//        SEQAN_ASSERT_EQ(set[1], test1);
-//        SEQAN_ASSERT_EQ(set[2], test2);
-//        SEQAN_ASSERT_EQ(set[3], test3);
+        setBlockSize(jst, 3);
+        reinit(jst);
+        SEQAN_ASSERT_EQ(journalNextBlock(jst, 5, Serial()), true);
+
+
+
+//                 01234567890123  4567890123
+        set[0] = "CACGTGGATCTGTAAAATGACGGACGGACTTGACGGGAGTACGAGCATCGACT";
+//                 012345678901234567890123
+        set[1] = "CACGTGGATCTGTACTGACGGACGGACTTGACGGGAGTACGAGCATCGACT";
+//                012345678901234567890123
+        set[2] = "ACGTGGATCTATACTGACGGACGGACTTGACGGGAGTACGAGCATCGACT";
+//                 01234567890123  47890123
+        set[3] = "CACGTGGATCTGTAAAATCGGCCGGACTTGACGGGAGTACGAGCATCGACT";
+
+        SEQAN_ASSERT_EQ(stringSet(jst)[0], set[0]);
+        SEQAN_ASSERT_EQ(stringSet(jst)[1], set[1]);
+        SEQAN_ASSERT_EQ(stringSet(jst)[2], set[2]);
+        SEQAN_ASSERT_EQ(stringSet(jst)[3], set[3]);
+
+        SEQAN_ASSERT_EQ(journalNextBlock(jst, 5, Serial()), true);
+
+//                  012345678901234567890123
+//        set[X] = "ACGTGGATCTGTACTGACGGACGGACTTGACGGGAGTACGAGCATCGACT";
+//                012345678901234567890123
+        set[0] = "ACGTGGATCTGTACTGACGGTAGGACTTGACGGGAGTACGAGCATCGACT";
+//                0123456789012347890    123
+        set[1] = "ACGTGGATCTGTACTCGGCACGTCGGACTTGACGGGAGTACGAGCATCGACT";
+//                0123456789012347895
+        set[2] = "ACGTGGATCTGTACTCGGCTTGACGGGAGTACGAGCATCGACT";
+//                0123456789012347890    123
+        set[3] = "ACGTGGATCTGTACTCGGCACGTCGGACTTGACGGGAGTACGAGCATCGACT";
+
+        SEQAN_ASSERT_EQ(stringSet(jst)[0], set[0]);
+        SEQAN_ASSERT_EQ(stringSet(jst)[1], set[1]);
+        SEQAN_ASSERT_EQ(stringSet(jst)[2], set[2]);
+        SEQAN_ASSERT_EQ(stringSet(jst)[3], set[3]);
+
+        SEQAN_ASSERT_EQ(journalNextBlock(jst, 5, Serial()), true);
+
+//                012345678901234567890123
+        set[0] = "ACGTGGATCTGTACTGACGGACGGACTTGACGGGAGTACGAGCATCGACT";
+//                012345678901234567890    123
+        set[1] = "ACGTGGATCTGTACTGACGGAACGTCGGACTTGACGGGAGTACGAGCATCGACT";
+//                012345678901234567890123
+        set[2] = "ACGTGGATCTGTACTGACGGACGGACTTGACGGGAGTACGAGCATCGACT";
+//                012345678901234567890    123
+        set[3] = "ACGTGGATCTGTACTGACGGAACGTCGGACTTGACGGGAGTACGAGCATCGACT";
+
+        SEQAN_ASSERT_EQ(stringSet(jst)[0], set[0]);
+        SEQAN_ASSERT_EQ(stringSet(jst)[1], set[1]);
+        SEQAN_ASSERT_EQ(stringSet(jst)[2], set[2]);
+        SEQAN_ASSERT_EQ(stringSet(jst)[3], set[3]);
+
+        SEQAN_ASSERT_EQ(journalNextBlock(jst, 5, Serial()), false);
     }
 
 }
@@ -441,9 +482,6 @@ SEQAN_DEFINE_TEST(test_journaled_string_tree_journal_next_block)
 
     JournaledStringTree<TDeltaMap> jst(hostSeq, deltaMap);
     _testJournaledStringTreeJournalNextBlock(jst);
-
-//    const JournaledStringTree<TDeltaMap> cJst(hostSeq, deltaMap);
-//    _testJournaledStringTreeJournalNextBlock(cJst);
 }
 
 SEQAN_DEFINE_TEST(test_journaled_string_tree_reinit)
@@ -541,16 +579,16 @@ SEQAN_DEFINE_TEST(test_journaled_string_tree_virtual_block_position)
 
     SEQAN_ASSERT_EQ(jst._blockVPOffset[0], 0);
     SEQAN_ASSERT_EQ(jst._activeBlockVPOffset[0], 3);
-    SEQAN_ASSERT_EQ(virtualBlockPosition(jst, 0), 0);
+    SEQAN_ASSERT_EQ(virtualBlockOffset(jst, 0), 0);
     SEQAN_ASSERT_EQ(jst._blockVPOffset[1], 0);
     SEQAN_ASSERT_EQ(jst._activeBlockVPOffset[1], 1);
-    SEQAN_ASSERT_EQ(virtualBlockPosition(jst, 1), 0);
+    SEQAN_ASSERT_EQ(virtualBlockOffset(jst, 1), 0);
     SEQAN_ASSERT_EQ(jst._blockVPOffset[2], 0);
     SEQAN_ASSERT_EQ(jst._activeBlockVPOffset[2], 0);
-    SEQAN_ASSERT_EQ(virtualBlockPosition(jst, 2), 0);
+    SEQAN_ASSERT_EQ(virtualBlockOffset(jst, 2), 0);
     SEQAN_ASSERT_EQ(jst._blockVPOffset[3], 0);
     SEQAN_ASSERT_EQ(jst._activeBlockVPOffset[3], 3);
-    SEQAN_ASSERT_EQ(virtualBlockPosition(jst, 3), 0);
+    SEQAN_ASSERT_EQ(virtualBlockOffset(jst, 3), 0);
 
     journalNextBlock(jst, 5, Serial());
 
@@ -560,16 +598,16 @@ SEQAN_DEFINE_TEST(test_journaled_string_tree_virtual_block_position)
 
     SEQAN_ASSERT_EQ(jst._blockVPOffset[0], 3);
     SEQAN_ASSERT_EQ(jst._activeBlockVPOffset[0], 0);
-    SEQAN_ASSERT_EQ(virtualBlockPosition(jst, 0), 3);
+    SEQAN_ASSERT_EQ(virtualBlockOffset(jst, 0), 3);
     SEQAN_ASSERT_EQ(jst._blockVPOffset[1], 1);
     SEQAN_ASSERT_EQ(jst._activeBlockVPOffset[1], -2);
-    SEQAN_ASSERT_EQ(virtualBlockPosition(jst, 1), 1);
+    SEQAN_ASSERT_EQ(virtualBlockOffset(jst, 1), 1);
     SEQAN_ASSERT_EQ(jst._blockVPOffset[2], 0);
     SEQAN_ASSERT_EQ(jst._activeBlockVPOffset[2], -7);
-    SEQAN_ASSERT_EQ(virtualBlockPosition(jst, 2), 0);
+    SEQAN_ASSERT_EQ(virtualBlockOffset(jst, 2), 0);
     SEQAN_ASSERT_EQ(jst._blockVPOffset[3], 3);
     SEQAN_ASSERT_EQ(jst._activeBlockVPOffset[3], -2);
-    SEQAN_ASSERT_EQ(virtualBlockPosition(jst, 3), 3);
+    SEQAN_ASSERT_EQ(virtualBlockOffset(jst, 3), 3);
 
     journalNextBlock(jst, 5, Serial());
 
@@ -579,16 +617,16 @@ SEQAN_DEFINE_TEST(test_journaled_string_tree_virtual_block_position)
 
     SEQAN_ASSERT_EQ(jst._blockVPOffset[0], 3);
     SEQAN_ASSERT_EQ(jst._activeBlockVPOffset[0], 0);
-    SEQAN_ASSERT_EQ(virtualBlockPosition(jst, 0), 3);
+    SEQAN_ASSERT_EQ(virtualBlockOffset(jst, 0), 3);
     SEQAN_ASSERT_EQ(jst._blockVPOffset[1], -1);
     SEQAN_ASSERT_EQ(jst._activeBlockVPOffset[1], 4);
-    SEQAN_ASSERT_EQ(virtualBlockPosition(jst, 1), -1);
+    SEQAN_ASSERT_EQ(virtualBlockOffset(jst, 1), -1);
     SEQAN_ASSERT_EQ(jst._blockVPOffset[2], -7);
     SEQAN_ASSERT_EQ(jst._activeBlockVPOffset[2], 0);
-    SEQAN_ASSERT_EQ(virtualBlockPosition(jst, 2), -7);
+    SEQAN_ASSERT_EQ(virtualBlockOffset(jst, 2), -7);
     SEQAN_ASSERT_EQ(jst._blockVPOffset[3], 1);
     SEQAN_ASSERT_EQ(jst._activeBlockVPOffset[3], 4);
-    SEQAN_ASSERT_EQ(virtualBlockPosition(jst, 3), 1);
+    SEQAN_ASSERT_EQ(virtualBlockOffset(jst, 3), 1);
 }
 
 

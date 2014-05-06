@@ -50,32 +50,6 @@ seqan::DataParallelTestConfig<char> testConfig;
 namespace seqan
 {
 
-//struct TestDataParallel_;
-//typedef Tag<TestDataParallel_> TestDummy;
-//
-//template <typename TNeedle>
-//class Pattern<TNeedle, TestDummy>
-//{
-//public:
-//    TNeedle _needle;
-//
-//    // TODO(rmaerker): Test different pattern sizes.
-//    Pattern() : _needle("xxx")
-//    {}
-//};
-//
-//template <typename TNeedle>
-//inline TNeedle & needle(Pattern<TNeedle, TestDummy> & pattern)
-//{
-//    return pattern._needle;
-//}
-//
-//template <typename TNeedle>
-//inline TNeedle const & needle(Pattern<TNeedle, TestDummy> const & pattern)
-//{
-//    return pattern._needle;
-//}
-
 template <typename TTraverser>
 struct DummyCaller_
 {

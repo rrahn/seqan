@@ -268,14 +268,17 @@ SEQAN_DEFINE_TEST(test_delta_map_insert)
     SEQAN_ASSERT_EQ(deltaType(deltaMap._deltaStore._varDataMap[6]), DeltaType::DELTA_TYPE_SNP);
     SEQAN_ASSERT_EQ(deltaType(deltaMap._deltaStore._varDataMap[7]), DeltaType::DELTA_TYPE_INS);
 
-    SEQAN_ASSERT_EQ(deltaMap._deltaStore._snpData[0], TSnp('A'));
-    SEQAN_ASSERT_EQ(deltaMap._deltaStore._snpData[1], TSnp('C'));
-    SEQAN_ASSERT_EQ(deltaMap._deltaStore._delData[0], TDel(2));
-    SEQAN_ASSERT_EQ(deltaMap._deltaStore._delData[1], TDel(5));
-    SEQAN_ASSERT_EQ(deltaMap._deltaStore._insData[0], TIns("ACGT"));
     SEQAN_ASSERT_EQ(deltaMap._deltaStore._insData[1], TIns("C"));
+    SEQAN_ASSERT_EQ(deltaMap._deltaStore._snpData[0], TSnp('A'));
     SEQAN_ASSERT_EQ(deltaMap._deltaStore._indelData[0], TInDel(2, "AAAA"));
+    SEQAN_ASSERT_EQ(deltaMap._deltaStore._delData[0], TDel(2));
     SEQAN_ASSERT_EQ(deltaMap._deltaStore._indelData[1], TInDel(3, "GTA"));
+    SEQAN_ASSERT_EQ(deltaMap._deltaStore._delData[1], TDel(5));
+    SEQAN_ASSERT_EQ(deltaMap._deltaStore._snpData[1], TSnp('C'));
+    SEQAN_ASSERT_EQ(deltaMap._deltaStore._insData[0], TIns("ACGT"));
+
+
+
 }
 
 SEQAN_DEFINE_TEST(test_delta_map_length)

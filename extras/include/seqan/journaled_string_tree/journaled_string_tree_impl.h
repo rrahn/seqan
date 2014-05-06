@@ -86,12 +86,12 @@ public:
     // TODO(rmaerker): Maybe no holder.
     Holder<TDeltaMap> _container;
 
-    // NOTE(rmaerker): We use this as an internal data structure, which is not set from outside.
-    mutable TJournalData  _journalSet;
-    mutable String<TSignedSize> _blockVPOffset;  // Virtual position offset for each sequence visited so far.
-    mutable String<TSignedSize> _activeBlockVPOffset;  // Virtual position offset for each sequence visited so far.
-    mutable TSize _activeBlock;
-    mutable bool _emptyJournal;
+    TJournalData  _journalSet;
+    String<TSignedSize> _blockVPOffset;  // Virtual position offset for each sequence visited so far.
+    String<TSignedSize> _activeBlockVPOffset;  // Virtual position offset for each sequence visited so far.
+    TSize _activeBlock;
+    TSize _blockShift;
+    bool _emptyJournal;
 
     static const TSize REQUIRE_FULL_JOURNAL = MaxValue<TSize>::VALUE;
     TSize _blockSize;
@@ -100,6 +100,7 @@ public:
     JournaledStringTree() : _container(),
                             _journalSet(),
                             _activeBlock(0),
+                            _blockShift(0),
                             _emptyJournal(true),
                             _blockSize(REQUIRE_FULL_JOURNAL),
                             _numBlocks(1)
@@ -109,6 +110,7 @@ public:
 
     template <typename THost>
     JournaledStringTree(THost & reference, TDeltaMap & varData) : _activeBlock(0),
+                                                                  _blockShift(0),
                                                                   _emptyJournal(true),
                                                                   _blockSize(REQUIRE_FULL_JOURNAL),
                                                                   _numBlocks(1)
@@ -338,23 +340,26 @@ _doJournalBlock(JournaledStringTree<TDeltaMap, TSpec> & jst,
     typedef typename Size<TJournalSet>::Type TSize;
 
     // Define the block limits.
-    TSize blockBegin = jst._activeBlock * jst._blockSize;
+    TSize blockBegin = jst._activeBlock * jst._blockSize + jst._blockShift;
     TSize blockEnd = _min(length(container(jst)), (jst._activeBlock + 1) * jst._blockSize);
 
     // Auxiliary variables.
     TDeltaMap & variantMap = container(jst);
     TJournalSet & journalSet = stringSet(jst);
+
     String<int> _lastVisitedNodes;
     if (!fullJournalRequired(jst))
-        resize(_lastVisitedNodes, length(stringSet(jst)), -1, Exact());
+        resize(_lastVisitedNodes, length(journalSet), -1, Exact());
 
-    // Check whether there is enough space.
-    SEQAN_ASSERT_EQ(length(journalSet), length(stringSet(jst)));
+    TMapIterator itMapBegin = begin(variantMap, Standard());
+    TMapIterator itMap = itMapBegin + blockBegin;
+    TMapIterator itMapEnd = begin(variantMap, Standard()) + blockEnd;
+    for (; itMapEnd != end(variantMap, Standard()) && *itMapEnd == *(itMapEnd - 1); ++itMapEnd);
 
     // Use parallel processing.
     // TODO(rmaerker): Consider more general Master-Worker design for parallelization?
     Splitter<TJournalSetIter> jSetSplitter(begin(journalSet, Standard()), end(journalSet, Standard()), parallelTag);
-    SEQAN_OMP_PRAGMA(parallel for if (length(stringSet(jst)) > 1000))
+    SEQAN_OMP_PRAGMA(parallel for /*if (length(stringSet(jst)) > 1000),*/ firstprivate(itMapBegin, itMap, itMapEnd))
     for (unsigned jobId = 0; jobId < length(jSetSplitter); ++jobId)
     {
 
@@ -371,11 +376,6 @@ _doJournalBlock(JournaledStringTree<TDeltaMap, TSpec> & jst,
             }
 
 //        printf("Thread %i: jobBegin %i - jobEnd %i\n", jobId, jobBegin, jobEnd);
-
-        TMapIterator itMapBegin = begin(variantMap, Standard());
-        TMapIterator itMap = itMapBegin + blockBegin;
-        TMapIterator itMapEnd = begin(variantMap, Standard()) + blockEnd;
-//        TCoverageIterator it = begin(deltaCoverageStore(variantMap), Standard()) + blockBegin;
 
         for (; itMap != itMapEnd; ++itMap)
         {
@@ -409,28 +409,31 @@ _doJournalBlock(JournaledStringTree<TDeltaMap, TSpec> & jst,
                     continue;
 
                 TMapIterator tmpMapIt = begin(variantMap, Standard()) + _lastVisitedNodes[i];
-//                TMappedDelta varKey = mappedDelta(variantMap, _lastVisitedNodes[i]);
-                unsigned offset = /*keys(variantMap)[_lastVisitedNodes[i]]*/ *tmpMapIt + contextSize;
+                unsigned offset = *tmpMapIt + contextSize;
                 if (deltaType(tmpMapIt) == DeltaType::DELTA_TYPE_DEL)
                     offset += deltaDel(tmpMapIt);  // Adds the size of the deletion.
-                // TODO(rmaerker): Add INDEL!
+                if (deltaType(tmpMapIt) == DeltaType::DELTA_TYPE_INDEL)
+                    offset += deltaIndel(tmpMapIt).i1;
 
-                if (itMapEnd != end(variantMap, Standard()) && offset >= *itMapEnd)
+                if (itMapEnd != end(variantMap, Standard()) && offset > *itMapEnd)
                 {
-                    // TODO(rmaerker): Check performance!
                     tmpMapIt = itMapEnd;
                     int localDiff = 0;
-                    while (tmpMapIt != end(variantMap, Standard()) && *tmpMapIt <= offset + localDiff)
+                    while (tmpMapIt != end(variantMap, Standard()) && *tmpMapIt < offset + localDiff)
                     {
                         if (deltaCoverage(tmpMapIt)[i])
                         {
-//                            TMappedDelta varKey = mappedDelta(variantMap, tmpMapIt - itMapBegin);
                             _journalNextVariant(journalSet[i], tmpMapIt);
 
                             if (deltaType(tmpMapIt) == DeltaType::DELTA_TYPE_DEL)
                                 localDiff += deltaDel(tmpMapIt);
                             else if (deltaType(tmpMapIt) == DeltaType::DELTA_TYPE_INS)
                                 localDiff = _max(0, localDiff - static_cast<int>(length(deltaIns(tmpMapIt))));
+                            else if (deltaType(tmpMapIt) == DeltaType::DELTA_TYPE_INDEL)
+                            {
+                                localDiff += deltaIndel(tmpMapIt).i1;
+                                localDiff = _max(0, localDiff - static_cast<int>(length(deltaIndel(tmpMapIt).i2)));
+                            }
                         }
                         ++tmpMapIt;
                     }
@@ -438,6 +441,7 @@ _doJournalBlock(JournaledStringTree<TDeltaMap, TSpec> & jst,
             }
         }
     }
+    jst._blockShift = itMapEnd - (begin(variantMap, Standard()) + blockEnd);
 }
 
 // ----------------------------------------------------------------------------
@@ -471,15 +475,15 @@ host(JournaledStringTree<TDeltaMap, TSpec> const & stringTree)
 }
 
 // ----------------------------------------------------------------------------
-// Function virtualBlockPosition()
+// Function virtualBlockOffset()
 // ----------------------------------------------------------------------------
 
 /*!
- * @fn JournaledStringTree#virtualBlockPosition
+ * @fn JournaledStringTree#virtualBlockOffset
  * @headerfile seqan/journaled_string_tree.h
  * @brief Returns the virtual offset for the current block for the given sequence.
  *
- * @signature TSize virtualBlockPosition(jst, id);
+ * @signature TSize virtualBlockOffset(jst, id);
  *
  * @param[in] jst    The Journal String Tree.
  * @param[in] id     The id of the sequence to get the offset for.
@@ -487,13 +491,13 @@ host(JournaledStringTree<TDeltaMap, TSpec> const & stringTree)
  * When constructing the sequence information block-wise, an additional offset is used to determine
  * the correct virtual position for the current block for each sequence.
  *
- * @return TSize Current block offset for the sequence <tt>id</tt> of type <tt>MakeSigned<Size<Journaled String Tree> ></tt>.
+ * @return The Current block offset for the given sequence of type <tt>MakeSigned<Size<JournaledStringTree> >::Type</tt>.
  */
 
 template <typename TDeltaMap, typename TSpec, typename TPosition>
-inline typename MakeSigned<typename Size<JournaledStringTree<TDeltaMap, TSpec> const>::Type>::Type &
-virtualBlockPosition(JournaledStringTree<TDeltaMap, TSpec> const & stringTree,
-               TPosition const & pos)
+inline typename MakeSigned<typename Size<JournaledStringTree<TDeltaMap, TSpec> const>::Type>::Type
+virtualBlockOffset(JournaledStringTree<TDeltaMap, TSpec> const & stringTree,
+                   TPosition const & pos)
 {
     return stringTree._blockVPOffset[pos];
 }
@@ -597,6 +601,7 @@ reinit(JournaledStringTree<TDeltaMap, TSpec> & jst)
 {
     // Reset all positions to 0.
     jst._activeBlock = 0;
+    jst._blockShift = 0;
     if (!fullJournalRequired(jst))
     {
         jst._emptyJournal = true;

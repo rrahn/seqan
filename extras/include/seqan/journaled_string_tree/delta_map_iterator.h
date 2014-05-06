@@ -46,8 +46,23 @@ namespace seqan {
 // Tags, Classes, Enums
 // ============================================================================
 
+/*!
+ * @class DeltaMapIterator
+ * @implements BidirectionalIteratorConcept
+ * @extends Iter
+ *
+ * @headerfile <seqan/journaled_string_tree.h>
+ *
+ * @brief Bidirectional iterator over a @link DeltaMap @endlink.
+ *
+ * @signature template <typename TDeltaMap>
+ *            class Iter<TDeltaMap, DeltaMapIteratorSpec>;
+ *
+ * @tparam TDeltaMap The delta map to iterate.
+ */
+
 template <typename TDeltaMap>
-class Iter<TDeltaMap, SpecDeltaMapIterator_>
+class Iter<TDeltaMap, DeltaMapIteratorSpec>
 {
 public:
     typedef typename GetMapValueString_<TDeltaMap>::Type TDeltaMapKeys;
@@ -67,20 +82,20 @@ public:
     {}
 
     // Copy Constructor
-    Iter(Iter<TDeltaMap, SpecDeltaMapIterator_> const & other) : _mapIter(other._mapIter),
+    Iter(Iter<TDeltaMap, DeltaMapIteratorSpec> const & other) : _mapIter(other._mapIter),
                                                                  _deltaStoreIter(other._deltaStoreIter),
                                                                  _deltaCoverageIter(other._deltaCoverageIter)
     {}
 
-    Iter(typename IterComplementConst<Iter<TDeltaMap, SpecDeltaMapIterator_> >::Type const & other) :
+    Iter(typename IterComplementConst<Iter<TDeltaMap, DeltaMapIteratorSpec> >::Type const & other) :
                     _mapIter(other._mapIter),
                     _deltaStoreIter(other._deltaStoreIter),
                    _deltaCoverageIter(other._deltaCoverageIter)
     {}
 
     // Assignment Operator
-    Iter<TDeltaMap, SpecDeltaMapIterator_> &
-    operator=(Iter<TDeltaMap, SpecDeltaMapIterator_> const & other)
+    Iter<TDeltaMap, DeltaMapIteratorSpec> &
+    operator=(Iter<TDeltaMap, DeltaMapIteratorSpec> const & other)
     {
         if (this != &other)
         {
@@ -91,8 +106,8 @@ public:
         return *this;
     }
 
-    Iter<TDeltaMap, SpecDeltaMapIterator_> &
-    operator=(typename IterComplementConst<Iter<TDeltaMap, SpecDeltaMapIterator_> >::Type const & other)
+    Iter<TDeltaMap, DeltaMapIteratorSpec> &
+    operator=(typename IterComplementConst<Iter<TDeltaMap, DeltaMapIteratorSpec> >::Type const & other)
     {
         _mapIter = other._mapIter;
         _deltaStoreIter = other._deltaStoreIter;
@@ -110,13 +125,13 @@ public:
 // ----------------------------------------------------------------------------
 
 template <typename TDeltaMap>
-struct Value<Iter<TDeltaMap, SpecDeltaMapIterator_> >
+struct Value<Iter<TDeltaMap, DeltaMapIteratorSpec> >
 {
     typedef typename Value<TDeltaMap>::Type Type;
 };
 
 template <typename TDeltaMap>
-struct Value<Iter<TDeltaMap, SpecDeltaMapIterator_> const >
+struct Value<Iter<TDeltaMap, DeltaMapIteratorSpec> const >
 {
     typedef typename Value<TDeltaMap const>::Type Type;
 };
@@ -126,32 +141,44 @@ struct Value<Iter<TDeltaMap, SpecDeltaMapIterator_> const >
 // ----------------------------------------------------------------------------
 
 template <typename TDeltaMap>
-struct Reference<Iter<TDeltaMap, SpecDeltaMapIterator_> >
+struct Reference<Iter<TDeltaMap, DeltaMapIteratorSpec> >
 {
     typedef typename Reference<TDeltaMap>::Type Type;
 };
 
 template <typename TDeltaMap>
-struct Reference<Iter<TDeltaMap, SpecDeltaMapIterator_> const >
+struct Reference<Iter<TDeltaMap, DeltaMapIteratorSpec> const >
 {
     typedef typename Reference<TDeltaMap const>::Type Type;
 };
+
+// ----------------------------------------------------------------------------
+// Metafunction GetValue
+// ----------------------------------------------------------------------------
+
+template <typename TDeltaMap>
+struct GetValue<Iter<TDeltaMap, DeltaMapIteratorSpec> > :
+    Value<Iter<TDeltaMap, DeltaMapIteratorSpec> >{};
+
+template <typename TDeltaMap>
+struct GetValue<Iter<TDeltaMap, DeltaMapIteratorSpec> const> :
+    Value<Iter<TDeltaMap, DeltaMapIteratorSpec> const>{};
 
 // ----------------------------------------------------------------------------
 // Metafunction Difference
 // ----------------------------------------------------------------------------
 
 template <typename TDeltaMap>
-struct Difference<Iter<TDeltaMap, SpecDeltaMapIterator_> >
+struct Difference<Iter<TDeltaMap, DeltaMapIteratorSpec> >
 {
-    typedef Iter<TDeltaMap, SpecDeltaMapIterator_> TIter_;
+    typedef Iter<TDeltaMap, DeltaMapIteratorSpec> TIter_;
     typedef typename TIter_::TMapIterator TMapIterator_;
     typedef typename Difference<TMapIterator_>::Type Type;
 };
 
 template <typename TDeltaMap>
-struct Difference<Iter<TDeltaMap, SpecDeltaMapIterator_> const > :
-    Difference<Iter<TDeltaMap, SpecDeltaMapIterator_> >{};
+struct Difference<Iter<TDeltaMap, DeltaMapIteratorSpec> const > :
+    Difference<Iter<TDeltaMap, DeltaMapIteratorSpec> >{};
 
 // ============================================================================
 // Functions
@@ -159,7 +186,7 @@ struct Difference<Iter<TDeltaMap, SpecDeltaMapIterator_> const > :
 
 template <typename TDeltaMap>
 inline void
-_initBegin(Iter<TDeltaMap, SpecDeltaMapIterator_> & iter,
+_initBegin(Iter<TDeltaMap, DeltaMapIteratorSpec> & iter,
            TDeltaMap & map)
 {
     iter._mapIter = begin(map._keys, Standard());
@@ -167,20 +194,9 @@ _initBegin(Iter<TDeltaMap, SpecDeltaMapIterator_> & iter,
     iter._deltaCoverageIter = begin(map._deltaCoverageStore, Standard());
 }
 
-//template <typename TDeltaMap>
-//inline void
-//_initBegin(Iter<TDeltaMap const, SpecDeltaMapIterator_> & iter,
-//           TDeltaMap const & map)
-//{
-//    iter._mapIter = begin(map._keys, Standard());
-//    iter._deltaStoreIter = begin(map._deltaStore, Standard());
-//    iter._deltaCoverageIter = begin(map._deltaCoverageStore, Standard());
-//}
-
-
 template <typename TDeltaMap>
 inline void
-_initEnd(Iter<TDeltaMap, SpecDeltaMapIterator_> & iter,
+_initEnd(Iter<TDeltaMap, DeltaMapIteratorSpec> & iter,
            TDeltaMap & map)
 {
     iter._mapIter = end(map._keys, Standard());
@@ -188,37 +204,62 @@ _initEnd(Iter<TDeltaMap, SpecDeltaMapIterator_> & iter,
     iter._deltaCoverageIter = end(map._deltaCoverageStore, Standard());
 }
 
-//template <typename TDeltaMap>
-//inline void
-//_initEnd(Iter<TDeltaMap const, SpecDeltaMapIterator_> & iter,
-//           TDeltaMap const & map)
-//{
-//    iter._mapIter = end(map._keys, Standard());
-//    iter._deltaStoreIter = end(map._deltaStore, Standard());
-//    iter._deltaCoverageIter = end(map._deltaCoverageStore, Standard());
-//}
+// ----------------------------------------------------------------------------
+// Function value()
+// ----------------------------------------------------------------------------
 
 template <typename TDeltaMap>
 inline typename Value<TDeltaMap>::Type const &
-value(Iter<TDeltaMap, SpecDeltaMapIterator_> & iter)
+value(Iter<TDeltaMap, DeltaMapIteratorSpec> & iter)
 {
     return value(iter._mapIter);
 }
 
 template <typename TDeltaMap>
 inline typename Reference<TDeltaMap const>::Type
-value(Iter<TDeltaMap, SpecDeltaMapIterator_> const & iter)
+value(Iter<TDeltaMap, DeltaMapIteratorSpec> const & iter)
 {
     return value(iter._mapIter);
+}
+
+// ----------------------------------------------------------------------------
+// Function value()
+// ----------------------------------------------------------------------------
+
+template <typename TDeltaMap>
+inline typename GetValue<Iter<TDeltaMap, DeltaMapIteratorSpec> >::Type const &
+getValue(Iter<TDeltaMap, DeltaMapIteratorSpec> & iter)
+{
+    return getValue(iter._mapIter);
+}
+
+template <typename TDeltaMap>
+inline typename GetValue<Iter<TDeltaMap, DeltaMapIteratorSpec> const>::Type
+getValue(Iter<TDeltaMap, DeltaMapIteratorSpec> const & iter)
+{
+    return getValue(iter._mapIter);
 }
 
 // ----------------------------------------------------------------------------
 // Function deltaType()
 // ----------------------------------------------------------------------------
 
+/*!
+ * @fn DeltaMapIterator#deltaType
+ *
+ * @headerfile <seqan/journaled_string_tree.h>
+ *
+ * @brief Returns the key of the delta event the current iterator points to.
+ *
+ * @signature TKey deltaType(it)
+ * @param[in]   it  The iterator to query the delta event key for.
+ *
+ * @return The key for the current delta event of type <tt>DeltaType::TValue</tt>.
+ */
+
 template <typename TDeltaMap>
 inline DeltaType::TValue
-deltaType(Iter<TDeltaMap, SpecDeltaMapIterator_> const& iter)
+deltaType(Iter<TDeltaMap, DeltaMapIteratorSpec> const& iter)
 {
     return deltaType(iter._deltaStoreIter);
 }
@@ -229,7 +270,7 @@ deltaType(Iter<TDeltaMap, SpecDeltaMapIterator_> const& iter)
 
 template <typename TDeltaMap>
 inline DeltaType::TValue
-deltaPosition(Iter<TDeltaMap, SpecDeltaMapIterator_> const& iter)
+deltaPosition(Iter<TDeltaMap, DeltaMapIteratorSpec> const& iter)
 {
     return deltaPosition(iter._deltaStoreIter);
 }
@@ -238,17 +279,37 @@ deltaPosition(Iter<TDeltaMap, SpecDeltaMapIterator_> const& iter)
 // Function deltaSnp()
 // ----------------------------------------------------------------------------
 
+/*!
+ * @fn DeltaMapIterator#deltaSnp
+ *
+ * @headerfile <seqan/journaled_string_tree.h>
+ *
+ * @brief Returns the SNP associated with the current iterator position.
+ *
+ * @signature TSnp deltaSnp(it)
+ * @param[in]   it  The iterator to query the SNP event for.
+ *
+ * @return A reference to the SNP at the current iterator position of type @link DeltaMap#DeltaValue @endlink.
+ *
+ * @see DeltaMapIterator#deltaDel
+ * @see DeltaMapIterator#deltaIns
+ * @see DeltaMapIterator#deltaIndel
+ *
+ */
+
 template <typename TDeltaMap>
 inline typename DeltaValue<TDeltaMap, DeltaType::DELTA_TYPE_SNP>::Type &
-deltaSnp(Iter<TDeltaMap, SpecDeltaMapIterator_> & iter)
+deltaSnp(Iter<TDeltaMap, DeltaMapIteratorSpec> & iter)
 {
+    SEQAN_ASSERT_EQ(deltaType(iter), DeltaType::DELTA_TYPE_SNP);
     return deltaSnp(iter._deltaStoreIter);
 }
 
 template <typename TDeltaMap>
 inline typename DeltaValue<TDeltaMap const, DeltaType::DELTA_TYPE_SNP>::Type &
-deltaSnp(Iter<TDeltaMap, SpecDeltaMapIterator_> const & iter)
+deltaSnp(Iter<TDeltaMap, DeltaMapIteratorSpec> const & iter)
 {
+    SEQAN_ASSERT_EQ(deltaType(iter), DeltaType::DELTA_TYPE_SNP);
     return deltaSnp(iter._deltaStoreIter);
 }
 
@@ -256,53 +317,110 @@ deltaSnp(Iter<TDeltaMap, SpecDeltaMapIterator_> const & iter)
 // Function deltaDel()
 // ----------------------------------------------------------------------------
 
+/*!
+ * @fn DeltaMapIterator#deltaDel
+ *
+ * @headerfile <seqan/journaled_string_tree.h>
+ *
+ * @brief Returns the deletion associated with the current iterator position.
+ *
+ * @signature TDel deltaDel(it)
+ * @param[in]   it  The iterator to query the deletion event for.
+ *
+ * @return A reference to the deletion at the current iterator position of type @link DeltaMap#DeltaValue @endlink.
+ *
+ * @see DeltaMapIterator#deltaSnp
+ * @see DeltaMapIterator#deltaIns
+ * @see DeltaMapIterator#deltaIndel
+ */
+
 template <typename TDeltaMap>
 inline typename DeltaValue<TDeltaMap, DeltaType::DELTA_TYPE_DEL>::Type &
-deltaDel(Iter<TDeltaMap, SpecDeltaMapIterator_> & iter)
+deltaDel(Iter<TDeltaMap, DeltaMapIteratorSpec> & iter)
 {
+    SEQAN_ASSERT_EQ(deltaType(iter), DeltaType::DELTA_TYPE_DEL);
     return deltaDel(iter._deltaStoreIter);
 }
 
 template <typename TDeltaMap>
 inline typename DeltaValue<TDeltaMap const, DeltaType::DELTA_TYPE_DEL>::Type &
-deltaDel(Iter<TDeltaMap, SpecDeltaMapIterator_> const & iter)
+deltaDel(Iter<TDeltaMap, DeltaMapIteratorSpec> const & iter)
 {
+    SEQAN_ASSERT_EQ(deltaType(iter), DeltaType::DELTA_TYPE_DEL);
     return deltaDel(iter._deltaStoreIter);
 }
 
 // ----------------------------------------------------------------------------
-// Function deltaSnp()
+// Function deltaIns()
 // ----------------------------------------------------------------------------
+
+/*!
+ * @fn DeltaMapIterator#deltaIns
+ *
+ * @headerfile <seqan/journaled_string_tree.h>
+ *
+ * @brief Returns the insertion associated with the current iterator position.
+ *
+ * @signature TIns deltaIns(it)
+ * @param[in]   it  The iterator to query the insertion event for.
+ *
+ * @return A reference to the insertion at the current iterator position of type @link DeltaMap#DeltaValue @endlink.
+ *
+ * @see DeltaMapIterator#deltaSnp
+ * @see DeltaMapIterator#deltaDel
+ * @see DeltaMapIterator#deltaIndel
+ */
 
 template <typename TDeltaMap>
 inline typename DeltaValue<TDeltaMap, DeltaType::DELTA_TYPE_INS>::Type &
-deltaIns(Iter<TDeltaMap, SpecDeltaMapIterator_> & iter)
+deltaIns(Iter<TDeltaMap, DeltaMapIteratorSpec> & iter)
 {
+    SEQAN_ASSERT_EQ(deltaType(iter), DeltaType::DELTA_TYPE_INS);
     return deltaIns(iter._deltaStoreIter);
 }
 
 template <typename TDeltaMap>
 inline typename DeltaValue<TDeltaMap const, DeltaType::DELTA_TYPE_INS>::Type &
-deltaIns(Iter<TDeltaMap, SpecDeltaMapIterator_> const & iter)
+deltaIns(Iter<TDeltaMap, DeltaMapIteratorSpec> const & iter)
 {
+    SEQAN_ASSERT_EQ(deltaType(iter), DeltaType::DELTA_TYPE_INS);
     return deltaIns(iter._deltaStoreIter);
 }
 
 // ----------------------------------------------------------------------------
-// Function deltaDel()
+// Function deltaIndel()
 // ----------------------------------------------------------------------------
+
+/*!
+ * @fn DeltaMapIterator#deltaIndel
+ *
+ * @headerfile <seqan/journaled_string_tree.h>
+ *
+ * @brief Returns the replacement associated with the current iterator position.
+ *
+ * @signature TIndel deltaIndel(it)
+ * @param[in]   it  The iterator to query the replacement event for.
+ *
+ * @return A reference to the replacement at the current iterator position of type @link DeltaMap#DeltaValue @endlink.
+ *
+ * @see DeltaMapIterator#deltaSnp
+ * @see DeltaMapIterator#deltaDel
+ * @see DeltaMapIterator#deltaIns
+ */
 
 template <typename TDeltaMap>
 inline typename DeltaValue<TDeltaMap, DeltaType::DELTA_TYPE_INDEL>::Type &
-deltaIndel(Iter<TDeltaMap, SpecDeltaMapIterator_> & iter)
+deltaIndel(Iter<TDeltaMap, DeltaMapIteratorSpec> & iter)
 {
+    SEQAN_ASSERT_EQ(deltaType(iter), DeltaType::DELTA_TYPE_INDEL);
     return deltaIndel(iter._deltaStoreIter);
 }
 
 template <typename TDeltaMap>
 inline typename DeltaValue<TDeltaMap const, DeltaType::DELTA_TYPE_INDEL>::Type &
-deltaIndel(Iter<TDeltaMap, SpecDeltaMapIterator_> const & iter)
+deltaIndel(Iter<TDeltaMap, DeltaMapIteratorSpec> const & iter)
 {
+    SEQAN_ASSERT_EQ(deltaType(iter), DeltaType::DELTA_TYPE_INDEL);
     return deltaIndel(iter._deltaStoreIter);
 }
 
@@ -310,45 +428,58 @@ deltaIndel(Iter<TDeltaMap, SpecDeltaMapIterator_> const & iter)
 // Function deltaCoverage()
 // ----------------------------------------------------------------------------
 
+/*!
+ * @fn DeltaMapIterator#deltaCoverage
+ *
+ * @headerfile <seqan/journaled_string_tree.h>
+ *
+ * @brief Returns the coverage associated with the current iterator position.
+ *
+ * @signature TCov deltaCoverage(it)
+ * @param[in]   it  The iterator to query the coverage for.
+ *
+ * @return A reference to the coverage at the current iterator position of type @link DeltaMap#DeltaCoverage @endlink.
+ */
+
 template <typename TDeltaMap>
 inline typename DeltaCoverage<TDeltaMap>::Type &
-deltaCoverage(Iter<TDeltaMap, SpecDeltaMapIterator_> & iter)
+deltaCoverage(Iter<TDeltaMap, DeltaMapIteratorSpec> & iter)
 {
     return value(iter._deltaCoverageIter);
 }
 
 template <typename TDeltaMap>
 inline typename DeltaCoverage<TDeltaMap>::Type &
-deltaCoverage(Iter<TDeltaMap, SpecDeltaMapIterator_> const & iter)
+deltaCoverage(Iter<TDeltaMap, DeltaMapIteratorSpec> const & iter)
 {
     return value(iter._deltaCoverageIter);
 }
 
 // ----------------------------------------------------------------------------
-// operator*
+// Function operator*()
 // ----------------------------------------------------------------------------
 
 template <typename TDeltaMap>
 inline typename Value<TDeltaMap>::Type const &
-operator*(Iter<TDeltaMap, SpecDeltaMapIterator_> & iter)
+operator*(Iter<TDeltaMap, DeltaMapIteratorSpec> & iter)
 {
     return value(iter);
 }
 
 template <typename TDeltaMap>
 inline typename Value<TDeltaMap>::Type const &
-operator*(Iter<TDeltaMap, SpecDeltaMapIterator_> const & iter)
+operator*(Iter<TDeltaMap, DeltaMapIteratorSpec> const & iter)
 {
     return value(iter);
 }
 
 // ----------------------------------------------------------------------------
-// operator++
+// Function operator++()                                               [prefix]
 // ----------------------------------------------------------------------------
 
 template <typename TDeltaMap>
-inline Iter<TDeltaMap, SpecDeltaMapIterator_> &
-operator++(Iter<TDeltaMap, SpecDeltaMapIterator_> & iter)
+inline Iter<TDeltaMap, DeltaMapIteratorSpec> &
+operator++(Iter<TDeltaMap, DeltaMapIteratorSpec> & iter)
 {
     ++iter._mapIter;
     ++iter._deltaStoreIter;
@@ -356,18 +487,26 @@ operator++(Iter<TDeltaMap, SpecDeltaMapIterator_> & iter)
     return iter;
 }
 
+// ----------------------------------------------------------------------------
+// Function operator++()                                              [postfix]
+// ----------------------------------------------------------------------------
+
 template <typename TDeltaMap>
-inline Iter<TDeltaMap, SpecDeltaMapIterator_>
-operator++(Iter<TDeltaMap, SpecDeltaMapIterator_> & iter,  int /*postfix*/)
+inline Iter<TDeltaMap, DeltaMapIteratorSpec>
+operator++(Iter<TDeltaMap, DeltaMapIteratorSpec> & iter,  int /*postfix*/)
 {
-    Iter<TDeltaMap, SpecDeltaMapIterator_> temp(iter);
+    Iter<TDeltaMap, DeltaMapIteratorSpec> temp(iter);
     ++iter;
     return temp;
 }
 
+// ----------------------------------------------------------------------------
+// Function operator+=()
+// ----------------------------------------------------------------------------
+
 template <typename TDeltaMap, typename TSize>
-inline Iter<TDeltaMap, SpecDeltaMapIterator_> &
-operator+=(Iter<TDeltaMap, SpecDeltaMapIterator_> & iter,  TSize const & len)
+inline Iter<TDeltaMap, DeltaMapIteratorSpec> &
+operator+=(Iter<TDeltaMap, DeltaMapIteratorSpec> & iter,  TSize const & len)
 {
     iter._mapIter += len;
     iter._deltaStoreIter += len;
@@ -375,18 +514,26 @@ operator+=(Iter<TDeltaMap, SpecDeltaMapIterator_> & iter,  TSize const & len)
     return iter;
 }
 
+// ----------------------------------------------------------------------------
+// Function operator+()
+// ----------------------------------------------------------------------------
+
 template <typename TDeltaMap, typename TSize>
-inline Iter<TDeltaMap, SpecDeltaMapIterator_>
-operator+(Iter<TDeltaMap, SpecDeltaMapIterator_> const & iter,  TSize const & len)
+inline Iter<TDeltaMap, DeltaMapIteratorSpec>
+operator+(Iter<TDeltaMap, DeltaMapIteratorSpec> const & iter,  TSize const & len)
 {
-    Iter<TDeltaMap, SpecDeltaMapIterator_> temp(iter);
+    Iter<TDeltaMap, DeltaMapIteratorSpec> temp(iter);
     temp += len;
     return temp;
 }
 
+// ----------------------------------------------------------------------------
+// Function operator--()                                              [postfix]
+// ----------------------------------------------------------------------------
+
 template <typename TDeltaMap>
-inline Iter<TDeltaMap, SpecDeltaMapIterator_> &
-operator--(Iter<TDeltaMap, SpecDeltaMapIterator_> & iter)
+inline Iter<TDeltaMap, DeltaMapIteratorSpec> &
+operator--(Iter<TDeltaMap, DeltaMapIteratorSpec> & iter)
 {
     --iter._mapIter;
     --iter._deltaStoreIter;
@@ -394,18 +541,26 @@ operator--(Iter<TDeltaMap, SpecDeltaMapIterator_> & iter)
     return iter;
 }
 
+// ----------------------------------------------------------------------------
+// Function operator--()                                               [prefix]
+// ----------------------------------------------------------------------------
+
 template <typename TDeltaMap>
-inline Iter<TDeltaMap, SpecDeltaMapIterator_>
-operator--(Iter<TDeltaMap, SpecDeltaMapIterator_> & iter,  int /*postfix*/)
+inline Iter<TDeltaMap, DeltaMapIteratorSpec>
+operator--(Iter<TDeltaMap, DeltaMapIteratorSpec> & iter,  int /*postfix*/)
 {
-    Iter<TDeltaMap, SpecDeltaMapIterator_> temp(iter);
+    Iter<TDeltaMap, DeltaMapIteratorSpec> temp(iter);
     --iter;
     return temp;
 }
 
+// ----------------------------------------------------------------------------
+// Function operator-=()
+// ----------------------------------------------------------------------------
+
 template <typename TDeltaMap, typename TSize>
-inline Iter<TDeltaMap, SpecDeltaMapIterator_> &
-operator-=(Iter<TDeltaMap, SpecDeltaMapIterator_> & iter,  TSize const & len)
+inline Iter<TDeltaMap, DeltaMapIteratorSpec> &
+operator-=(Iter<TDeltaMap, DeltaMapIteratorSpec> & iter,  TSize const & len)
 {
     iter._mapIter -= len;
     iter._deltaStoreIter -= len;
@@ -413,35 +568,47 @@ operator-=(Iter<TDeltaMap, SpecDeltaMapIterator_> & iter,  TSize const & len)
     return iter;
 }
 
+// ----------------------------------------------------------------------------
+// Function operator-()
+// ----------------------------------------------------------------------------
+
 template <typename TDeltaMap, typename TSize>
-inline Iter<TDeltaMap, SpecDeltaMapIterator_>
-operator-(Iter<TDeltaMap, SpecDeltaMapIterator_> const & iter,  TSize const & len)
+inline Iter<TDeltaMap, DeltaMapIteratorSpec>
+operator-(Iter<TDeltaMap, DeltaMapIteratorSpec> const & iter,  TSize const & len)
 {
-    Iter<TDeltaMap, SpecDeltaMapIterator_> temp(iter);
+    Iter<TDeltaMap, DeltaMapIteratorSpec> temp(iter);
     temp -= len;
     return temp;
 }
 
+// ----------------------------------------------------------------------------
+// Function operator-()
+// ----------------------------------------------------------------------------
+
 template <typename TDeltaMap>
-inline typename Difference<Iter<TDeltaMap, SpecDeltaMapIterator_> >::Type
-operator-(Iter<TDeltaMap, SpecDeltaMapIterator_> const & lhs,
-          Iter<TDeltaMap, SpecDeltaMapIterator_> const & rhs)
+inline typename Difference<Iter<TDeltaMap, DeltaMapIteratorSpec> >::Type
+operator-(Iter<TDeltaMap, DeltaMapIteratorSpec> const & lhs,
+          Iter<TDeltaMap, DeltaMapIteratorSpec> const & rhs)
 {
     return lhs._mapIter - rhs._mapIter;
 }
 
 template <typename TDeltaMap>
-inline typename Difference<Iter<TDeltaMap, SpecDeltaMapIterator_> >::Type
-operator-(Iter<TDeltaMap, SpecDeltaMapIterator_> const & lhs,
-          typename IterComplementConst<Iter<TDeltaMap, SpecDeltaMapIterator_> >::Type const & rhs)
+inline typename Difference<Iter<TDeltaMap, DeltaMapIteratorSpec> >::Type
+operator-(Iter<TDeltaMap, DeltaMapIteratorSpec> const & lhs,
+          typename IterComplementConst<Iter<TDeltaMap, DeltaMapIteratorSpec> >::Type const & rhs)
 {
     return lhs._mapIter - rhs._mapIter;
 }
+
+// ----------------------------------------------------------------------------
+// Function operator==()
+// ----------------------------------------------------------------------------
 
 template <typename TDeltaMap>
 inline bool
-operator==(Iter<TDeltaMap, SpecDeltaMapIterator_> const & a,
-           Iter<TDeltaMap, SpecDeltaMapIterator_> const & b)
+operator==(Iter<TDeltaMap, DeltaMapIteratorSpec> const & a,
+           Iter<TDeltaMap, DeltaMapIteratorSpec> const & b)
 {
     if (a._mapIter != b._mapIter)
         return false;
@@ -450,89 +617,109 @@ operator==(Iter<TDeltaMap, SpecDeltaMapIterator_> const & a,
 
 template <typename TDeltaMap>
 inline bool
-operator==(Iter<TDeltaMap, SpecDeltaMapIterator_> const & a,
-           typename IterComplementConst<Iter<TDeltaMap, SpecDeltaMapIterator_> >::Type const & b)
+operator==(Iter<TDeltaMap, DeltaMapIteratorSpec> const & a,
+           typename IterComplementConst<Iter<TDeltaMap, DeltaMapIteratorSpec> >::Type const & b)
 {
-    typedef typename IterMakeConst<Iter<TDeltaMap, SpecDeltaMapIterator_> >::Type TConstIter;
+    typedef typename IterMakeConst<Iter<TDeltaMap, DeltaMapIteratorSpec> >::Type TConstIter;
     return static_cast<TConstIter>(a) == static_cast<TConstIter>(b);
 }
 
+// ----------------------------------------------------------------------------
+// Function operator!=()
+// ----------------------------------------------------------------------------
+
 template <typename TDeltaMap>
 inline bool
-operator!=(Iter<TDeltaMap, SpecDeltaMapIterator_> const & a,
-           Iter<TDeltaMap, SpecDeltaMapIterator_> const & b)
+operator!=(Iter<TDeltaMap, DeltaMapIteratorSpec> const & a,
+           Iter<TDeltaMap, DeltaMapIteratorSpec> const & b)
 {
     return !(a == b);
 }
 
 template <typename TDeltaMap>
 inline bool
-operator!=(Iter<TDeltaMap, SpecDeltaMapIterator_> const & a,
-           typename IterComplementConst<Iter<TDeltaMap, SpecDeltaMapIterator_> >::Type const & b)
+operator!=(Iter<TDeltaMap, DeltaMapIteratorSpec> const & a,
+           typename IterComplementConst<Iter<TDeltaMap, DeltaMapIteratorSpec> >::Type const & b)
 {
     return !(a == b);
 }
 
+// ----------------------------------------------------------------------------
+// Function operator<()
+// ----------------------------------------------------------------------------
+
 template <typename TDeltaMap>
 inline bool
-operator<(Iter<TDeltaMap, SpecDeltaMapIterator_> const & a,
-           Iter<TDeltaMap, SpecDeltaMapIterator_> const & b)
+operator<(Iter<TDeltaMap, DeltaMapIteratorSpec> const & a,
+           Iter<TDeltaMap, DeltaMapIteratorSpec> const & b)
 {
     return a._mapIter < b._mapIter;
 }
 
 template <typename TDeltaMap>
 inline bool
-operator<(Iter<TDeltaMap, SpecDeltaMapIterator_> const & a,
-          typename IterComplementConst<Iter<TDeltaMap, SpecDeltaMapIterator_> >::Type const & b)
+operator<(Iter<TDeltaMap, DeltaMapIteratorSpec> const & a,
+          typename IterComplementConst<Iter<TDeltaMap, DeltaMapIteratorSpec> >::Type const & b)
 {
     return a._mapIter < b._mapIter;
 }
 
+// ----------------------------------------------------------------------------
+// Function operator<=()
+// ----------------------------------------------------------------------------
+
 template <typename TDeltaMap>
 inline bool
-operator<=(Iter<TDeltaMap, SpecDeltaMapIterator_> const & a,
-           Iter<TDeltaMap, SpecDeltaMapIterator_> const & b)
+operator<=(Iter<TDeltaMap, DeltaMapIteratorSpec> const & a,
+           Iter<TDeltaMap, DeltaMapIteratorSpec> const & b)
 {
     return a._mapIter <= b._mapIter;
 }
 
 template <typename TDeltaMap>
 inline bool
-operator<=(Iter<TDeltaMap, SpecDeltaMapIterator_> const & a,
-           typename IterComplementConst<Iter<TDeltaMap, SpecDeltaMapIterator_> >::Type const & b)
+operator<=(Iter<TDeltaMap, DeltaMapIteratorSpec> const & a,
+           typename IterComplementConst<Iter<TDeltaMap, DeltaMapIteratorSpec> >::Type const & b)
 {
     return a._mapIter <= b._mapIter;
 }
 
+// ----------------------------------------------------------------------------
+// Function operator>()
+// ----------------------------------------------------------------------------
+
 template <typename TDeltaMap>
 inline bool
-operator>(Iter<TDeltaMap, SpecDeltaMapIterator_> const & a,
-           Iter<TDeltaMap, SpecDeltaMapIterator_> const & b)
+operator>(Iter<TDeltaMap, DeltaMapIteratorSpec> const & a,
+           Iter<TDeltaMap, DeltaMapIteratorSpec> const & b)
 {
     return a._mapIter > b._mapIter;
 }
 
 template <typename TDeltaMap>
 inline bool
-operator>(Iter<TDeltaMap, SpecDeltaMapIterator_> const & a,
-           typename IterComplementConst<Iter<TDeltaMap, SpecDeltaMapIterator_> >::Type const & b)
+operator>(Iter<TDeltaMap, DeltaMapIteratorSpec> const & a,
+           typename IterComplementConst<Iter<TDeltaMap, DeltaMapIteratorSpec> >::Type const & b)
 {
     return a._mapIter > b._mapIter;
 }
 
+// ----------------------------------------------------------------------------
+// Function operator>=()
+// ----------------------------------------------------------------------------
+
 template <typename TDeltaMap>
 inline bool
-operator>=(Iter<TDeltaMap, SpecDeltaMapIterator_> const & a,
-           Iter<TDeltaMap, SpecDeltaMapIterator_> const & b)
+operator>=(Iter<TDeltaMap, DeltaMapIteratorSpec> const & a,
+           Iter<TDeltaMap, DeltaMapIteratorSpec> const & b)
 {
     return a._mapIter >= b._mapIter;
 }
 
 template <typename TDeltaMap>
 inline bool
-operator>=(Iter<TDeltaMap, SpecDeltaMapIterator_> const & a,
-           typename IterComplementConst<Iter<TDeltaMap, SpecDeltaMapIterator_> >::Type const & b)
+operator>=(Iter<TDeltaMap, DeltaMapIteratorSpec> const & a,
+           typename IterComplementConst<Iter<TDeltaMap, DeltaMapIteratorSpec> >::Type const & b)
 {
     return a._mapIter >= b._mapIter;
 }

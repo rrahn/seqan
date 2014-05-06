@@ -118,12 +118,9 @@ struct MockGenerator_
 
 	TJournalSet _seqData;
 	TDeltaMap _varStore;
-//	TStringTree _mock;
 
 	MockGenerator_() : _seqData(), _varStore()
-	{
-//		setValue(_mock._variantData, _varStore);
-	}
+	{}
 
 	template <typename TVar, typename TCov, typename TSize2>
 	void generate(String<TVar> & varData, String<TCov> & covData, TSize2 const & refSize)
@@ -192,8 +189,6 @@ struct MockGenerator_
 				break;
 			}
 		}
-
-//		_mock._journalSize = length(_seqData);
 	}
 };
 
@@ -204,7 +199,6 @@ void generateRef(THost & seq,
 	typedef typename Value<THost>::Type THostValue;
 	typedef typename Iterator<THost>::Type TIter;
 
-//	unsigned alphabetSize = ValueSize<THostValue>::VALUE >> 1;
 	Pdf<Uniform<unsigned> > pdf(65, 90);
 
 	resize(seq, newLength, Exact());

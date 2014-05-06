@@ -328,7 +328,7 @@ inline void _readJSeqBlock(DeltaMap<TValue, TAlphabet> & deltaMap,
         {
             TSnp snp;
             blockSize -= _readSnp(snp, deltaRef, reader, jseqHeader, isDnaCompressed);  // Read alphabet dependent snp value.
-            insert(deltaMap, deltaRef, snp);  // Record the snp.
+            _insert(deltaMap, deltaRef, length(deltaMap), snp);  // Record the snp.
         }
         else  // Is an insertion or deletion.
         {
@@ -346,7 +346,7 @@ inline void _readJSeqBlock(DeltaMap<TValue, TAlphabet> & deltaMap,
                     reverse(buffer);
                 __uint32 delSize = *reinterpret_cast<__uint32*>(&buffer[0]);
                 setBitTo(delSize, BitsPerValue<__uint32>::VALUE - 1, false);
-                insert(deltaMap, deltaRef, static_cast<TDel>(delSize));  // Record the deletion.
+                _insert(deltaMap, deltaRef, length(deltaMap), static_cast<TDel>(delSize));  // Record the deletion.
                 blockSize -= length(buffer);
             }
             else
@@ -359,7 +359,7 @@ inline void _readJSeqBlock(DeltaMap<TValue, TAlphabet> & deltaMap,
                 clear(buffer);
                 readNChars(buffer, reader, insSize);
                 TIns insSegment = buffer;  // TODO(rmaerker): Do we have to copy the data first?
-                insert(deltaMap, deltaRef, insSegment);
+                _insert(deltaMap, deltaRef, length(deltaMap), insSegment);
                 blockSize -= length(buffer);
             }
             // TODO(rmaerker): Add case for INDEL.

@@ -52,6 +52,23 @@ namespace seqan
 // Struct DeltaType
 // ----------------------------------------------------------------------------
 
+/*!
+ * @enum DeltaType
+ * @brief Keys for specifying the delta type to be accessed.
+ *
+ * @val DELTA_TYPE_SNP
+ * @brief DELTA_TYPE_SNP Id to denote SNP events.
+ *
+ * @val DELTA_TYPE_DEL
+ * @brief DELTA_TYPE_DEL Id to denote deletion events.
+ *
+ * @val DELTA_TYPE_INS
+ * @brief DELTA_TYPE_INS Id to denote insertion events.
+ *
+ * @val DElTA_TYPE_INDEL
+ * @brief DELTA_TYPE_INDEL Id to denote replacements events.
+ */
+
 struct DeltaType
 {
     typedef size_t TValue;
@@ -318,6 +335,10 @@ struct Iterator<DeltaStore<TSize, TAlphabet> const, Standard>
 // Functions
 // ============================================================================
 
+// ----------------------------------------------------------------------------
+// Function begin()
+// ----------------------------------------------------------------------------
+
 template <typename TSize, typename TAlphabet>
 inline typename Iterator<DeltaStore<TSize, TAlphabet>, Standard>::Type
 begin(DeltaStore<TSize, TAlphabet> & deltaStore, Standard const /*tag*/)
@@ -339,6 +360,10 @@ begin(DeltaStore<TSize, TAlphabet> const & deltaStore, Standard const /*tag*/)
     tmp._containerPtr = &deltaStore;
     return tmp;
 }
+
+// ----------------------------------------------------------------------------
+// Function end()
+// ----------------------------------------------------------------------------
 
 template <typename TSize, typename TAlphabet>
 inline typename Iterator<DeltaStore<TSize, TAlphabet>, Standard>::Type
@@ -362,6 +387,10 @@ end(DeltaStore<TSize, TAlphabet> const & deltaStore, Standard const /*tag*/)
     return tmp;
 }
 
+// ----------------------------------------------------------------------------
+// Function value()
+// ----------------------------------------------------------------------------
+
 template <typename TDeltaStore>
 inline typename Reference<TDeltaStore>::Type
 value(Iter<TDeltaStore, SpecDeltaStoreIterator_> & iter)
@@ -375,6 +404,10 @@ value(Iter<TDeltaStore, SpecDeltaStoreIterator_> const & iter)
 {
     return value(iter._dataIter);
 }
+
+// ----------------------------------------------------------------------------
+// Function operator++()
+// ----------------------------------------------------------------------------
 
 template <typename TDeltaStore>
 inline Iter<TDeltaStore, SpecDeltaStoreIterator_> &
@@ -393,6 +426,10 @@ operator++(Iter<TDeltaStore, SpecDeltaStoreIterator_> & iter,  int /*postfix*/)
     return temp;
 }
 
+// ----------------------------------------------------------------------------
+// Function operator+=()
+// ----------------------------------------------------------------------------
+
 template <typename TDeltaStore, typename TSize>
 inline Iter<TDeltaStore, SpecDeltaStoreIterator_> &
 operator+=(Iter<TDeltaStore, SpecDeltaStoreIterator_> & iter,  TSize const & len)
@@ -400,6 +437,10 @@ operator+=(Iter<TDeltaStore, SpecDeltaStoreIterator_> & iter,  TSize const & len
     iter._dataIter += len;
     return iter;
 }
+
+// ----------------------------------------------------------------------------
+// Function operator+()
+// ----------------------------------------------------------------------------
 
 template <typename TDeltaStore, typename TSize>
 inline Iter<TDeltaStore, SpecDeltaStoreIterator_>
@@ -409,6 +450,10 @@ operator+(Iter<TDeltaStore, SpecDeltaStoreIterator_> const & iter,  TSize const 
     temp += len;
     return temp;
 }
+
+// ----------------------------------------------------------------------------
+// Function operator--()
+// ----------------------------------------------------------------------------
 
 template <typename TDeltaStore>
 inline Iter<TDeltaStore, SpecDeltaStoreIterator_> &
@@ -427,6 +472,10 @@ operator--(Iter<TDeltaStore, SpecDeltaStoreIterator_> & iter,  int /*postfix*/)
     return temp;
 }
 
+// ----------------------------------------------------------------------------
+// Function operator-=()
+// ----------------------------------------------------------------------------
+
 template <typename TDeltaStore, typename TSize>
 inline Iter<TDeltaStore, SpecDeltaStoreIterator_> &
 operator-=(Iter<TDeltaStore, SpecDeltaStoreIterator_> & iter,  TSize const & len)
@@ -434,6 +483,10 @@ operator-=(Iter<TDeltaStore, SpecDeltaStoreIterator_> & iter,  TSize const & len
     iter._dataIter -= len;
     return iter;
 }
+
+// ----------------------------------------------------------------------------
+// Function operator-()
+// ----------------------------------------------------------------------------
 
 template <typename TDeltaStore, typename TSize>
 inline Iter<TDeltaStore, SpecDeltaStoreIterator_>
@@ -451,6 +504,10 @@ operator-(Iter<TDeltaStore, SpecDeltaStoreIterator_> const & lhs,
 {
     return lhs._dataIter - rhs._dataIter;
 }
+
+// ----------------------------------------------------------------------------
+// Function operator==()
+// ----------------------------------------------------------------------------
 
 template <typename TDeltaStore>
 inline bool
@@ -473,6 +530,10 @@ operator==(Iter<TDeltaStore, SpecDeltaStoreIterator_> const & a,
     return static_cast<TConstIter>(a) == static_cast<TConstIter>(b);
 }
 
+// ----------------------------------------------------------------------------
+// Function operator!=()
+// ----------------------------------------------------------------------------
+
 template <typename TDeltaStore>
 inline bool
 operator!=(Iter<TDeltaStore, SpecDeltaStoreIterator_> const & a,
@@ -488,6 +549,10 @@ operator!=(Iter<TDeltaStore, SpecDeltaStoreIterator_> const & a,
 {
     return !(a == b);
 }
+
+// ----------------------------------------------------------------------------
+// Function operator<()
+// ----------------------------------------------------------------------------
 
 template <typename TDeltaStore>
 inline bool
@@ -505,6 +570,10 @@ operator<(Iter<TDeltaStore, SpecDeltaStoreIterator_> const & a,
     return a._dataIter < b._dataIter;
 }
 
+// ----------------------------------------------------------------------------
+// Function operator<=()
+// ----------------------------------------------------------------------------
+
 template <typename TDeltaStore>
 inline bool
 operator<=(Iter<TDeltaStore, SpecDeltaStoreIterator_> const & a,
@@ -521,6 +590,10 @@ operator<=(Iter<TDeltaStore, SpecDeltaStoreIterator_> const & a,
     return a._dataIter <= b._dataIter;
 }
 
+// ----------------------------------------------------------------------------
+// Function operator>()
+// ----------------------------------------------------------------------------
+
 template <typename TDeltaStore>
 inline bool
 operator>(Iter<TDeltaStore, SpecDeltaStoreIterator_> const & a,
@@ -536,6 +609,10 @@ operator>(Iter<TDeltaStore, SpecDeltaStoreIterator_> const & a,
 {
     return a._dataIter > b._dataIter;
 }
+
+// ----------------------------------------------------------------------------
+// Function operator>=()
+// ----------------------------------------------------------------------------
 
 template <typename TDeltaStore>
 inline bool

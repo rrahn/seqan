@@ -40,7 +40,6 @@
 
 #include "test_delta_map.h"
 #include "test_journaled_string_tree.h"
-#include "test_journaled_string_tree_util.h"
 #include "test_journaled_string_tree_traverse.h"
 
 SEQAN_BEGIN_TESTSUITE(test_journaled_string_tree)
@@ -82,9 +81,6 @@ SEQAN_BEGIN_TESTSUITE(test_journaled_string_tree)
     SEQAN_CALL_TEST(test_journaled_string_tree_journal_next_block);
     SEQAN_CALL_TEST(test_journaled_string_tree_host);
     SEQAN_CALL_TEST(test_journaled_string_tree_virtual_block_position);
-
-//	// Test for finder implementation of data parallel module.
-//	SEQAN_CALL_TEST(test_journaled_journaled_string_tree_merge_point_stack);
 
 	// ----------------------------------------------------------------------------
     // Test all variants being SNPs.
@@ -154,9 +150,9 @@ SEQAN_BEGIN_TESTSUITE(test_journaled_string_tree)
     SEQAN_CALL_TEST(test_journaled_journaled_string_tree_finder_config_2_1_0_journaled_string_tree);
     SEQAN_CALL_TEST(test_journaled_journaled_string_tree_finder_config_2_1_1_journaled_string_tree);
     SEQAN_CALL_TEST(test_journaled_journaled_string_tree_finder_config_2_1_2_journaled_string_tree);
-    SEQAN_CALL_TEST(test_journaled_journaled_string_tree_finder_config_2_1_3_journaled_string_tree);  // Fails
+    SEQAN_CALL_TEST(test_journaled_journaled_string_tree_finder_config_2_1_3_journaled_string_tree);
     SEQAN_CALL_TEST(test_journaled_journaled_string_tree_finder_config_2_1_4_journaled_string_tree);
-    SEQAN_CALL_TEST(test_journaled_journaled_string_tree_finder_config_2_1_5_journaled_string_tree);  // Fails
+    SEQAN_CALL_TEST(test_journaled_journaled_string_tree_finder_config_2_1_5_journaled_string_tree);
 
     // Test equidistant position including 0, different coverages.
     SEQAN_CALL_TEST(test_journaled_journaled_string_tree_finder_config_3_1_0_journaled_string_tree);

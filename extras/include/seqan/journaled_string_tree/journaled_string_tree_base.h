@@ -46,22 +46,16 @@ namespace seqan {
 // ============================================================================
 
 // ----------------------------------------------------------------------------
-// Tag WindowTraversalForward
+// Tag ContextPositionLeft
 // ----------------------------------------------------------------------------
-
-struct WindowTraversalForward_;
-typedef Tag<WindowTraversalForward_> WindowTraversalForward;
 
 struct ContextPositionLeft_;
 typedef Tag<ContextPositionLeft_> ContextPositionLeft;
 
 
 // ----------------------------------------------------------------------------
-// Tag WindowTraversalBackward
+// Tag ContextPositionRight
 // ----------------------------------------------------------------------------
-
-struct WindowTraversalBackward_;
-typedef Tag<WindowTraversalBackward_> WindowTraversalBackward;
 
 struct ContextPositionRight_;
 typedef Tag<ContextPositionRight_> ContextPositionRight;
@@ -105,7 +99,6 @@ class JournaledStringTree;
 template <typename T>
 struct GetState;
 
-
 // ----------------------------------------------------------------------------
 // Metafunction ContextIteratorPosition
 // ----------------------------------------------------------------------------
@@ -122,7 +115,6 @@ struct ContextIteratorPosition
 
 template <typename T>
 struct RequireFullContext : True{};
-
 
 // ============================================================================
 // Functions

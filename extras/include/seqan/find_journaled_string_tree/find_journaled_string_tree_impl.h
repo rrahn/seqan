@@ -48,7 +48,6 @@ namespace seqan
 // Tags, Classes, Enums
 // ============================================================================
 
-
 template <typename TContainer, typename TPattern, typename TSpec>
 struct Finder2<TContainer, TPattern, DataParallel<TSpec> >
 {

@@ -51,6 +51,7 @@ namespace seqan
 // ============================================================================
 
 struct SpecDeltaMapIterator_;
+typedef Tag<SpecDeltaMapIterator_> DeltaMapIteratorSpec;
 
 template <typename TMap>
 struct GetMapValueString_;
@@ -60,6 +61,32 @@ struct GetDeltaStore_;
 
 template <typename TMap>
 struct GetDeltaCoverageStore_;
+
+/*!
+ * @class DeltaMap
+ *
+ * @headerfile <seqan/journaled_string_tree.h>
+ *
+ * @brief Stores delta information and maps them to a common coordinate system.
+ *
+ * @signature template <typename TValue, typename TAlphabet>
+ *            class DeltaMap
+ * @tparam TValue The value type of the keys.
+ * @tparam TAlphabet The alphabet used to store SNPs and insertions.
+ *
+ * This map stores biological delta events, i.e. replacements, insertions and deletions, for multiple sequences
+ * based to a common reference sequence. A bitvector is used to denote the coverage of a delta.
+ * Note, the keys must be comparable using the less-than operator.
+ *
+ * The delta events are stored in a multi-container fashion. To access a delta event at any given iterator position
+ * of the delta map the delta type must be known beforehand. The function @link DeltaMapIterator#deltaType @endlink can
+ * be used to access the id of the corresponding delta event. Based on the type the correct position must be called
+ * to get access to the stored value.
+ *
+ * Deletions are stored as the length of the deletion. Insertions are stored in an concatenated string set internally
+ * and replacements are stored as a pair of a deletion length as first parameter and an insertion string as second.
+ * Thus variable replacements, where the deletion length can differ from the length of the insertion.
+ */
 
 template <typename TValue, typename TAlphabet, typename TSpec = Default>
 class DeltaMap
@@ -76,7 +103,6 @@ public:
 
     DeltaMap() : _keys(), _deltaStore(), _deltaCoverageStore()
     {}
-
 };
 
 // ============================================================================
@@ -139,6 +165,16 @@ struct GetDeltaCoverageStore_<DeltaMap<TValue, TAlphabet, TSpec> const>
 // Metafunction Value
 // ----------------------------------------------------------------------------
 
+/*!
+ * @mfn DeltaMap#Value
+ * @headerfile <seqan/journaled_string_tree.h>
+ * @brief Returns type of the reference coordinate system.
+ *
+ * @signature Value<TDeltaMap>::Type
+ * @tparam TDeltaMap The type to query the value type for.
+ * @return TValue The value type to use for <tt>TDeltaMap</tt>.
+ */
+
 template <typename TValue, typename TAlphabet, typename TSpec>
 struct Value<DeltaMap<TValue, TAlphabet, TSpec> >
 {
@@ -155,6 +191,16 @@ struct Value<DeltaMap<TValue, TAlphabet, TSpec> const>
 // Metafunction Reference
 // ----------------------------------------------------------------------------
 
+/*!
+ * @mfn DeltaMap#Reference
+ * @headerfile <seqan/journaled_string_tree.h>
+ * @brief Returns reference type of the reference coordinate system.
+ *
+ * @signature Reference<TDeltaMap>::Type
+ * @tparam TDeltaMap The type to query the reference type for.
+ * @return TReference The reference type to use for <tt>TDeltaMap</tt>.
+ */
+
 template <typename TValue, typename TAlphabet, typename TSpec>
 struct Reference<DeltaMap<TValue, TAlphabet, TSpec> >
 {
@@ -170,6 +216,16 @@ struct Reference<DeltaMap<TValue, TAlphabet, TSpec> const>
 // ----------------------------------------------------------------------------
 // Metafunction Size
 // ----------------------------------------------------------------------------
+
+/*!
+ * @mfn DeltaMap#Size
+ * @headerfile <seqan/journaled_string_tree.h>
+ * @brief Returns size type for a delta map.
+ *
+ * @signature Size<TDeltaMap>::Type
+ * @tparam TDeltaMap The type to query the size type for.
+ * @return TSize The size type to use for <tt>TDeltaMap</tt>.
+ */
 
 template <typename TValue, typename TAlphabet, typename TSpec>
 struct Size<DeltaMap<TValue, TAlphabet, TSpec> >
@@ -188,6 +244,16 @@ struct Size<DeltaMap<TValue, TAlphabet, TSpec> const > :
 // Metafunction Position
 // ----------------------------------------------------------------------------
 
+/*!
+ * @mfn DeltaMap#Position
+ * @headerfile <seqan/journaled_string_tree.h>
+ * @brief Returns position type for a delta map.
+ *
+ * @signature Position<TDeltaMap>::Type
+ * @tparam TDeltaMap The type to query the position type for.
+ * @return TPosition The position type to use for <tt>TDeltaMap</tt>.
+ */
+
 template <typename TValue, typename TAlphabet, typename TSpec>
 struct Position<DeltaMap<TValue, TAlphabet, TSpec> >  :
     Size<DeltaMap<TValue, TAlphabet, TSpec> >{};
@@ -200,18 +266,28 @@ struct Position<DeltaMap<TValue, TAlphabet, TSpec> const >  :
 // Metafunction Iterator
 // ----------------------------------------------------------------------------
 
+/*!
+ * @mfn DeltaMap#Iterator
+ * @headerfile <seqan/journaled_string_tree.h>
+ * @brief Returns iterator type for a delta map.
+ *
+ * @signature Iterator<TDeltaMap, Standard>::Type
+ * @tparam TDeltaMap The type to query the iterator type for.
+ * @return TIterator The iterator type to use for <tt>TDeltaMap</tt>.
+ */
+
 template <typename TValue, typename TAlphabet, typename TSpec>
 struct Iterator<DeltaMap<TValue, TAlphabet, TSpec>, Standard>
 {
     typedef DeltaMap<TValue, TAlphabet, TSpec> TDeltaMap_;
-    typedef Iter<TDeltaMap_, SpecDeltaMapIterator_> Type;
+    typedef Iter<TDeltaMap_, DeltaMapIteratorSpec> Type;
 };
 
 template <typename TValue, typename TAlphabet, typename TSpec>
 struct Iterator<DeltaMap<TValue, TAlphabet, TSpec> const, Standard>
 {
     typedef DeltaMap<TValue, TAlphabet, TSpec> TDeltaMap_;
-    typedef Iter<TDeltaMap_ const, SpecDeltaMapIterator_> Type;
+    typedef Iter<TDeltaMap_ const, DeltaMapIteratorSpec> Type;
 };
 
 // ----------------------------------------------------------------------------
@@ -221,7 +297,7 @@ struct Iterator<DeltaMap<TValue, TAlphabet, TSpec> const, Standard>
 template <typename TValue, typename TAlphabet, typename TSpec>
 struct DefaultGetIteratorSpec<DeltaMap< TValue, TAlphabet, TSpec> >
 {
-    typedef SpecDeltaMapIterator_ Type;
+    typedef DeltaMapIteratorSpec Type;
 };
 
 template <typename TValue, typename TAlphabet, typename TSpec>
@@ -231,6 +307,19 @@ struct DefaultGetIteratorSpec<DeltaMap< TValue, TAlphabet, TSpec> const> :
 // ----------------------------------------------------------------------------
 // Metafunction DeltaValue
 // ----------------------------------------------------------------------------
+
+/*!
+ * @mfn DeltaMap#DeltaValue
+ * @headerfile <seqan/journaled_string_tree.h>
+ * @brief Returns value type of a specific delta.
+ *
+ * @signature DeltaValue<TDeltaMap, ID>::Type
+ * @tparam TDeltaMap The type to query the iterator type for.
+ * @tparam ID        Id to specify the delta type. One of @link DeltaType @endlink.
+ *
+ * The delta map stores four different delta events: SNPs, insertions, deletions and variable replacements.
+ * This metafunction returns the correct type for the specified event.
+ */
 
 template <typename TValue, typename TAlphabet, typename TSpec, typename DeltaType::TValue TYPE>
 struct DeltaValue<DeltaMap<TValue, TAlphabet, TSpec>, TYPE>
@@ -251,6 +340,15 @@ struct DeltaValue<DeltaMap<TValue, TAlphabet, TSpec> const, TYPE>
 // ----------------------------------------------------------------------------
 // Metafunction DeltaCoverage
 // ----------------------------------------------------------------------------
+
+/*!
+ * @mfn DeltaMap#DeltaCoverage
+ * @headerfile <seqan/journaled_string_tree.h>
+ * @brief Returns coverage type of a delta map.
+ *
+ * @signature DeltaCoverage<TDeltaMap, KEY>::Type
+ * @tparam TDeltaMap The type to query the iterator type for.
+ */
 
 template <typename TMap>
 struct DeltaCoverage;
@@ -274,6 +372,20 @@ struct DeltaCoverage<DeltaMap<TValue, TAlphabet, TSpec> const>
 // ----------------------------------------------------------------------------
 // Function find()
 // ----------------------------------------------------------------------------
+
+/*!
+ * @fn DeltaMap#find
+ * @headerfile <seqan/journaled_string_tree.h>
+ * @brief Returns an iterator to the first occurrence of the passed key or the end if the key is not contained.
+ *
+ * @signature TIterator find(deltaMap, key)
+ *
+ * @param[in] deltaMap The delta map to search for the key.
+ * @param[in] key   The key to be searched.
+ *
+ * @return TIterator An @link DeltaMap#Iterator @endlink to the first mapped entry that is equal to the key.
+ *  Otherwise an iterator to the end of the map is returned.
+ */
 
 template <typename TValue, typename TAlphabet, typename TSpec, typename TKey>
 inline typename Iterator<DeltaMap<TValue, TAlphabet, TSpec>, Standard>::Type
@@ -306,7 +418,6 @@ find(DeltaMap<TValue, TAlphabet, TSpec> const & deltaMap,
 // ----------------------------------------------------------------------------
 // Function _insert()                                                     [DEL]
 // ----------------------------------------------------------------------------
-// TODO(rmaerker): At the moment we just append the new value which is not clear by the name of this function. We need to adapt the function to do a binary search and then insert at the suggested position. For now the values must be presorted.
 
 template <typename TValue, typename TAlphabet, typename TSpec, typename TKey, typename TPosition>
 inline void
@@ -376,6 +487,21 @@ _insert(DeltaMap<TValue, TAlphabet, TSpec> & deltaMap,
 // Function insert()
 // ----------------------------------------------------------------------------
 
+/*!
+ * @fn DeltaMap#insert
+ * @headerfile <seqan/journaled_string_tree.h>
+ * @brief Inserts a new delta event.
+ *
+ * @signature TIterator insert(deltaMap, key, delta, cov)
+ *
+ * @param[in,out] deltaMap  The map to insert the new delta.
+ * @param[in]     key       The key the new event maps to.
+ * @param[in]     delta     The delta event.
+ * @param[in]     cov       The coverage of this delta event.
+ *
+ * @return An iterator of type @link DeltaMap#Iterator @endlink pointing to the inserted element.
+ */
+
 template <typename TValue, typename TAlphabet, typename TSpec, typename TKey,
           typename TDelta>
 inline typename Iterator<DeltaMap<TValue, TAlphabet, TSpec>, Standard>::Type
@@ -397,6 +523,19 @@ insert(DeltaMap<TValue, TAlphabet, TSpec> & deltaMap,
 // ----------------------------------------------------------------------------
 // Function begin()
 // ----------------------------------------------------------------------------
+
+/*!
+ * @fn DeltaMap#begin
+ * @headerfile <seqan/journaled_string_tree.h>
+ * @brief Returns an iterator pointing to the beginning of the map.
+ *
+ * @signature TIterator begin(deltaMap, tag)
+ *
+ * @param[in] deltaMap  The map to get the iterator for.
+ * @param[in] tag       The iterator tag. Of type @link ContainerIteratorTags @endlink.
+ *
+ * @return An iterator of type @link DeltaMap#Iterator @endlink pointing to the beginning of the map.
+ */
 
 template <typename TValue, typename TAlphabet, typename TSpec>
 inline typename Iterator<DeltaMap<TValue, TAlphabet, TSpec>, Standard>::Type
@@ -444,6 +583,19 @@ iter(DeltaMap<TValue, TAlphabet, TSpec> const & deltaMap,
 // Function end()
 // ----------------------------------------------------------------------------
 
+/*!
+ * @fn DeltaMap#end
+ * @headerfile <seqan/journaled_string_tree.h>
+ * @brief Returns an iterator pointing to the end of the map.
+ *
+ * @signature TIterator end(deltaMap, tag)
+ *
+ * @param[in] deltaMap  The map to get the iterator for.
+ * @param[in] tag       The iterator tag. Of type @link ContainerIteratorTags @endlink.
+ *
+ * @return An iterator of type @link DeltaMap#Iterator @endlink pointing to the end of the map.
+ */
+
 template <typename TValue, typename TAlphabet, typename TSpec>
 inline typename Iterator<DeltaMap<TValue, TAlphabet, TSpec>, Standard>::Type
 end(DeltaMap<TValue, TAlphabet, TSpec> & deltaMap, Standard const &/*tag*/)
@@ -468,6 +620,16 @@ end(DeltaMap<TValue, TAlphabet, TSpec> const & deltaMap, Standard const &/*tag*/
 // Function clear()
 // ----------------------------------------------------------------------------
 
+/*!
+ * @fn DeltaMap#clear
+ * @headerfile <seqan/journaled_string_tree.h>
+ * @brief Clears the delta map.
+ *
+ * @signature clear(deltaMap)
+ *
+ * @param[in, out] deltaMap  The map to be cleared.
+ */
+
 template <typename TValue, typename TAlphabet, typename TSpec>
 inline void
 clear(DeltaMap<TValue, TAlphabet, TSpec> & deltaMap)
@@ -481,6 +643,18 @@ clear(DeltaMap<TValue, TAlphabet, TSpec> & deltaMap)
 // Function empty()
 // ----------------------------------------------------------------------------
 
+/*!
+ * @fn DeltaMap#empty
+ * @headerfile <seqan/journaled_string_tree.h>
+ * @brief Checks if the delta map is empty.
+ *
+ * @signature bool empty(deltaMap)
+ *
+ * @param[in] deltaMap  The map to be checked for.
+ *
+ * @return <tt>true</tt> if empty, otherwise <tt>false</tt>
+ */
+
 template <typename TValue, typename TAlphabet, typename TSpec>
 inline bool
 empty(DeltaMap<TValue, TAlphabet, TSpec> const & deltaMap)
@@ -491,6 +665,18 @@ empty(DeltaMap<TValue, TAlphabet, TSpec> const & deltaMap)
 // ----------------------------------------------------------------------------
 // Function length()
 // ----------------------------------------------------------------------------
+
+/*!
+ * @fn DeltaMap#length
+ * @headerfile <seqan/journaled_string_tree.h>
+ * @brief Returns the number of mapped delta events.
+ *
+ * @signature TSize length(deltaMap)
+ *
+ * @param[in] deltaMap  The map to get the length for.
+ *
+ * @return The number of delta events stored in the map.
+ */
 
 template <typename TValue, typename TAlphabet, typename TSpec>
 inline typename Size<DeltaMap<TValue, TAlphabet, TSpec> >::Type
@@ -503,6 +689,18 @@ length(DeltaMap<TValue, TAlphabet, TSpec> const & deltaMap)
 // Function coverageSize()
 // ----------------------------------------------------------------------------
 
+/*!
+ * @fn DeltaMap#coverageSize
+ * @headerfile <seqan/journaled_string_tree.h>
+ * @brief Returns the number of sequences covered per delta event.
+ *
+ * @signature TSize coverageSize(deltaMap)
+ *
+ * @param[in] deltaMap  The map to get the coverage size for.
+ *
+ * @return The number of sequences covering a delta event.
+ */
+
 template <typename TValue, typename TAlphabet, typename TSpec>
 inline typename Size<DeltaMap<TValue, TAlphabet, TSpec> >::Type
 coverageSize(DeltaMap<TValue, TAlphabet, TSpec> const & deltaMap)
@@ -514,6 +712,19 @@ coverageSize(DeltaMap<TValue, TAlphabet, TSpec> const & deltaMap)
 // Function setCoverageSize()
 // ----------------------------------------------------------------------------
 
+/*!
+ * @fn DeltaMap#setCoverageSize
+ * @headerfile <seqan/journaled_string_tree.h>
+ * @brief Sets the number of sequences covering a delta event.
+ *
+ * @signature  setCoverageSize(deltaMap, size)
+ *
+ * @param[in, out] deltaMap  The map to set the coverage size for.
+ * @param[in]      size      The new coverage size.
+ *
+ * This function sets the coverage size globally to all delta events contained in the map.
+ */
+
 template <typename TValue, typename TAlphabet, typename TSpec, typename TSize>
 inline void
 setCoverageSize(DeltaMap<TValue, TAlphabet, TSpec> & deltaMap, TSize const & size)
@@ -522,7 +733,6 @@ setCoverageSize(DeltaMap<TValue, TAlphabet, TSpec> & deltaMap, TSize const & siz
 }
 
 // TODO(rmaerker): Implement erase
-// TODO(rmaerker): Implement find
 }
 
 #endif // EXTRAS_INCLUDE_SEQAN_DATA_PARALLEL_DATA_PARALLEL_DELTA_MAP_H_

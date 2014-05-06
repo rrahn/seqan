@@ -66,14 +66,11 @@ public:
     typedef typename Value<MergePointMap_>::Type TValue;
     typedef typename DeltaCoverage<TVariantMap>::Type TDeltaCoverage;
     typedef String<TValue> TMergePoints;
-//    typedef String<TCoverage> TCoverageString;
 
     TVariantMap*    _varMapPtr;
-    TDeltaCoverage _mergeCoverage;
-    TMergePoints    _mergePoints;  // Stores the reference position of the merge point
+    mutable TDeltaCoverage _mergeCoverage;
+    mutable TMergePoints    _mergePoints;  // Stores the reference position of the merge point
 
-
-//    TCoverageString _mergePointCoverage;  // Stores the sequences that are merged back at this point.
     MergePointMap_() : _varMapPtr(NULL), _mergeCoverage(), _mergePoints()
     {}
 
@@ -147,7 +144,6 @@ template <typename TVariantMap>
 inline void clear(MergePointMap_<TVariantMap> & mergePointStore)
 {
     clear(mergePointStore._mergePoints);
-//    clear(mergePointStore._mergePointCoverage);
 }
 
 // ----------------------------------------------------------------------------
@@ -168,7 +164,6 @@ inline void push(MergePointMap_<TVariantMap> & mergePointStore,
     if (empty(mergePointStore._mergePoints))
     {
         insertValue(mergePointStore._mergePoints, 0, tmp);
-//        insertValue(mergePointStore._mergePointCoverage, 0, coverage);
         return;
     }
 
@@ -179,15 +174,12 @@ inline void push(MergePointMap_<TVariantMap> & mergePointStore,
     insertValue(mergePointStore._mergePoints, position(it), tmp);
     // Record the new merge point character.
     mergePointStore._mergeCoverage |= deltaCoverage(branchNodeIt);
-
-//    insertValue(mergePointStore._mergePointCoverage, position(it), coverage);
 }
 
 template <typename TVariantMap>
 inline void pop(MergePointMap_<TVariantMap> & mergePointStore)
 {
     eraseBack(mergePointStore._mergePoints);
-//    eraseBack(mergePointStore._mergePointCoverage);
 }
 
 template <typename TVariantMap>
@@ -296,7 +288,6 @@ _syncToMergePoint(TCoverage & target,
     SEQAN_ASSERT(mergePointStack._varMapPtr != NULL);  // Check if the pointer is initialized.
     for (; it != itEnd; --it)
         transform(target, target, mappedCoverage(*mergePointStack._varMapPtr, it->i2), FunctorBitwiseOr());
-//        bitwiseOr(target, target, mergePointStack._mergePointCoverage[position(it)]);
 
     return position(itEnd) + 1;
 }
@@ -373,12 +364,13 @@ _mapVirtualToVirtual(TIter & target,
             if (deltaCoverage(tmpIt)[proxyId] != true)  // Irrelevant variant.
                 continue;
 
-//            TMappedDelta deltaKey = mappedDelta(variantStore, position(tmpIt));
             // If between hostPos and breakpoint are any other insertion or deletion, then we keep track of this virtual offset.
             if (deltaType(tmpIt) == DeltaType::DELTA_TYPE_INS)
                 virtOffset += length(deltaIns(tmpIt));
             else if (deltaType(tmpIt) == DeltaType::DELTA_TYPE_SNP)
                 ++virtOffset;
+            else if (deltaType(tmpIt) == DeltaType::DELTA_TYPE_INDEL)
+                virtOffset += length(deltaIndel(tmpIt).i2);
         }
         target += (1 + virtOffset + _localEntryPosition(source));
     }
@@ -407,13 +399,10 @@ _mapHostToVirtual(TIterator & resultIt,
     typedef typename Size<TCargo>::Type TCargoSize;
     typedef JournalEntryLtByPhysicalOriginPos<TCargoPos, TCargoSize> TComp;
 
-//    typedef typename GetDeltaMap<TFinder>::Type TDeltaMap;
     typedef typename Iterator<TDeltaMap, Standard>::Type TVarIterator;
 
     // We need to set the iterator to the correct position within the proxy sequence given the host pos.
     TJournalEntries & journalEntries = _journalEntries(js);
-
-    // std::cerr << journalEntries << "\n";
 
     if (empty(journalEntries._journalNodes))
     {
@@ -457,7 +446,8 @@ _mapHostToVirtual(TIterator & resultIt,
                 virtualOffset += length(deltaIns(itVar));
             else if (deltaType(itVar) == DeltaType::DELTA_TYPE_SNP)
                 ++virtualOffset;
-            // TODO(rmaerker): Add Ins_Del type!
+            else if (deltaType(itVar) == DeltaType::DELTA_TYPE_INDEL)
+                virtualOffset += length(deltaIndel(itVar).i2);
             ++itVar;
         }
         resultIt += virtualOffset;  // Set the iterator to the beginning of the variant.
@@ -488,13 +478,6 @@ _mapHostToVirtual(TIterator & resultIt,
     TVarIterator itVar = std::upper_bound(begin(variantStore, Standard()),
                                           end(variantStore, Standard()),
                                           _physicalPosition(resultIt));
-//        if (*itVar, static_cast<unsigned const>(hostPos))
-//        {
-//            std::cerr << "Entry Info: " << *resultIt._journalEntriesIterator << std::endl;
-//            std::cerr << "Host Info: " << hostPos << std::endl;
-//            std::cerr << "PhysicalPosition: " << physicalPosition(resultIt) << std::endl;
-//            std::cerr << "Var Info: " << *itVar << std::endl;
-//        }
 
     SEQAN_ASSERT_LEQ(*itVar, static_cast<unsigned const>(hostPos));
 
@@ -513,7 +496,8 @@ _mapHostToVirtual(TIterator & resultIt,
             virtualOffset += length(deltaIns(itVar));
         else if (deltaType(itVar) == DeltaType::DELTA_TYPE_SNP)
             ++virtualOffset;
-        // TODO(rmaerker): Add Ins_Del type!
+        else if (deltaType(itVar) == DeltaType::DELTA_TYPE_INDEL)
+            virtualOffset += length(deltaIndel(itVar).i2);
         ++itVar;
     }
     resultIt += virtualOffset + 1;  // Set the iterator to the beginning of the variant.
@@ -522,7 +506,6 @@ _mapHostToVirtual(TIterator & resultIt,
 // ----------------------------------------------------------------------------
 // Function _testEqual()
 // ----------------------------------------------------------------------------
-// TODO(rmaerker): Move to packed string.
 
 template <typename TValue, typename THostSpec>
 inline bool
