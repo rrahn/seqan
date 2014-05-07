@@ -34,6 +34,9 @@
 // Collection of char checking functions
 // ==========================================================================
 
+#ifndef SEQAN_STREAM_IS_H_
+#define SEQAN_STREAM_IS_H_
+
 // ==========================================================================
 // We add documentation for cctype here for completeness.
 // ==========================================================================
@@ -335,11 +338,14 @@
 ..include:seqan/stream.h
 */
 
-#ifdef PLATFORM_WINDOWS_VS
-// TODO(holtgrew): Adding basic/POSIX functions for OS that do not support them theirselves should go into platform.
-inline
-int isblank(int c)
+#ifdef PLATFORM_WINDOWS
+
+inline int
+isblank(int c)
 {
-    return (c == ' ') || (c == '\t');
+    return (c == ' ' || c == '\t');
 }
-#endif  // #ifdef PLATFORM_WINDOWS_VS
+
+#endif  // #ifdef PLATFORM_WINDOWS
+
+#endif  // #ifndef SEQAN_STREAM_IS_H_
