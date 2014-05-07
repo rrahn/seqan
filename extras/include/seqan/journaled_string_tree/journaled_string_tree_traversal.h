@@ -48,12 +48,53 @@ namespace seqan {
 // Tags, Classes, Enums
 // ============================================================================
 
+/*!
+ * @defgroup JstTraverserContextPositions
+ * @brief Tag to specialize the position of the iterator within the context.
+ *
+ * @tag JstTraverserContextPositions#ContextPositionLeft
+ * @headerfile <seqan/journaled_string_tree.h>
+ * @brief The context iterator points to the begin of the context.
+ *
+ * @signature struct ContextPositionLeft_;
+ * @signautre typedef Tag<ContextPositionLeft_> ContextPositionLeft;
+ *
+ * @tag JstTraverserContextPositions#ContextPositionRight
+ * @headerfile <seqan/journaled_string_tree.h>
+ * @brief The context iterator points to the end of the context.
+ *
+ * @signature struct ContextPositionRight_;
+ * @signautre typedef Tag<ContextPositionRight_> ContextPositionRight;
+ */
+
 enum JstTraversalState
 {
     JST_TRAVERSAL_STATE_NULL,
     JST_TRAVERSAL_STATE_MASTER,
     JST_TRAVERSAL_STATE_BRANCH
 };
+
+/*!
+ * @defgroup JstTraversalTags JST Traversal Tags
+ * @brief Tags for selecting state of the Journaled String Tree traversal.
+ *
+ * @tag JstTraversalTags#StateTraverseMaster
+ * @headerfile <seqan/journaled_string_tree.h>
+ * @brief Tag for selecting master strand.
+ *
+ * @signature struct TraverseStateMaster_;
+ * @signature typedef Tag<TraverseStateMaster_> StateTraverseMaster;
+ *
+ * @tag AlignmentAlgorithmTags#NeedlemanWunsch
+ *
+ * @tag JstTraversalTags#StateTraverseBranch
+ * @headerfile <seqan/journaled_string_tree.h>
+ *
+ * @brief Tag for selecting branch strand.
+ *
+ * @signature struct TraverseStateBranch_;
+ * @signature typedef Tag<TraverseStateBranch_> StateTraverseBranch;
+ */
 
 struct TraverseStateMaster_;
 typedef Tag<TraverseStateMaster_> StateTraverseMaster;
@@ -63,6 +104,63 @@ typedef Tag<TraverseStateBranch_> StateTraverseBranch;
 
 template <typename TContainer, typename TState, typename TSpec>
 class JstTraverser;
+
+/*!
+ * @class JstTraverser
+ * @headerfile <seqan/journaled_string_tree.h>
+ *
+ * @brief Manages traversal over the @link JournaledStringTree @enldink.
+ *
+ * @signature template <tyepanme TContainer, typename TState, typename TSpec>
+ *            class JstTraverser<TContainer, TState, TSpec>
+ *
+ * @tparam TContainer The type of the container to be traverser. Must be of type @link JournaledStringTree @endlink
+ * @tparam TState     The state to restore for an external algorithm.
+ * @tparam TSpec      Specialization of the traversal algorithm. See @link JstTraverserSpec @endlink.
+ *
+ * @fn JstTraverser::JstTraverser
+ * @brief constructor
+ * @signature JstTraverser::JstTraverser();
+ * @signature JstTraverser::JstTraverser(container, w);
+ *
+ * @param container The container to be traversed. Must be of type @link JournaledStringTree @endlink.
+ * @param w         The size of the context.
+ *
+ *  The JstTraverser manages the traversal over a Journaled String Tree. It stores the current state of the traversal
+ *  and provides additional interfaces to access the values at the current position. It encapsulates an forward-iterator
+ *  to simultaneous scan over the sequences contained in the Journaled String Tree from left to right.
+ *
+ *  Discuss mutable.
+ */
+
+/*!
+ * @tag JstTraverserSpec
+ * @headerfile <seqan/journaled_string_tree.h>
+ * @brief Tag to specialize the @link JstTraverser @endlink.
+ *
+ * @signature template<typename TContextPosition, typename TRequireFullContext>
+ *            class JstTraverserSpec<TContextPosition, TRequireFullContext>{};
+ *
+ * @tparam TContextPosition Tag to indicate the iterator position within the context. Must be one of: @link JstTraverserContextPositions @endlink.
+ *         Defaults to @link JstTraverserContextPositions#ContextPositionLeft @endlink.
+ *
+ * @usage
+ *
+ * Some algorithms that work on a local context are either prefix or suffix based. This means, that they either explore
+ * the context in forward direction or in backward direction. An example for prefix based algorithms is the naiive
+ * online-search algorithm which scans the context from left to right. On the other hand the horspool algorithm
+ * scans the context from right to left. To access the end of the sequence context more efficiently the specialization
+ * @link JstTraverserContextPositions#ContextPositionRight @endlink is used.
+ *
+ * @tparam TRequireFullContext Tag to indicate if the entire context must lie within the borders of the master or branch
+ * segment. One of @link LogicalValues @endlink. Defaults to @link LogicalValues#True @endlink.
+ *
+ * @usage
+ *
+ * In addition to the context position it is necessary to distinguish between algorithms that require the entire context
+ * to be accessible and those that do not. For example the Myer's bitvector algorithm only needs the last position of
+ * the sequence context, while it uses a state to keep track of the entire context.
+ */
 
 template <typename TDeltaMap, typename TTreeSpec, typename TState, typename TSpec>
 class JstTraverser<JournaledStringTree<TDeltaMap, TTreeSpec>, TState, TSpec>
@@ -136,6 +234,17 @@ public:
 // Metafunction Container
 // ----------------------------------------------------------------------------
 
+/*!
+ * @mfn JstTraverser#Container
+ * @headerfile <seqan/journaled_string_tree.h>
+ * @brief Returns the container type.
+ *
+ * @signature Container<TJstTraverser>::Type
+ * @tparam TJstTraverser The type of the traverser.
+ *
+ * @return The container type.
+ */
+
 template <typename TContainer, typename TState, typename TSpec>
 struct Container<JstTraverser<TContainer, TState, TSpec> >
 {
@@ -151,6 +260,18 @@ struct Container<JstTraverser<TContainer, TState, TSpec> const>
 // ----------------------------------------------------------------------------
 // Metafunction Position
 // ----------------------------------------------------------------------------
+
+/*!
+ * @mfn JstTraverser#Position
+ * @headerfile <seqan/journaled_string_tree.h>
+ * @brief Returns the position type.
+ *
+ * @signature Position<TJstTraverser>::Type
+ * @tparam TJstTraverser The type of the traverser.
+ *
+ * @return The position type. Note this is a vector of @link Pair @endlink structures where the first entry refers to
+ * the sequence and the second entry to its current position.
+ */
 
 template <typename TContainer, typename TState, typename TSpec>
 struct Position<JstTraverser<TContainer, TState, TSpec> >
@@ -177,6 +298,54 @@ struct Size<JstTraverser<TContainer, TState, TSpec> > :
 template <typename TContainer, typename TState, typename TSpec>
 struct Size<JstTraverser<TContainer, TState, TSpec> const> :
        Size<TContainer const>{};
+
+// ----------------------------------------------------------------------------
+// Metafunction Iterator                                  [StateTraverseMaster]
+// ----------------------------------------------------------------------------
+
+/*!
+ * @mfn JstTraverser#Iterator
+ * @headerfile <seqan/journaled_string_tree.h>
+ * @brief Returns the type of the iterator of either the master or the branch strand.
+ *
+ * @signature Iterator<TJstTraverser, TTag>::Type
+ * @tparam TJstTraverser The type of the traverser.
+ * @tparam TTag          The tag to specify the correct iterator. Must be one of @link JstTraversalTags @endlink.
+ *
+ * @return The type of the iterator.
+ */
+
+template <typename TContainer, typename TState, typename TSpec>
+struct Iterator<JstTraverser<TContainer, TState, TSpec>,  StateTraverseMaster>
+{
+    typedef JstTraverser<TContainer, TState, TSpec> TTraverser_;
+    typedef typename TTraverser_::TMasterBranchIterator Type;
+};
+
+template <typename TContainer, typename TState, typename TSpec>
+struct Iterator<JstTraverser<TContainer, TState, TSpec> const,  StateTraverseMaster>
+{
+    typedef JstTraverser<TContainer, TState, TSpec> const TTraverser_;
+    typedef typename TTraverser_::TMasterBranchIterator Type;
+};
+
+// ----------------------------------------------------------------------------
+// Metafunction Iterator                                  [StateTraverseBranch]
+// ----------------------------------------------------------------------------
+
+template <typename TContainer, typename TState, typename TSpec>
+struct Iterator<JstTraverser<TContainer, TState, TSpec>,  StateTraverseBranch>
+{
+    typedef JstTraverser<TContainer, TState, TSpec> TTraverser_;
+    typedef typename TTraverser_::TJournalIterator Type;
+};
+
+template <typename TContainer, typename TState, typename TSpec>
+struct Iterator<JstTraverser<TContainer, TState, TSpec> const,  StateTraverseBranch>
+{
+    typedef JstTraverser<TContainer, TState, TSpec> const TTraverser_;
+    typedef typename TTraverser_::TJournalIterator Type;
+};
 
 // ----------------------------------------------------------------------------
 // Metafunction BranchNode
@@ -243,6 +412,22 @@ _windowBeginPosition(JstTraverser<TContainer, TState, JstTraverserSpec<TContextP
 // Function windowBeginPosition()
 // ----------------------------------------------------------------------------
 
+/*!
+ * @fn JstTraverser#windowBeginPosition
+ * @headerfile <seqan/journaled_string_tree.h>
+ * @brief Returns the begin position of the current window for either the master or the branch segment.
+ *
+ * @signature TPosition windowBeginPosition(traverser)
+ * @param[in] traverser The traverser to query the window begin position for.
+ *
+ * @return The window begin position of type @link Position @endlink, where <tt>T</tt> is of type
+ * @link JstTraverser#Container @endlink.
+ *
+ * @see JstTraverser#clippedWindowBeginPosition
+ * @see JstTraverser#windowEndPosition
+ * @see JstTraverser#clippwedWindowEndPosition
+ */
+
 template <typename TContainer, typename TState, typename TSpec>
 inline typename Position<TContainer>::Type
 windowBeginPosition(JstTraverser<TContainer, TState, TSpec> const & traverser)
@@ -256,6 +441,25 @@ windowBeginPosition(JstTraverser<TContainer, TState, TSpec> const & traverser)
 // ----------------------------------------------------------------------------
 // Function clippedWindowBeginPosition()
 // ----------------------------------------------------------------------------
+
+/*!
+ * @fn JstTraverser#clippedWindowBeginPosition
+ * @headerfile <seqan/journaled_string_tree.h>
+ * @brief Returns the clipped begin position of the current window for either the master or the branch segment.
+ *
+ * @signature TPosition clippedWindowBeginPosition(traverser)
+ * @param[in] traverser The traverser to query the clipped window begin position for.
+ *
+ * @return The clipped window begin position of type @link Position @endlink, where <tt>T</tt> is of type
+ * @link JstTraverser#Container @endlink.
+ *
+ * In some cases the window might reach over the begin or the end of the reference sequence. In order to get a valid
+ * position one can use this function instead of the @link  JstTraverser#windowBeginPosition @endlink.
+ *
+ * @see JstTraverser#windowBeginPosition
+ * @see JstTraverser#windowEndPosition
+ * @see JstTraverser#clippwedWindowEndPosition
+ */
 
 template <typename TContainer, typename TState, typename TSpec, typename TTraversalState>
 inline typename Position<TContainer>::Type
@@ -299,6 +503,22 @@ _windowEndPosition(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPos
 // Function windowEndPosition()
 // ----------------------------------------------------------------------------
 
+/*!
+ * @fn JstTraverser#windowEndPosition
+ * @headerfile <seqan/journaled_string_tree.h>
+ * @brief Returns the end position of the current window for either the master or the branch segment.
+ *
+ * @signature TPosition windowEndPosition(traverser)
+ * @param[in] traverser The traverser to query the  window end position for.
+ *
+ * @return The window end position of type @link Position @endlink, where <tt>T</tt> is of type
+ * @link JstTraverser#Container @endlink.
+ *
+ * @see JstTraverser#windowBeginPosition
+ * @see JstTraverser#clippwedWindowBeginPosition
+ * @see JstTraverser#clippwedWindowEndPosition
+ */
+
 template <typename TContainer, typename TState, typename TSpec>
 inline typename Position<TContainer>::Type
 windowEndPosition(JstTraverser<TContainer, TState, TSpec> const & traverser)
@@ -312,6 +532,25 @@ windowEndPosition(JstTraverser<TContainer, TState, TSpec> const & traverser)
 // ----------------------------------------------------------------------------
 // Function clippedWindowEndPosition()
 // ----------------------------------------------------------------------------
+
+/*!
+ * @fn JstTraverser#clippedWindowEndPosition
+ * @headerfile <seqan/journaled_string_tree.h>
+ * @brief Returns the clipped end position of the current window for either the master or the branch segment.
+ *
+ * @signature TPosition clippedEndBeginPosition(traverser)
+ * @param[in] traverser The traverser to query the clipped window end position for.
+ *
+ * @return The clipped window end position of type @link Position @endlink, where <tt>T</tt> is of type
+ * @link JstTraverser#Container @endlink.
+ *
+ * In some cases the window might reach over the begin or the end of the reference sequence. In order to get a valid
+ * position one can use this function instead of the @link  JstTraverser#windowEndPosition @endlink.
+ *
+ * @see JstTraverser#windowBeginPosition
+ * @see JstTraverser#clippwedWindowBeginPosition
+ * @see JstTraverser#windowEndPosition
+ */
 
 template <typename TContainer, typename TState, typename TSpec, typename TTraversalState>
 inline typename Position<TContainer>::Type
@@ -328,44 +567,42 @@ clippedWindowEndPosition(JstTraverser<TContainer, TState, TSpec> const & travers
 // Function windowBegin()                                 [StateTraverseMaster]
 // ----------------------------------------------------------------------------
 
+/*!
+ * @fn JstTraverser#windowBegin
+ * @headerfile <seqan/journaled_string_tree.h>
+ * @brief Returns an iterator pointing to the begin of the current window.
+ *
+ * @signature TIterator windowBegin(traverser, tag)
+ * @param[in] traverser The traverser to query the iterator pointing to the begin of the window for.
+ * @param[in] tag       Tag indicating the source of the iterator. Must be one of @link JstTraversalTags @endlink.
+ *
+ * @return An iterator pointing to the begin of the begin of the current window in either the master or the current
+ * branch segment.
+ *
+ * Note, the result is undefined if the iterator for the branch segment is requested and the current traversal is not
+ * in the branch mode. For the master segment the iterator is always valid. To check for the current state of the
+ * traverser use the functions @link JstTraverser#isMaster @endlink and @link JstTraverser#isBranch @endlink.
+ *
+ * @see JstTraverser#windowEnd
+ * @see JstTraverser#contextIterator
+ */
+
 // ContextPositionLeft.
-template <typename TContainer, typename TState, typename TContextBegin>
-inline typename JstTraverser<TContainer, TState, JstTraverserSpec<ContextPositionLeft, TContextBegin> >::TMasterBranchIterator
-windowBegin(JstTraverser<TContainer, TState, JstTraverserSpec<ContextPositionLeft, TContextBegin> > const & traverser,
+template <typename TContainer, typename TState, typename TFullContext>
+inline typename Iterator<JstTraverser<TContainer, TState, JstTraverserSpec<ContextPositionLeft, TFullContext> >,  StateTraverseMaster>::Type
+windowBegin(JstTraverser<TContainer, TState, JstTraverserSpec<ContextPositionLeft, TFullContext> > const & traverser,
             StateTraverseMaster const & /*tag*/)
 {
     return traverser._masterIt;
 }
 
 // ContextPositionRight.
-template <typename TContainer, typename TState, typename TContextBegin>
-inline typename JstTraverser<TContainer, TState, JstTraverserSpec<ContextPositionRight, TContextBegin> >::TMasterBranchIterator
-windowBegin(JstTraverser<TContainer, TState, JstTraverserSpec<ContextPositionRight, TContextBegin> > const & traverser,
+template <typename TContainer, typename TState, typename TFullContext>
+inline typename Iterator<JstTraverser<TContainer, TState, JstTraverserSpec<ContextPositionRight, TFullContext> >,  StateTraverseMaster>::Type
+windowBegin(JstTraverser<TContainer, TState, JstTraverserSpec<ContextPositionRight, TFullContext> > const & traverser,
             StateTraverseMaster const & /*tag*/)
 {
     return traverser._masterIt - (traverser._windowSize - 1);
-}
-
-// ----------------------------------------------------------------------------
-// Function windowEnd()                                   [StateTraverseMaster]
-// ----------------------------------------------------------------------------
-
-// ContextPositionLeft.
-template <typename TContainer, typename TState, typename TContextBegin>
-inline typename JstTraverser<TContainer, TState, JstTraverserSpec<ContextPositionLeft, TContextBegin> >::TMasterBranchIterator
-windowEnd(JstTraverser<TContainer, TState, JstTraverserSpec<ContextPositionLeft, TContextBegin> > const & traverser,
-          StateTraverseMaster const & /*tag*/)
-{
-    return traverser._masterIt + (traverser._windowSize - 1);
-}
-
-// ContextPositionRight.
-template <typename TContainer, typename TState, typename TContextBegin>
-inline typename JstTraverser<TContainer, TState, JstTraverserSpec<ContextPositionRight, TContextBegin> >::TMasterBranchIterator
-windowEnd(JstTraverser<TContainer, TState, JstTraverserSpec<ContextPositionRight, TContextBegin> > const & traverser,
-          StateTraverseMaster const & /*tag*/)
-{
-    return traverser._masterIt;
 }
 
 // ----------------------------------------------------------------------------
@@ -373,39 +610,138 @@ windowEnd(JstTraverser<TContainer, TState, JstTraverserSpec<ContextPositionRight
 // ----------------------------------------------------------------------------
 
 // ContextPositionLeft.
-template <typename TContainer, typename TState, typename TContextBegin>
-inline typename JstTraverser<TContainer, TState, JstTraverserSpec<ContextPositionLeft, TContextBegin> >::TJournalIterator
-windowBegin(JstTraverser<TContainer, TState, JstTraverserSpec<ContextPositionLeft, TContextBegin> > const & traverser,
+template <typename TContainer, typename TState, typename TFullContext>
+inline typename Iterator<JstTraverser<TContainer, TState, JstTraverserSpec<ContextPositionLeft, TFullContext> >,  StateTraverseBranch>::Type
+windowBegin(JstTraverser<TContainer, TState, JstTraverserSpec<ContextPositionLeft, TFullContext> > const & traverser,
             StateTraverseBranch const & /*tag*/)
 {
     return traverser._branchIt;
 }
 
 // ContextPositionRight.
-template <typename TContainer, typename TState, typename TContextBegin>
-inline typename JstTraverser<TContainer, TState, JstTraverserSpec<ContextPositionRight, TContextBegin> >::TJournalIterator
-windowBegin(JstTraverser<TContainer, TState, JstTraverserSpec<ContextPositionRight, TContextBegin> > const & traverser,
+template <typename TContainer, typename TState, typename TFullContext>
+inline typename Iterator<JstTraverser<TContainer, TState, JstTraverserSpec<ContextPositionRight, TFullContext> >,  StateTraverseBranch>::Type
+windowBegin(JstTraverser<TContainer, TState, JstTraverserSpec<ContextPositionRight, TFullContext> > const & traverser,
             StateTraverseBranch const & /*tag*/)
 {
     return traverser._branchIt - (traverser._windowSize - 1);
 }
 
 // ----------------------------------------------------------------------------
+// Function windowEnd()                                   [StateTraverseMaster]
+// ----------------------------------------------------------------------------
+
+/*!
+ * @fn JstTraverser#windowEnd
+ * @headerfile <seqan/journaled_string_tree.h>
+ * @brief Returns an iterator pointing to the end of the current window.
+ *
+ * @signature TIterator windowEnd(traverser, tag)
+ * @param[in] traverser The traverser to query the iterator pointing to the end of the window for.
+ * @param[in] tag       Tag indicating the source of the iterator. Must be one of @link JstTraversalTags @endlink.
+ *
+ * @return An iterator pointing to the end of the begin of the current window in either the master or the current
+ * branch segment of type @link JstTraverser#Iterator @endlink.
+ *
+ * Note, the result is undefined if the iterator for the branch segment is requested and the current traversal is not
+ * in the branch mode. For the master segment the iterator is always valid. To check for the current state of the
+ * traverser use the functions @link JstTraverser#isMaster @endlink and @link JstTraverser#isBranch @endlink.
+ *
+ * @see JstTraverser#windowBegin
+ * @see JstTraverser#contextIterator
+ */
+
+// ContextPositionLeft.
+template <typename TContainer, typename TState, typename TFullContext>
+inline typename Iterator<JstTraverser<TContainer, TState, JstTraverserSpec<ContextPositionLeft, TFullContext> >,  StateTraverseMaster>::Type
+windowEnd(JstTraverser<TContainer, TState, JstTraverserSpec<ContextPositionLeft, TFullContext> > const & traverser,
+          StateTraverseMaster const & /*tag*/)
+{
+    return traverser._masterIt + (traverser._windowSize - 1);
+}
+
+// ContextPositionRight.
+template <typename TContainer, typename TState, typename TFullContext>
+inline typename Iterator<JstTraverser<TContainer, TState, JstTraverserSpec<ContextPositionRight, TFullContext> >,  StateTraverseMaster>::Type
+windowEnd(JstTraverser<TContainer, TState, JstTraverserSpec<ContextPositionRight, TFullContext> > const & traverser,
+          StateTraverseMaster const & /*tag*/)
+{
+    return traverser._masterIt;
+}
+
+// ----------------------------------------------------------------------------
 // Function windowEnd()                                   [StateTraverseBranch]
 // ----------------------------------------------------------------------------
 
-template <typename TContainer, typename TState, typename TContextBegin>
-inline typename JstTraverser<TContainer, TState, JstTraverserSpec<ContextPositionLeft, TContextBegin> >::TJournalIterator
-windowEnd(JstTraverser<TContainer, TState, JstTraverserSpec<ContextPositionLeft, TContextBegin> > const & traverser,
+template <typename TContainer, typename TState, typename TFullContext>
+inline typename Iterator<JstTraverser<TContainer, TState, JstTraverserSpec<ContextPositionLeft, TFullContext> >,  StateTraverseBranch>::Type
+windowEnd(JstTraverser<TContainer, TState, JstTraverserSpec<ContextPositionLeft, TFullContext> > const & traverser,
           StateTraverseBranch const & /*tag*/)
 {
     return traverser._branchIt + (traverser._windowSize - 1);
 }
 
-template <typename TContainer, typename TState, typename TContextBegin>
-inline typename JstTraverser<TContainer, TState, JstTraverserSpec<ContextPositionRight, TContextBegin> >::TJournalIterator
-windowEnd(JstTraverser<TContainer, TState, JstTraverserSpec<ContextPositionRight, TContextBegin> > const & traverser,
+template <typename TContainer, typename TState, typename TFullContext>
+inline typename Iterator<JstTraverser<TContainer, TState, JstTraverserSpec<ContextPositionRight, TFullContext> >,  StateTraverseBranch>::Type
+windowEnd(JstTraverser<TContainer, TState, JstTraverserSpec<ContextPositionRight, TFullContext> > const & traverser,
           StateTraverseBranch const & /*tag*/)
+{
+    return traverser._branchIt;
+}
+
+// ----------------------------------------------------------------------------
+// Function contextIterator()
+// ----------------------------------------------------------------------------
+
+/*!
+ * @fn JstTraverser#contextIterator
+ * @headerfile <seqan/journaled_string_tree.h>
+ * @brief Returns the iterator to the current context.
+ *
+ * @signature TIterator contextIterator(traverser, tag)
+ * @param[in] traverser The traverser to query current context iterator for.
+ * @param[in] tag       Tag indicating the source of the iterator. Must be one of @link JstTraversalTags @endlink.
+ *
+ * @return A reference to the iterator pointing to the current context of type @link JstTraverser#Iterator @endlink.
+ *
+ * Note, the result is undefined if the iterator for the branch segment is requested and the current traversal is not
+ * in the branch mode. For the master segment the iterator is always valid. To check for the current state of the
+ * traverser use the functions @link JstTraverser#isMaster @endlink and @link JstTraverser#isBranch @endlink.
+ *
+ * @see JstTraverser#windowBegin
+ * @see JstTraverser#windowEnd
+ */
+
+// StateTraverseMaster.
+template <typename TContainer, typename TState, typename TSpec>
+inline typename Iterator<JstTraverser<TContainer, TState, TSpec>, StateTraverseMaster>::Type &
+contextIterator(JstTraverser<TContainer, TState, TSpec> & traverser,
+                StateTraverseMaster const & /*tag*/)
+{
+    return traverser._masterIt;
+}
+
+template <typename TContainer, typename TState, typename TSpec>
+inline typename Iterator<JstTraverser<TContainer, TState, TSpec> const, StateTraverseMaster>::Type &
+contextIterator(JstTraverser<TContainer, TState, TSpec> const & traverser,
+                StateTraverseMaster const & /*tag*/)
+{
+    return traverser._masterIt;
+}
+
+// StateTraverseBranch.
+template <typename TContainer, typename TState, typename TSpec>
+inline typename Iterator<JstTraverser<TContainer, TState, TSpec>, StateTraverseBranch>::Type &
+contextIterator(JstTraverser<TContainer, TState, TSpec> & traverser,
+                StateTraverseBranch const & /*tag*/)
+{
+    return traverser._branchIt;
+}
+
+template <typename TContainer, typename TState, typename TSpec>
+inline typename Iterator<JstTraverser<TContainer, TState, TSpec> const, StateTraverseBranch>::Type &
+contextIterator(JstTraverser<TContainer, TState, TSpec> const & traverser,
+                StateTraverseBranch const & /*tag*/)
 {
     return traverser._branchIt;
 }
@@ -452,6 +788,23 @@ _globalInit(JstTraverser<TContainer, TState, TSpec> & traverser)
 // Function position()
 // ----------------------------------------------------------------------------
 
+/*!
+ * @fn JstTraverser#position
+ * @headerfile <seqan/journaled_string_tree.h>
+ * @brief Returns a vector containing all the sequences and their virtual positions that are active for the current
+ * window.
+ *
+ * @signature TPositionVec position(traverser)
+ * @param[in, out] traverser The traverser to query the position vector for.
+ *
+ * @return The vector containing the positions of all active sequences for the current window of type
+ * @link JstTraverser#Position @endlink.
+ *
+ * Note, this function internally updates some states of the traverser despite of it's constness qualification.
+ * To ensure that no internal states are updated call the function @link JstTraverser#synch @endlink explicitely.
+ */
+
+// TODO(rmaerker): Make const-qualified!
 template <typename TContainer, typename TState, typename TContextPos, typename TContextBegin>
 inline typename Position<JstTraverser<JournaledStringTree<TContainer, StringTreeDefault>, TState, JstTraverserSpec<TContextPos, TContextBegin> > >::Type
 position(JstTraverser<JournaledStringTree<TContainer, StringTreeDefault>, TState, JstTraverserSpec<TContextPos, TContextBegin> > & traverser)
@@ -524,6 +877,7 @@ position(JstTraverser<JournaledStringTree<TContainer, StringTreeDefault>, TState
 // Function state()
 // ----------------------------------------------------------------------------
 
+// TODO(rmaerker): Remove!
 template <typename TContainer, typename TState, typename TSpec>
 inline JstTraversalState
 state(JstTraverser<TContainer, TState, TSpec> const & traverser)
@@ -534,6 +888,19 @@ state(JstTraverser<TContainer, TState, TSpec> const & traverser)
 // ----------------------------------------------------------------------------
 // Function isMaster()
 // ----------------------------------------------------------------------------
+
+/*!
+ * @fn JstTraverser#isMasterState
+ * @headerfile <seqan/journaled_string_tree.h>
+ * @brief Returns a <tt>bool</tt> indicating if the traverser is operating on the master strand.
+ *
+ * @signature bool isMasterState(traverser)
+ * @param[in] traverser The traverser to check the current state for.
+ *
+ * @return <tt>true</tt> if the current window is in the master strand, otherwise <tt>false</tt>.
+ *
+ * @see JstTraverser#isBranchState
+ */
 
 template <typename TContainer, typename TState, typename TSpec>
 inline bool
@@ -546,6 +913,19 @@ isMaster(JstTraverser<TContainer, TState, TSpec> const & traverser)
 // Function isBranch()
 // ----------------------------------------------------------------------------
 
+/*!
+ * @fn JstTraverser#isBranchState
+ * @headerfile <seqan/journaled_string_tree.h>
+ * @brief Returns a <tt>bool</tt> indicating if the traverser is operating on the branch strand.
+ *
+ * @signature bool isBranchState(traverser)
+ * @param[in] traverser The traverser to check the current state for.
+ *
+ * @return <tt>true</tt> if the current window is in the branch strand, otherwise <tt>false</tt>.
+ *
+ * @see JstTraverser#isBranchState
+ */
+
 template <typename TContainer, typename TState, typename TSpec>
 inline bool
 isBranch(JstTraverser<TContainer, TState, TSpec> const & traverser)
@@ -554,46 +934,19 @@ isBranch(JstTraverser<TContainer, TState, TSpec> const & traverser)
 }
 
 // ----------------------------------------------------------------------------
-// Function contextIterator()
-// ----------------------------------------------------------------------------
-
-// StateTraverseMaster.
-template <typename TContainer, typename TState, typename TSpec>
-inline typename JstTraverser<TContainer, TState, TSpec>::TMasterBranchIterator &
-contextIterator(JstTraverser<TContainer, TState, TSpec> & traverser,
-                StateTraverseMaster const & /*tag*/)
-{
-    return traverser._masterIt;
-}
-
-template <typename TContainer, typename TState, typename TSpec>
-inline typename JstTraverser<TContainer, TState, TSpec>::TMasterBranchIterator const &
-contextIterator(JstTraverser<TContainer, TState, TSpec> const & traverser,
-                StateTraverseMaster const & /*tag*/)
-{
-    return traverser._masterIt;
-}
-
-// StateTraverseBranch.
-template <typename TContainer, typename TState, typename TSpec>
-inline typename JstTraverser<TContainer, TState, TSpec>::TJournalIterator &
-contextIterator(JstTraverser<TContainer, TState, TSpec> & traverser,
-                StateTraverseBranch const & /*tag*/)
-{
-    return traverser._branchIt;
-}
-
-template <typename TContainer, typename TState, typename TSpec>
-inline typename JstTraverser<TContainer, TState, TSpec>::TJournalIterator const &
-contextIterator(JstTraverser<TContainer, TState, TSpec> const & traverser,
-                StateTraverseBranch const & /*tag*/)
-{
-    return traverser._branchIt;
-}
-
-// ----------------------------------------------------------------------------
 // Function coverage()
 // ----------------------------------------------------------------------------
+
+/*!
+ * @fn JstTraverser#coverage
+ * @headerfile <seqan/journaled_string_tree.h>
+ * @brief Returns the coverage for the current window.
+ *
+ * @signature TCoverage coverage(traverser)
+ * @param[in]   traverser The traverser to get the active coverage for.
+ *
+ * @return The coverage for the current window of type @link DeltaMap#DeltaCoverage @endlink.
+ */
 
 template <typename TContainer, typename TState, typename TSpec>
 inline typename DeltaCoverage<typename Container<TContainer const>::Type> ::Type &
@@ -1574,18 +1927,66 @@ _reinitBlockEnd(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPositi
 // Function init()
 // ----------------------------------------------------------------------------
 
+/*!
+ * @fn JstTraverser#init
+ * @headerfile <seqan/journaled_string_tree.h>
+ * @brief Initializes the @link JstTraverser @endlink.
+ *
+ * @signature init(traverser)
+ * @signature init(traverser, cont)
+ * @signature init(traverser, cont, w)
+ * @param[in, out]  traverser   The traverser to ne initialized.
+ * @param[in]       cont        The container to be set.
+ * @param[in]       w           The window size to be set.
+ *
+ * Before using the init function one has to make sure, that the window size and the container of the
+ * @link JstTraverser @endlink instance are set properly. Otherwise the behavior is undefined.
+ */
+
+template <typename TContainer, typename TState, typename TContextPosition, typename TRequireFullContext>
+inline void
+init(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosition, TRequireFullContext> > & traverser)
+{
+    _initSegment(traverser, begin(container(container(traverser)), Rooted()),
+                 end(container(container(traverser)), Rooted()), 0, length(host(container(traverser))));
+}
+
 template <typename TContainer, typename TState, typename TContextPosition, typename TRequireFullContext>
 inline void
 init(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosition, TRequireFullContext> > & traverser,
      TContainer & obj)
 {
     setContainer(traverser, obj);
-    _initSegment(traverser, begin(container(obj), Rooted()), end(container(obj), Rooted()), 0, length(host(obj)));
+    init(traverser);
+}
+
+template <typename TContainer, typename TState, typename TContextPosition, typename TRequireFullContext, typename TSize>
+inline void
+init(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosition, TRequireFullContext> > & traverser,
+     TContainer & obj,
+     TSize const & windowSize)
+{
+    setContainer(traverser, obj);
+    setWindowSize(traverser, windowSize);
+    init(traverser);
 }
 
 // ----------------------------------------------------------------------------
 // Function traverse()
 // ----------------------------------------------------------------------------
+
+/*!
+ * @fn JstTraverser#traverse
+ * @headerfile <seqan/journaled_string_tree.h>
+ * @brief Triggers the traversal.
+ *
+ * @signature traverse(traverser, ext, delegate);
+ *
+ * @param[in, out]  traverser The traverser that manages the traverser. Must be of type @link JstTraverser @endlink.
+ * @param[in, out]  ext       An external algorithm. Must implement the @link TraversalExtensionPointConcept @endlink.
+ * @param[in]       delegate  A functor which is called by the external algorithm.
+ *
+ */
 
 template <typename TContainer, typename TState, typename TSpec, typename TOperator, typename TDelegate>
 inline void
@@ -1597,20 +1998,20 @@ traverse(JstTraverser<TContainer, TState, TSpec> & traverser,
 }
 
 // ----------------------------------------------------------------------------
-// Function setContainer()
-// ----------------------------------------------------------------------------
-
-template <typename TContainer, typename TState, typename TSpec>
-inline void
-setContainer(JstTraverser<TContainer, TState, TSpec> & traverser,
-             TContainer & container)
-{
-    traverser._haystackPtr = &container;
-}
-
-// ----------------------------------------------------------------------------
 // Function setWindowSize()
 // ----------------------------------------------------------------------------
+
+/*!
+ * @fn JstTraverser#setWindowSize
+ * @headerfile <seqan/journaled_string_tree.h>
+ * @brief Sets the window size of the context.
+ *
+ * @signature TContainer setsetWindowSize(traverser, w)
+ * @param[in, out]  traverser The traverser to set the window size to.
+ * @param[in]       w         The window size.
+ *
+ * @see JstTraverser#windowSize
+ */
 
 template <typename TContainer, typename TState, typename TSpec, typename TSize>
 inline void
@@ -1624,6 +2025,19 @@ setWindowSize(JstTraverser<TContainer, TState, TSpec> & traverser,
 // Function windowSize()
 // ----------------------------------------------------------------------------
 
+/*!
+ * @fn JstTraverser#windowSize
+ * @headerfile <seqan/journaled_string_tree.h>
+ * @brief Returns the window size of the context.
+ *
+ * @signature TContainer windowSize(traverser)
+ * @paramp[in] traverser The taverser to query the windowSize for.
+ *
+ * @return The window size.
+ *
+ * @see JstTraverser#setWindowSize
+ */
+
 template <typename TContainer, typename TState, typename TSpec>
 inline typename Size<JstTraverser<TContainer, TState, TSpec> >::Type
 windowSize(JstTraverser<TContainer, TState, TSpec> const & traverser)
@@ -1632,8 +2046,45 @@ windowSize(JstTraverser<TContainer, TState, TSpec> const & traverser)
 }
 
 // ----------------------------------------------------------------------------
+// Function setContainer()
+// ----------------------------------------------------------------------------
+
+/*!
+ * @fn JstTraverser#setContainer
+ * @headerfile <seqan/journaled_string_tree.h>
+ * @brief Sets the container.
+ *
+ * @signature TContainer setContainer(traverser, container)
+ * @param[in, out]  traverser The traverser to set the container to.
+ * @param[in]       container The container to be set.
+ *
+ * @see JstTraverser#container
+ */
+
+template <typename TContainer, typename TState, typename TSpec>
+inline void
+setContainer(JstTraverser<TContainer, TState, TSpec> & traverser,
+             TContainer & container)
+{
+    traverser._haystackPtr = &container;
+}
+
+// ----------------------------------------------------------------------------
 // Function container()
 // ----------------------------------------------------------------------------
+
+/*!
+ * @fn JstTraverser#container
+ * @headerfile <seqan/journaled_string_tree.h>
+ * @brief Returns a reference to the underlying container.
+ *
+ * @signature TContainer container(traverser)
+ * @param[in] traverser The taverser to query the container for.
+ *
+ * @return A reference to the container of type @link JstTraverser#Container @endlink the traverser is operating on.
+ *
+ * @see JstTraverser#setContainer
+ */
 
 template <typename TContainer, typename TState, typename TSpec>
 inline typename Container<JstTraverser<TContainer, TState, TSpec> >::Type &

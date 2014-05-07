@@ -32,7 +32,6 @@ add_definitions (${SEQAN_DEFINITIONS})
 add_executable (test_journaled_string_tree
                 test_journaled_string_tree.cpp
                 test_delta_map.h
-                test_journaled_string_tree_util.h
                 test_journaled_string_tree_traverse.h
                 test_journaled_string_tree_mock_generator.h)
 

@@ -1,3 +1,14 @@
+Concept for JstTraversalConcept
+
+MF: GetState<T>::Type	
+
+FN: void 			  execute(ext, del, trav, tag)
+	GetState<T>::Type getState(ext)
+	void 			  setState(ext, state)
+	
+JstFinderExtensionConcept
+	: extends JstTraversalConcept
+
 Interface for ExtensionFunctor
 
 template <typename TObject, typename TSpec>
@@ -10,13 +21,13 @@ class ExtensionFunctor
 MF:
 
 FinderExtension
-[ExtensionState]
-[ContextBeginPosition]
-[RequireFullContext]
+[GetState] : Default Nothing  -> refinement
+[ContextBeginPosition] : Default ContextBeginLeft
+[RequireFullContext] : Default True
 
 FN:
 
 init() : void
-[setExtensionState(ExtensionFunctor, State) : void]
-[getExtensionState(ExtensionFunctor) : ExtensionState]
-[execute(Result, ExtensionFunctor, Iterator) : void]
+[setState(ExtensionFunctor, State) : void] -> refinement
+[getState(ExtensionFunctor) : ExtensionState] -> refinement
+[execute(Result, ExtensionFunctor, Iterator) : void] -> refinement
