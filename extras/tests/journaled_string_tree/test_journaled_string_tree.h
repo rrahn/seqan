@@ -186,19 +186,18 @@ SEQAN_DEFINE_TEST(test_journaled_string_tree_container)
 {
     typedef DeltaMap<unsigned, Dna> TDeltaMap;
     typedef JournaledStringTree<TDeltaMap> TJst;
-    typedef typename Container<TJst>::Type TContainer;
 
     String<Dna> hostSeq = "ACGTGGATCTGTACTGACGGACGGACTTGACGGGAGTACGAGCATCGACT";
 
     {  // Empty container
-        JournaledStringTree<TDeltaMap> jst;
+        TJst jst;
         SEQAN_ASSERT_EQ(empty(container(jst)), true);
     }
 
     {  // Set container
         TDeltaMap deltaMap;
         _testDetlaMapfill(deltaMap);
-        JournaledStringTree<TDeltaMap> jst(hostSeq, deltaMap);
+        TJst jst(hostSeq, deltaMap);
         SEQAN_ASSERT_EQ(&container(jst), &deltaMap);
     }
 }
@@ -207,19 +206,18 @@ SEQAN_DEFINE_TEST(test_journaled_string_tree_string_set)
 {
     typedef DeltaMap<unsigned, Dna> TDeltaMap;
     typedef JournaledStringTree<TDeltaMap> TJst;
-    typedef typename Container<TJst>::Type TContainer;
 
     String<Dna> hostSeq = "ACGTGGATCTGTACTGACGGACGGACTTGACGGGAGTACGAGCATCGACT";
 
     {  // Empty container
-        JournaledStringTree<TDeltaMap> jst;
+        TJst jst;
         SEQAN_ASSERT_EQ(empty(stringSet(jst)), true);
     }
 
     {  // Set container
         TDeltaMap deltaMap;
         _testDetlaMapfill(deltaMap);
-        JournaledStringTree<TDeltaMap> jst(hostSeq, deltaMap);
+        TJst jst(hostSeq, deltaMap);
         SEQAN_ASSERT_EQ(host(stringSet(jst)), hostSeq);
         SEQAN_ASSERT_EQ(length(stringSet(jst)), 8u);
     }
@@ -229,26 +227,25 @@ SEQAN_DEFINE_TEST(test_journaled_string_tree_host)
 {
     typedef DeltaMap<unsigned, Dna> TDeltaMap;
     typedef JournaledStringTree<TDeltaMap> TJst;
-    typedef typename Container<TJst>::Type TContainer;
 
     String<Dna> hostSeq = "ACGTGGATCTGTACTGACGGACGGACTTGACGGGAGTACGAGCATCGACT";
 
     {  // Empty container
-        JournaledStringTree<TDeltaMap> jst;
+        TJst jst;
         SEQAN_ASSERT_EQ(empty(host(jst)), true);
     }
 
     {  // Set container
         TDeltaMap deltaMap;
         _testDetlaMapfill(deltaMap);
-        JournaledStringTree<TDeltaMap> jst(hostSeq, deltaMap);
+        TJst jst(hostSeq, deltaMap);
         SEQAN_ASSERT_EQ(host(jst), hostSeq);
     }
 
     {  // Set container
         TDeltaMap deltaMap;
         _testDetlaMapfill(deltaMap);
-        JournaledStringTree<TDeltaMap> jst(hostSeq, deltaMap);
+        TJst jst(hostSeq, deltaMap);
         SEQAN_ASSERT_EQ(host(jst), hostSeq);
     }
 }
@@ -283,19 +280,18 @@ SEQAN_DEFINE_TEST(test_journaled_string_tree_full_journal_required)
 {
     typedef DeltaMap<unsigned, Dna> TDeltaMap;
     typedef JournaledStringTree<TDeltaMap> TJst;
-    typedef typename Container<TJst>::Type TContainer;
 
     String<Dna> hostSeq = "ACGTGGATCTGTACTGACGGACGGACTTGACGGGAGTACGAGCATCGACT";
 
     {  // Empty container
-        JournaledStringTree<TDeltaMap> jst;
+        TJst jst;
         SEQAN_ASSERT_EQ(fullJournalRequired(jst), true);
     }
 
     {  // Set container
         TDeltaMap deltaMap;
         _testDetlaMapfill(deltaMap);
-        JournaledStringTree<TDeltaMap> jst(hostSeq, deltaMap);
+        TJst jst(hostSeq, deltaMap);
         SEQAN_ASSERT_EQ(fullJournalRequired(jst), true);
 
         setBlockSize(jst, 3);
@@ -344,8 +340,6 @@ template <typename TJst>
 void _testJournaledStringTreeJournalNextBlock(TJst & jst)
 {
     typedef typename RemoveConst<typename Host<TJst>::Type >::Type TString;
-    typedef typename Container<TJst>::Type TDeltaMap;
-    typedef typename Iterator<TDeltaMap>::Type TIter;
 
     StringSet<TString> set;
     resize(set, 4, Exact());
@@ -434,7 +428,6 @@ SEQAN_DEFINE_TEST(test_journaled_string_tree_journal_next_block)
 {
     typedef DeltaMap<unsigned, Dna> TDeltaMap;
     typedef JournaledStringTree<TDeltaMap> TJst;
-    typedef Size<TJst>::Type TSize;
 
     String<Dna> hostSeq = "ACGTGGATCTGTACTGACGGACGGACTTGACGGGAGTACGAGCATCGACT";
     TDeltaMap deltaMap;
@@ -480,7 +473,7 @@ SEQAN_DEFINE_TEST(test_journaled_string_tree_journal_next_block)
     deltaMap._deltaCoverageStore[7][2] = false;
     deltaMap._deltaCoverageStore[7][3] = true;
 
-    JournaledStringTree<TDeltaMap> jst(hostSeq, deltaMap);
+    TJst jst(hostSeq, deltaMap);
     _testJournaledStringTreeJournalNextBlock(jst);
 }
 
@@ -520,10 +513,8 @@ SEQAN_DEFINE_TEST(test_journaled_string_tree_virtual_block_position)
 {
     typedef DeltaMap<unsigned, Dna> TDeltaMap;
     typedef JournaledStringTree<TDeltaMap> TJst;
-    typedef Size<TJst>::Type TSize;
-    typedef GetStringSet<TJst>::Type TJournalSet;
 
-    JournaledStringTree<TDeltaMap> jst;
+    TJst jst;
     String<Dna> hostSeq = "ACGTGGATCTGTACTGACGGACGGACTTGACGGGAGTACGAGCATCGACT";
     TDeltaMap deltaMap;
     _testDetlaMapfill(deltaMap);

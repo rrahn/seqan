@@ -312,14 +312,15 @@ _syncToMergePoint(TCoverage & target,
 // ----------------------------------------------------------------------------
 
 // Rebases the target iterator to the source iterator's position based on the common host.
-template <typename TIter, typename TBranchNodeIt, typename TDeltaMap, typename TProxyId>
+template <typename TIter, typename TIterSrc, typename TBranchNodeIt, typename TDeltaMap, typename TProxyId>
 inline void
 _mapVirtualToVirtual(TIter & target,
-                     TIter const & source,
+                     TIterSrc const & source,
                      TBranchNodeIt const & branchNodeIt,
                      TDeltaMap const & variantStore,
                      TProxyId const & proxyId)
 {
+    typedef typename Position<TIter>::Type TPosition;
     // Check if both journals point to the same reference.
     SEQAN_ASSERT_EQ(&host(*target._journalStringPtr), &host(*source._journalStringPtr));
 
@@ -346,7 +347,7 @@ _mapVirtualToVirtual(TIter & target,
             if (atBegin(target._journalEntriesIterator, target._journalStringPtr->_journalEntries) &&
                 target._journalEntriesIterator->segmentSource == SOURCE_PATCH)
             {
-                setPosition(target, 0);
+                setPosition(target, static_cast<TPosition>(0));
                 hostPos = 0;
             }
             else

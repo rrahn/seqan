@@ -84,6 +84,12 @@ struct Finder2<TContainer, TPattern, DataParallel<TSpec> >
     }
 };
 
+template <typename TContainer, typename TPattern, typename TSpec>
+SEQAN_CONCEPT_IMPL(Finder2<TContainer, TPattern, DataParallel<TSpec> >,       (JstTraversalConcept));
+
+template <typename TContainer, typename TPattern, typename TSpec>
+SEQAN_CONCEPT_IMPL(Finder2<TContainer, TPattern, DataParallel<TSpec> > const, (JstTraversalConcept));
+
 // ============================================================================
 // Metafunctions
 // ============================================================================
@@ -157,7 +163,7 @@ struct GetState<Finder2<TContainer, TPattern, DataParallel<TSpec> > const> :
 // ----------------------------------------------------------------------------
 
 template <typename TContainer, typename TPattern, typename TSpec>
-struct GetJstTraverserForFinder_<Finder2<TContainer, TPattern, TSpec> >
+struct GetJstTraverser<Finder2<TContainer, TPattern, TSpec> >
 {
     typedef Finder2<TContainer, TPattern, TSpec> TFinder_;
     typedef typename ContextIteratorPosition<TFinder_>::Type TContextPosition_;
@@ -234,13 +240,12 @@ execute(TResult & res,
 // ----------------------------------------------------------------------------
 
 template <typename TContainer, typename TPattern, typename TSpec, typename TDelegate, typename TTraverser, typename TTag>
-inline typename Size<TContainer>::Type
+inline typename Size<TTraverser>::Type
 deliverContext(Finder2<TContainer, TPattern, DataParallel<TSpec> > & finder,
                TDelegate & delegateFunctor,
                TTraverser & traverser,
                TTag const & /*traverserState*/)
 {
-//    typedef Finder2<TContainer, TPattern, DataParallel<TSpec> > TFinder;
     typedef typename Size<TContainer>::Type TSize;
 
     Pair<bool, TSize> res(false, 1);
@@ -321,14 +326,14 @@ find(Finder2<TContainer, TPattern, DataParallel<TSpec> > & finder,
      int scoreLimit = 0)
 {
     typedef Finder2<TContainer, TPattern, DataParallel<TSpec> > TFinder;
-    typedef typename GetJstTraverserForFinder_<TFinder>::Type TTraverser;
+    typedef typename GetJstTraverser<TFinder>::Type TTraverser;
 
     // Set up the journaled string tree traversal.
     TTraverser traverser(container(finder), length(needle(pattern)) - scoreLimit);
 #ifdef PROFILE_JST_INTERN
     double timeBuild = sysTime();
 #endif
-    while (journalNextBlock(container(finder), windowSize(traverser)))  // Generating the journal index for the next block.
+    while (journalNextBlock(container(finder), contextSize(traverser)))  // Generating the journal index for the next block.
     {
         if (finder._needReinit)
         {
@@ -341,7 +346,7 @@ find(Finder2<TContainer, TPattern, DataParallel<TSpec> > & finder,
         std::cerr << "Time-C: " << sysTime() - timeBuild << " s" << std::endl;
         double timeSearch = sysTime();
 #endif
-        traverse(traverser, finder, delegate);
+        traverse(finder, delegate, traverser);
 #ifdef PROFILE_JST_INTERN
         std::cerr << "Time-S: " << sysTime() - timeSearch << " s" << std::endl;
         timeBuild = sysTime();

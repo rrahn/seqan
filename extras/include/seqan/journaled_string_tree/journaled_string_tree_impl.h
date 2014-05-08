@@ -59,7 +59,7 @@ struct GetStringSet{};
 
 /*!
  * @class JournaledStringTree Journaled String Tree
- * @headerfile seqan/journaled_string_tree.h
+ * @headerfile <seqan/journaled_string_tree.h>
  * @brief A succinct data structure that can traverse a set of similar sequences simultaneously.
  *
  * @signature template <typename TDelta[, typename TSpec]>
@@ -129,7 +129,7 @@ public:
 
 /*!
  * @mfn JournaledStringTree#Spec
- * @headerfile seqan/journaled_string_tree.h
+ * @headerfile <seqan/journaled_string_tree.h>
  * @brief Returns the specialization type.
  *
  * @signature Spec<TJst>::Type;
@@ -155,7 +155,7 @@ struct Spec<JournaledStringTree<TDeltaMap, TSpec> const> :
 
 /*!
  * @mfn JournaledStringTree#Position
- * @headerfile seqan/journaled_string_tree.h
+ * @headerfile <seqan/journaled_string_tree.h>
  * @brief The position type.
  *
  * @signature Position<TJst>::Type;
@@ -179,7 +179,7 @@ struct Position<JournaledStringTree<TDeltaMap, TSpec> const> :
 
 /*!
  * @mfn JournaledStringTree#Size
- * @headerfile seqan/journaled_string_tree.h
+ * @headerfile <seqan/journaled_string_tree.h>
  * @brief The size type.
  *
  * @signature Size<TJst>::Type;
@@ -203,7 +203,7 @@ struct Size<JournaledStringTree<TDeltaMap, TSpec> const> :
 
 /*!
  * @mfn JournaledStringTree#Host
- * @headerfile seqan/journaled_string_tree.h
+ * @headerfile <seqan/journaled_string_tree.h>
  * @brief Returns the type of the global reference.
  *
  * @signature Host<TJst>::Type;
@@ -234,7 +234,7 @@ struct Host<JournaledStringTree<TDeltaMap, TSpec> const>
 
 /*!
  * @mfn JournaledStringTree#Container
- * @headerfile seqan/journaled_string_tree.h
+ * @headerfile <seqan/journaled_string_tree.h>
  * @brief Returns the type of the branch node map holding the delta information.
  *
  * @signature Container<TJst>::Type;
@@ -262,7 +262,7 @@ struct Container<JournaledStringTree<TDeltaMap, TSpec> const>
 
 /*!
  * @mfn JournaledStringTree#GetStringSet
- * @headerfile seqan/journaled_string_tree.h
+ * @headerfile <seqan/journaled_string_tree.h>
  * @brief Returns the type of the string set holding the compressed sequences.
  *
  * @signature GetStringSet<TJst>::Type;
@@ -450,7 +450,7 @@ _doJournalBlock(JournaledStringTree<TDeltaMap, TSpec> & jst,
 
 /*!
  * @fn JournaledStringTree#host
- * @headerfile seqan/journaled_string_tree.h
+ * @headerfile <seqan/journaled_string_tree.h>
  * @brief Returns a reference to the global reference sequence.
  *
  * @signature THost host(jst);
@@ -480,7 +480,7 @@ host(JournaledStringTree<TDeltaMap, TSpec> const & stringTree)
 
 /*!
  * @fn JournaledStringTree#virtualBlockOffset
- * @headerfile seqan/journaled_string_tree.h
+ * @headerfile <seqan/journaled_string_tree.h>
  * @brief Returns the virtual offset for the current block for the given sequence.
  *
  * @signature TSize virtualBlockOffset(jst, id);
@@ -491,7 +491,7 @@ host(JournaledStringTree<TDeltaMap, TSpec> const & stringTree)
  * When constructing the sequence information block-wise, an additional offset is used to determine
  * the correct virtual position for the current block for each sequence.
  *
- * @return The Current block offset for the given sequence of type <tt>MakeSigned<Size<JournaledStringTree> >::Type</tt>.
+ * @return The Current block offset for the given sequence of type <tt>MakeSigned\<Size\<JournaledStringTree\>::Type \>::Type</tt>.
  */
 
 template <typename TDeltaMap, typename TSpec, typename TPosition>
@@ -508,7 +508,7 @@ virtualBlockOffset(JournaledStringTree<TDeltaMap, TSpec> const & stringTree,
 
 /*!
  * @fn JournaledStringTree#fullJournalRequired
- * @headerfile seqan/journaled_string_tree.h
+ * @headerfile <seqan/journaled_string_tree.h>
  * @brief Checks whether the sequences are constructed block-wise or not.
  *
  * @signature bool fullJournalRequired(jst);
@@ -533,7 +533,7 @@ fullJournalRequired(JournaledStringTree<TDeltaMap, TSpec> const & stringTree)
 
 /*!
  * @fn JournaledStringTree#journalNextBlock
- * @headerfile seqan/journaled_string_tree.h
+ * @headerfile <seqan/journaled_string_tree.h>
  * @brief Constructs the sequence content for the next block if available.
  *
  * @signature bool journalNextBlock(jst, w[, tag]);
@@ -583,7 +583,7 @@ bool journalNextBlock(JournaledStringTree<TDeltaMap, TSpec> & stringTree,
 
 /*!
  * @fn JournaledStringTree#reinit
- * @headerfile seqan/journaled_string_tree.h
+ * @headerfile <seqan/journaled_string_tree.h>
  * @brief Reinitializes the journaled string tree.
  *
  * @signature void reinit(jst);
@@ -617,7 +617,7 @@ reinit(JournaledStringTree<TDeltaMap, TSpec> & jst)
 
 /*!
  * @fn JournaledStringTree#init
- * @headerfile seqan/journaled_string_tree.h
+ * @headerfile <seqan/journaled_string_tree.h>
  * @brief Initializes the journaled string tree.
  *
  * @signature void init(jst, host, delta);
@@ -656,7 +656,7 @@ init(JournaledStringTree<TDeltaMap, TSpec> & jst,
 
 /*!
  * @fn JournaledStringTree#setBlockSize
- * @headerfile seqan/journaled_string_tree.h
+ * @headerfile <seqan/journaled_string_tree.h>
  * @brief Sets the number of variants processed at a time.
  *
  * @signature void setBlockSize(jst, block);
@@ -689,7 +689,7 @@ setBlockSize(JournaledStringTree<TDeltaMap, TSpec> & stringTree,
 
 /*!
  * @fn JournaledStringTree#getBlockSize
- * @headerfile seqan/journaled_string_tree.h
+ * @headerfile <seqan/journaled_string_tree.h>
  * @brief Returns the size of the blocks.
  *
  * @signature TSize getBlockSize(jst);
@@ -714,7 +714,7 @@ getBlockSize(JournaledStringTree<TDeltaMap, TSpec> const & stringTree)
 
 /*!
  * @fn JournaledStringTree#container
- * @headerfile seqan/journaled_string_tree.h
+ * @headerfile <seqan/journaled_string_tree.h>
  * @brief Returns a reference to the object holding the delta information for a set of sequences.
  *
  * @signature TBranchNodeMap container(jst);
@@ -746,7 +746,7 @@ container(JournaledStringTree<TDeltaMap, TSpec> const & stringTree)
 
 /*!
  * @fn JournaledStringTree#stringSet
- * @headerfile seqan/journaled_string_tree.h
+ * @headerfile <seqan/journaled_string_tree.h>
  * @brief Returns a reference to the constructed sequences.
  *
  * @signature TStringSet stringSet(jst);

@@ -627,7 +627,7 @@ end(DeltaMap<TValue, TAlphabet, TSpec> const & deltaMap, Standard const &/*tag*/
  *
  * @signature clear(deltaMap)
  *
- * @param[in, out] deltaMap  The map to be cleared.
+ * @param[in,out] deltaMap  The map to be cleared.
  */
 
 template <typename TValue, typename TAlphabet, typename TSpec>
@@ -719,7 +719,7 @@ coverageSize(DeltaMap<TValue, TAlphabet, TSpec> const & deltaMap)
  *
  * @signature  setCoverageSize(deltaMap, size)
  *
- * @param[in, out] deltaMap  The map to set the coverage size for.
+ * @param[in,out] deltaMap  The map to set the coverage size for.
  * @param[in]      size      The new coverage size.
  *
  * This function sets the coverage size globally to all delta events contained in the map.

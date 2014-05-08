@@ -70,6 +70,7 @@
 // Journaled String Tree Traversal.
 // ===========================================================================
 
+#include <seqan/journaled_string_tree/journaled_string_tree_traversal_concept.h>
 #include <seqan/journaled_string_tree/journaled_string_tree_traversal_branch_stack.h>
 #include <seqan/journaled_string_tree/journaled_string_tree_traversal.h>
 

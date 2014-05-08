@@ -69,9 +69,9 @@ struct FindResultsTester_
     template <typename TTraverser>
     inline void operator()(TTraverser & traverser)
     {
-        typedef typename seqan::Position<TTraverser>::Type TPositionVec;
+        typedef typename seqan::Positions<TTraverser>::Type TPositionVec;
 
-        TPositionVec posVec = position(traverser);
+        TPositionVec posVec = positions(traverser);
         for (unsigned i = 0; i < length(posVec); ++i)
             appendValue(_hitStringSet[posVec[i].i1], posVec[i].i2);
     }

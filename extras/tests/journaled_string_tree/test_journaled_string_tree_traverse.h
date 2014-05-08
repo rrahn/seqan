@@ -50,14 +50,17 @@ seqan::DataParallelTestConfig<char> testConfig;
 namespace seqan
 {
 
-template <typename TTraverser>
+template <typename TContainer>
 struct DummyCaller_
 {
-    TTraverser * _traverserPtr;
+    TContainer * _containerPtr;
 
-    DummyCaller_(TTraverser & other) : _traverserPtr(&other)
+    DummyCaller_(TContainer & other) : _containerPtr(&other)
     {}
 };
+
+template <typename T> SEQAN_CONCEPT_IMPL(DummyCaller_<T>,       (JstTraversalConcept));
+template <typename T> SEQAN_CONCEPT_IMPL(DummyCaller_<T> const, (JstTraversalConcept));
 
 template <typename TValue>
 struct DummyDelegator_
@@ -73,11 +76,11 @@ struct DummyDelegator_
     template <typename TTraverser>
     void operator()(TTraverser & traverser)
     {
-        typedef typename Position<TTraverser>::Type TPosVec;
+        typedef typename Positions<TTraverser>::Type TPosVec;
 #ifdef TEST_DEBUG_OUTPUT
         std::cerr << "position(traverser): ";
 #endif
-        TPosVec posVec = position(traverser);
+        TPosVec posVec = positions(traverser);
         for (unsigned i = 0; i < length(posVec); ++i)
         {
 #ifdef TEST_DEBUG_OUTPUT
@@ -92,9 +95,29 @@ struct DummyDelegator_
     }
 };
 
-template <typename TTraverser, typename TValue, typename TContainer, typename TState, typename TSpec, typename TTag>
-inline size_t
-deliverContext(DummyCaller_<TTraverser> & /*dummy*/,
+template <typename TContainer>
+struct GetState<DummyCaller_<TContainer> >
+{
+    typedef Nothing Type;
+};
+
+template <typename TContainer>
+struct GetState<DummyCaller_<TContainer> const>
+{
+    typedef Nothing const Type;
+};
+
+template <typename TContainer>
+struct GetJstTraverser<DummyCaller_<TContainer> >
+{
+    typedef DummyCaller_<TContainer> TDummy_;
+    typedef typename GetState<TDummy_>::Type TState;
+    typedef JstTraverser<TContainer, TState, JstTraverserSpec<> > Type;
+};
+
+template <typename TDumyContainer, typename TValue, typename TContainer, typename TState, typename TSpec, typename TTag>
+inline typename Size<JstTraverser<TContainer, TState, TSpec> >::Type
+deliverContext(DummyCaller_<TDumyContainer> & /*dummy*/,
                DummyDelegator_<TValue> & delegator,
                JstTraverser<TContainer, TState, TSpec> & traverser,
                TTag const & /*tag*/)
@@ -103,16 +126,23 @@ deliverContext(DummyCaller_<TTraverser> & /*dummy*/,
     return 1;
 }
 
-template <typename TTraverser>
+template <typename TContainer>
 inline Nothing
-getState(DummyCaller_<TTraverser> & /*dummy*/)
+getState(DummyCaller_<TContainer> & /*dummy*/)
 {
     return Nothing();
 }
 
-template <typename TTraverser, typename TState>
+template <typename TContainer>
+inline Nothing const
+getState(DummyCaller_<TContainer const> & /*dummy*/)
+{
+    return Nothing();
+}
+
+template <typename TContainer, typename TState>
 inline void
-setState(DummyCaller_<TTraverser> & /*dummy*/,
+setState(DummyCaller_<TContainer> & /*dummy*/,
          TState const & /*state*/)
 {
     // no-op.
@@ -157,7 +187,7 @@ bool _runTestForConfiguration(unsigned posConf,
 
     typedef TMockGenerator::TStringTree TStringTree;
     typedef JstTraverser<TStringTree, Nothing, JstTraverserSpec<> > TTraverser;
-    typedef DummyCaller_<TTraverser> TDummyCaller;
+    typedef DummyCaller_<TStringTree> TDummyCaller;
 
     TVarData varData;
     TCovData covData;
@@ -173,14 +203,28 @@ bool _runTestForConfiguration(unsigned posConf,
 
     TSequenceAppender seqAppender(length(mockGen._seqData));
     TTraverser traverser(jst, windowSize);
-    TDummyCaller dummyCaller(traverser);
-    traverse(traverser, dummyCaller, seqAppender);
+    TDummyCaller dummyCaller(jst);
+
+    traverse(dummyCaller, seqAppender, traverser);
 
 #ifdef TEST_DEBUG_OUTPUT
     _printDebugInfo(mockGen, seqAppender, windowSize);
 #endif
 
     return compareResults(seqAppender._processedSeq, mockGen._seqData, windowSize);
+}
+
+SEQAN_DEFINE_TEST(test_journaled_string_tree_jst_traversal_concept)
+{
+    using namespace seqan;
+
+    typedef DeltaMap<unsigned, Dna> TDeltaMap;
+    typedef JournaledStringTree<TDeltaMap> TJst;
+
+    typedef DummyCaller_<TJst> TDummy;
+
+    bool res =  Is<JstTraversalConcept<TDummy> >::VALUE;
+    SEQAN_ASSERT_EQ(res, true);
 }
 
 // ----------------------------------------------------------------------------

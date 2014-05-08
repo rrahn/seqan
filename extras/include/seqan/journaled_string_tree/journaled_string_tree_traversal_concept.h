@@ -41,39 +41,67 @@
 namespace seqan
 {
 
+// ============================================================================
+// Forwards
+// ============================================================================
+
+struct TraverseStateMaster_;
+typedef Tag<TraverseStateMaster_> StateTraverseMaster;
+
+struct TraverseStateBranch_;
+typedef Tag<TraverseStateBranch_> StateTraverseBranch;
+
+// ============================================================================
+// Tags, Classes, Enums
+// ============================================================================
+
 /*!
  * @concept JstTraversalConcept
  *
  * @headerfile <seqan/journaled_string_tree.h>
  *
- * @brief Concept for a type that is registered as an external algorithm to the traversal over a
- * @link JournaledStringTree @endlink.
+ * @brief Concept for a type that triggers the traversal over a @link JournaledStringTree @endlink.
  *
  * @signature concept JstTraversalConcept;
  *
  * The @link JournaledStringTree @endlink offers no iterator but a global traversal function to iterate over
  * the data. To facilitate iterator-like behavior, the JstTraversalConcept offers a common interface to interrupt the
- * traversal at any position and allow communications between the caller and the callee. Using this interface algorithms
+ * traversal at any position and allows communications between the caller and the callee. Using this interface algorithms
  * can generically implement the traversal over a @link JournaledStringTree @endlink.
- *
+ */
+
+/*!
  * @mfn JstTraversalConcept#GetState
  * @brief Returns type of the state of the external caller.
  * @signature GetState<TCaller>::Type;
  * @tparam TCaller The type of the caller that triggers the traversal.
  * @return  TState The type of state objects. Default type is @link Nothing @endlink.
- *
- *
+ */
+
+/*!
+ * @mfn JstTraversalConcept#GetJstTraverser
+ * @brief Returns type of the traverser for the caller.
+ * @signature GetJstTraverser<TCaller>::Type;
+ * @tparam  TCaller The type of the caller that triggers the traversal.
+ * @return  TTraverser The type of the traverser (@link JstTraverser @endlink).
+ */
+
+/*!
  * @fn JstTraversalConcept#deliverContext
  * @headerfile <seqan/journaled_string_tree.h>
  * @brief Interrupts the traversal and delivers the current sequence context to the caller.
  *
- * @signature deliverContext(caller, delegate, callee, tag);
+ * @signature TSize deliverContext(caller, delegate, callee, tag);
  *
- * @param[in, out] caller   The caller that triggered the traversal.
- * @param[in, out] delegate An additional functor that can be called.
+ * @param[in,out] caller   The caller that triggered the traversal.
+ * @param[in,out] delegate An additional functor that can be called.
  * @param[in]      callee   The traverser managing the traversal. Must be of type @link JstTraverser @endlink.
  * @param[in]      tag      The tag indicating the current state. One of @link JstTraversalStates @endlink.
  *
+ * @return TSize The step size the window is moved by the traverser.
+ */
+
+/*!
  * @fn JstTraversalConcept#getState
  * @headerfile <seqan/journaled_string_tree.h>
  * @brief Returns the current state of the caller.
@@ -82,25 +110,44 @@ namespace seqan
  * @param[in] caller The caller that triggered the traversal.
  * @return TState The current state of type @link JstTraversalConcept#GetState @endlink. Returns per default
  * @link Nothing @endlink.
- *
+ */
+
+/*!
  * @fn JstTraversalConcept#setState
  * @headerfile <seqan/journaled_string_tree.h>
  * @brief Sets the current state to the caller.
  *
  * @signature setState(caller, state);
- * @param[in, out] caller   The caller to set the state to.
+ * @param[in,out] caller   The caller to set the state to.
  * @param[in]      state    The state to be set. Of type @link JstTraversalConcept#GetState @endlink.
  *
  * The default implementation is a <i>no-op</i> function.
  */
 
-// ============================================================================
-// Forwards
-// ============================================================================
+SEQAN_CONCEPT(JstTraversalConcept,(TCaller))
+{
+    typedef typename GetState<TCaller>::Type                  TState;
+    typedef typename GetJstTraverser<TCaller>::Type           TTraverser;
+    typedef typename Size<TTraverser>::Type                   TSize;
+    typedef Nothing                                           TDelegate;
 
-// ============================================================================
-// Tags, Classes, Enums
-// ============================================================================
+    TCaller    c;
+    TState     state;
+    TTraverser traverser;
+    TSize      size;
+
+    SEQAN_CONCEPT_USAGE(JstTraversalConcept)
+    {
+        // Concept for setState and getState.
+        sameType(getState(c), state);
+        state = getState(c);
+        setState(c, state);
+
+        // Concept for deliverContext.
+        sameType(deliverContext(c, TDelegate(), traverser, StateTraverseMaster()), size);
+        sameType(deliverContext(c, TDelegate(), traverser, StateTraverseBranch()), size);
+    }
+};
 
 // ============================================================================
 // Metafunctions

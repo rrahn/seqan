@@ -54,19 +54,20 @@ namespace seqan
 
 /*!
  * @enum DeltaType
+ * @headerfile <seqan/journaled_string_tree.h>
  * @brief Keys for specifying the delta type to be accessed.
  *
- * @val DELTA_TYPE_SNP
- * @brief DELTA_TYPE_SNP Id to denote SNP events.
+ * @val DeltaType DELTA_TYPE_SNP
+ * @brief Id to denote SNP events.
  *
- * @val DELTA_TYPE_DEL
- * @brief DELTA_TYPE_DEL Id to denote deletion events.
+ * @val DeltaType DELTA_TYPE_DEL
+ * @brief Id to denote deletion events.
  *
- * @val DELTA_TYPE_INS
- * @brief DELTA_TYPE_INS Id to denote insertion events.
+ * @val DeltaType DELTA_TYPE_INS
+ * @brief Id to denote insertion events.
  *
- * @val DElTA_TYPE_INDEL
- * @brief DELTA_TYPE_INDEL Id to denote replacements events.
+ * @val DeltaType DElTA_TYPE_INDEL
+ * @brief Id to denote replacements events.
  */
 
 struct DeltaType
