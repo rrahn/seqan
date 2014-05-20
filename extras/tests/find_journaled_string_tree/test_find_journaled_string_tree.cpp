@@ -55,11 +55,23 @@ SEQAN_BEGIN_TESTSUITE(find_journaled_string_tree)
     SEQAN_CALL_TEST(test_find_journaled_string_tree_del_occ_simple);
     SEQAN_CALL_TEST(test_find_journaled_string_tree_fuzzy_occ_simple);
 
+    SEQAN_CALL_TEST(test_find_journaled_string_tree_ref_occ_simple_block);
+    SEQAN_CALL_TEST(test_find_journaled_string_tree_snp_occ_simple_block);
+    SEQAN_CALL_TEST(test_find_journaled_string_tree_ins_occ_simple_block);
+    SEQAN_CALL_TEST(test_find_journaled_string_tree_del_occ_simple_block);
+    SEQAN_CALL_TEST(test_find_journaled_string_tree_fuzzy_occ_simple_block);
+
     SEQAN_CALL_TEST(test_find_journaled_string_tree_ref_occ_horspool);
     SEQAN_CALL_TEST(test_find_journaled_string_tree_snp_occ_horspool);
     SEQAN_CALL_TEST(test_find_journaled_string_tree_ins_occ_horspool);
     SEQAN_CALL_TEST(test_find_journaled_string_tree_del_occ_horspool);
     SEQAN_CALL_TEST(test_find_journaled_string_tree_fuzzy_occ_horspool);
+
+    SEQAN_CALL_TEST(test_find_journaled_string_tree_ref_occ_horspool_block);
+    SEQAN_CALL_TEST(test_find_journaled_string_tree_snp_occ_horspool_block);
+    SEQAN_CALL_TEST(test_find_journaled_string_tree_ins_occ_horspool_block);
+    SEQAN_CALL_TEST(test_find_journaled_string_tree_del_occ_horspool_block);
+    SEQAN_CALL_TEST(test_find_journaled_string_tree_fuzzy_occ_horspool_block);
 
     SEQAN_CALL_TEST(test_find_journaled_string_tree_ref_occ_shift_and);
     SEQAN_CALL_TEST(test_find_journaled_string_tree_snp_occ_shift_and);
@@ -67,11 +79,23 @@ SEQAN_BEGIN_TESTSUITE(find_journaled_string_tree)
     SEQAN_CALL_TEST(test_find_journaled_string_tree_del_occ_shift_and);
     SEQAN_CALL_TEST(test_find_journaled_string_tree_fuzzy_occ_shift_and);
 
+    SEQAN_CALL_TEST(test_find_journaled_string_tree_ref_occ_shift_and_block);
+    SEQAN_CALL_TEST(test_find_journaled_string_tree_snp_occ_shift_and_block);
+    SEQAN_CALL_TEST(test_find_journaled_string_tree_ins_occ_shift_and_block);
+    SEQAN_CALL_TEST(test_find_journaled_string_tree_del_occ_shift_and_block);
+    SEQAN_CALL_TEST(test_find_journaled_string_tree_fuzzy_occ_shift_and_block);
+
     SEQAN_CALL_TEST(test_find_journaled_string_tree_ref_occ_shift_or);
     SEQAN_CALL_TEST(test_find_journaled_string_tree_snp_occ_shift_or);
     SEQAN_CALL_TEST(test_find_journaled_string_tree_ins_occ_shift_or);
     SEQAN_CALL_TEST(test_find_journaled_string_tree_del_occ_shift_or);
     SEQAN_CALL_TEST(test_find_journaled_string_tree_fuzzy_occ_shift_or);
+
+    SEQAN_CALL_TEST(test_find_journaled_string_tree_ref_occ_shift_or_block);
+    SEQAN_CALL_TEST(test_find_journaled_string_tree_snp_occ_shift_or_block);
+    SEQAN_CALL_TEST(test_find_journaled_string_tree_ins_occ_shift_or_block);
+    SEQAN_CALL_TEST(test_find_journaled_string_tree_del_occ_shift_or_block);
+    SEQAN_CALL_TEST(test_find_journaled_string_tree_fuzzy_occ_shift_or_block);
 
     SEQAN_CALL_TEST(test_find_journaled_string_tree_ref_occ_myers_ukkonen_infix_0_errors);
     SEQAN_CALL_TEST(test_find_journaled_string_tree_ref_occ_myers_ukkonen_infix_3_errors);
@@ -83,6 +107,17 @@ SEQAN_BEGIN_TESTSUITE(find_journaled_string_tree)
     SEQAN_CALL_TEST(test_find_journaled_string_tree_del_occ_myers_ukkonen_infix_3_errors);
     SEQAN_CALL_TEST(test_find_journaled_string_tree_fuzzy_occ_myers_ukkonen_infix_0_errors);
     SEQAN_CALL_TEST(test_find_journaled_string_tree_fuzzy_occ_myers_ukkonen_infix_3_errors);
+
+    SEQAN_CALL_TEST(test_find_journaled_string_tree_ref_occ_myers_ukkonen_infix_0_errors_block);
+    SEQAN_CALL_TEST(test_find_journaled_string_tree_ref_occ_myers_ukkonen_infix_3_errors_block);
+    SEQAN_CALL_TEST(test_find_journaled_string_tree_snp_occ_myers_ukkonen_infix_0_errors_block);
+    SEQAN_CALL_TEST(test_find_journaled_string_tree_snp_occ_myers_ukkonen_infix_3_errors_block);
+    SEQAN_CALL_TEST(test_find_journaled_string_tree_ins_occ_myers_ukkonen_infix_0_errors_block);
+    SEQAN_CALL_TEST(test_find_journaled_string_tree_ins_occ_myers_ukkonen_infix_3_errors_block);
+    SEQAN_CALL_TEST(test_find_journaled_string_tree_del_occ_myers_ukkonen_infix_0_errors_block);
+    SEQAN_CALL_TEST(test_find_journaled_string_tree_del_occ_myers_ukkonen_infix_3_errors_block);
+    SEQAN_CALL_TEST(test_find_journaled_string_tree_fuzzy_occ_myers_ukkonen_infix_0_errors_block);
+    SEQAN_CALL_TEST(test_find_journaled_string_tree_fuzzy_occ_myers_ukkonen_infix_3_errors_block);
 
 }
 SEQAN_END_TESTSUITE

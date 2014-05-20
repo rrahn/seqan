@@ -109,7 +109,8 @@ bool _runTest(TMockGenerator & mockGen,
               int seqBase,
               unsigned patternPos,
               unsigned patternLength,
-              int /*numErrors*/)
+              int /*numErrors*/,
+              unsigned blockSize)
 {
     using namespace seqan;
 
@@ -139,6 +140,10 @@ bool _runTest(TMockGenerator & mockGen,
 
     FindResultsTester_<TPosition> delegate(length(mockGen._seqData));
     TContainer jst(host(mockGen._seqData), mockGen._varStore);
+
+    if (blockSize > 0u)
+        setBlockSize(jst, blockSize);
+
     TFinder finder(jst);
     find(finder, pattern, delegate);
 
@@ -173,7 +178,8 @@ bool _runTest(TMockGenerator & mockGen,
               int seqBase,
               unsigned patternPos,
               unsigned patternLength,
-              int numErrors)
+              int numErrors,
+              unsigned blockSize)
 {
     using namespace seqan;
 
@@ -224,6 +230,8 @@ bool _runTest(TMockGenerator & mockGen,
 
     FindResultsTester_<TPosition> delegate(length(mockGen._seqData));
     TContainer jst(host(mockGen._seqData), mockGen._varStore);
+    if (blockSize > 0u)
+        setBlockSize(jst, blockSize);
     TFinder finder(jst);
     find(finder, pattern, delegate, numErrors);
 
@@ -263,15 +271,13 @@ bool _configureTest(seqan::Dna /*alphabet*/,
                     int seqBase,
                     unsigned patternPos,
                     unsigned patternLength,
-                    int numErrors = 0)
+                    int numErrors = 0,
+                    unsigned blockSize = 0u)
 {
     using namespace seqan;
 
-//    typedef String<Dna, Journaled<Alloc<>, SortedArray > > TJournalString;
-//    typedef Host<TJournalString>::Type THost;
     typedef String<MockVariantData<Dna> > TVarData;
     typedef String<String<bool, Packed<> > > TCovData;
-
     typedef MockGenerator_<unsigned, Dna> TMockGenerator;
 
     TVarData varData;
@@ -283,7 +289,7 @@ bool _configureTest(seqan::Dna /*alphabet*/,
     // Generate the mock for the current configuration.
     mockGen.generate(varData, covData, 110);
 
-    return _runTest(mockGen, Dna(), TAlgorithm(), seqBase, patternPos, patternLength, numErrors);
+    return _runTest(mockGen, Dna(), TAlgorithm(), seqBase, patternPos, patternLength, numErrors, blockSize);
 }
 
 template <typename TAlgorithm>
@@ -295,7 +301,8 @@ bool _configureTest(char /*alphabet*/,
                     int seqBase,
                     unsigned patternPos,
                     unsigned patternLength,
-                    int numErros = 0)
+                    int numErros = 0,
+                    unsigned blockSize = 0u)
 {
     using namespace seqan;
 
@@ -315,7 +322,7 @@ bool _configureTest(char /*alphabet*/,
     // Generate the mock for the current configuration.
     mockGen.generate(varData, covData, 110);
 
-    return _runTest(mockGen, char(), TAlgorithm(), seqBase, patternPos, patternLength, numErros);
+    return _runTest(mockGen, char(), TAlgorithm(), seqBase, patternPos, patternLength, numErros, blockSize);
 }
 
 #endif  // EXTRAS_TESTS_FIND_JOURNALED_STRING_TREE_TEST_FIND_JOURNALED_STRING_TREE_COMPARE_RESULTS_H_
