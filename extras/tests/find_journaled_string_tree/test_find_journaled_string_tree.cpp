@@ -34,6 +34,8 @@
 // Test suite for data parallel finder.
 // ==========================================================================
 
+//#define DEBUG_DATA_PARALLEL
+
 #include <seqan/basic.h>
 
 #include "../journaled_string_tree/test_journaled_string_tree_mock_generator.h"
@@ -44,7 +46,6 @@
 #include "test_find_journaled_string_tree_shift_and.h"
 #include "test_find_journaled_string_tree_shift_or.h"
 #include "test_find_journaled_string_tree_myers.h"
-
 
 SEQAN_BEGIN_TESTSUITE(find_journaled_string_tree)
 {

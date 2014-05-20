@@ -37,7 +37,6 @@
 #ifndef EXTRAS_TESTS_FIND_JOURNALED_STRING_TREE_TEST_FIND_JOURNALED_STRING_TREE_COMPARE_RESULTS_H_
 #define EXTRAS_TESTS_FIND_JOURNALED_STRING_TREE_TEST_FIND_JOURNALED_STRING_TREE_COMPARE_RESULTS_H_
 
-
 #include <algorithm>
 #include <seqan/basic.h>
 #include <seqan/journaled_set.h>
@@ -77,6 +76,31 @@ struct FindResultsTester_
     }
 };
 
+template <typename TMock, typename TJst, typename TNdl, typename TTheirHits, typename TMyHits, typename TIdx>
+void
+_printDebugInfo(TMock const & mockGen, TJst const & jst, TNdl const & ndl,
+                TTheirHits const & theirHits, TMyHits const & myHits, TIdx const & idx)
+{
+    std::cout << "\nTheir Hits for " << idx<< std::endl;
+
+    for (unsigned j = 0; j < length(theirHits); ++j)
+        std::cout << theirHits[j] << ", ";
+
+    std::cout << "\nMy Hits for " << idx << std::endl;
+    for (unsigned j = 0; j < length(myHits[idx]); ++j)
+        std::cout << myHits[idx][j] << ", ";
+
+    std::cout << "\n\nSequences"<< std::endl;
+    std::cout << "Pattern: " << ndl << std::endl;
+    std::cout << "\nRef: " << host(mockGen._seqData) << "\n" << std::endl;
+
+    for (unsigned i = 0; i < length(mockGen._seqData); ++i)
+        std::cout << "Gen: " << mockGen._seqData[i] << std::endl;
+
+    std::cout << "\n" << std::endl;
+    for (unsigned i = 0; i < length(mockGen._seqData); ++i)
+        std::cout << "JST: " << stringSet(jst)[i] << std::endl;
+}
 
 template <typename TMockGenerator, typename TAlphabet, typename TAlgorithm>
 bool _runTest(TMockGenerator & mockGen,
@@ -203,17 +227,6 @@ bool _runTest(TMockGenerator & mockGen,
     TFinder finder(jst);
     find(finder, pattern, delegate, numErrors);
 
-//    std::cout << "Pattern: " << ndl << std::endl;
-//
-//    std::cout << "\nRef: " << host(mockGen._seqData) << "\n" << std::endl;
-//
-//    for (unsigned i = 0; i < length(mockGen._seqData); ++i)
-//        std::cout << "Gen: " << mockGen._seqData[i] << std::endl;
-//
-//    std::cout << "\n" << std::endl;
-//    for (unsigned i = 0; i < length(mockGen._seqData); ++i)
-//        std::cout << "JST: " << journalData(jst)[i] << std::endl;
-
     // Search over each sequence separately and find the pattern.
     for (unsigned i = 0; i < length(mockGen._seqData); ++i)
     {
@@ -226,11 +239,17 @@ bool _runTest(TMockGenerator & mockGen,
             appendValue(compareHits, position(standardFinder));
 
         if (length(compareHits) != length(delegate._hitStringSet[i]))
+        {
+            _printDebugInfo(mockGen, jst, ndl, compareHits, delegate._hitStringSet, i);
             return false;
+        }
 
         for (unsigned j = 0; j < length(compareHits); ++j)
             if (compareHits[j] != delegate._hitStringSet[i][j])
+            {
+                _printDebugInfo(mockGen, jst, ndl, compareHits, delegate._hitStringSet, i);
                 return false;
+            }
     }
     return true;
 }
