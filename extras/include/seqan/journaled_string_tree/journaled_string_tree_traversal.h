@@ -1617,7 +1617,7 @@ void _traverseBranchWithAlt(JstTraverser<TContainer, TState, JstTraverserSpec<Co
             TIndel & indel = deltaIndel(traverser._branchNodeIt);
             nextBranch._proxyEndPosDiff = indel.i1;
             nextBranch._proxyEndPosDiff -= static_cast<int>(length(indel.i2));
-            contextSizeRight += length(indel.i2);
+            contextSizeRight += length(indel.i2) - 1;
             if (indel.i1 > 1)
             {
                 nextBranch._mappedHostPos += indel.i1 - 1;  // Moves right by the size of the deletion.
