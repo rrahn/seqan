@@ -1914,8 +1914,9 @@ _execTraversal(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPositio
     std::cerr << "--- position: " << position(contextBegin(traverser, StateTraverseMaster())) << std::endl;
 #endif
     }
+
     // Synchronize master coverage in the end.
-    _updateMergePoints(traverser._mergePointStack, position(contextBegin(traverser, StateTraverseMaster())));
+    _updateMergePoints(traverser._mergePointStack, _contextBeginPosition(traverser, StateTraverseMaster()));
     transform(traverser._activeMasterCoverage, traverser._activeMasterCoverage,
               traverser._mergePointStack._mergeCoverage,
               FunctorNested<FunctorBitwiseAnd, FunctorIdentity, FunctorBitwiseNot>());

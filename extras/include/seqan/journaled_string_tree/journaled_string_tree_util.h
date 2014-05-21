@@ -237,8 +237,9 @@ _updateMergePoints(MergePointMap_<TVariantMap> & mergePointStack,
     typedef typename Value<TMergePointStack>::Type TMergePoint;
     typedef typename TMergePointStack::TMergePoints const TMergePoints;
     typedef typename Iterator<TMergePoints const, Standard>::Type TMergePointIt;
+    typedef typename MakeSigned<TPosition>::Type TSignedPos;
 
-    if (length(mergePointStack._mergePoints) == 1u)
+    if (length(mergePointStack._mergePoints) == 1u || static_cast<TSignedPos>(pos) < 0)
         return false;
 
     TMergePoint tmp(pos, 0);
