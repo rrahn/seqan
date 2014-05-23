@@ -32,7 +32,13 @@
 // Author: Rene Rahn <rene.rahn@fu-berlin.de>
 // ==========================================================================
 
+#ifdef SEQAN_ENABLE_DEBUG
+#undef SEQAN_ENABLE_DEBUG
+#endif
+#define SEQAN_ENABLE_DEBUG 0
+
 #include <string>
+#include <vector>
 #include <sstream>
 #include <pthread.h>
 #include <stdio.h>
@@ -52,6 +58,48 @@ using namespace seqan;
 // ==========================================================================
 // Classes
 // ==========================================================================
+
+template <typename TVariantMap>
+class MergePointMap_
+{
+public:
+    typedef unsigned TValue;
+    typedef String<bool, Packed<> > TDeltaCoverage;
+    typedef String<TValue> TMergePoints;
+
+    TVariantMap*            _varMapPtr;
+//    TDeltaCoverage
+    unsigned _mergeCoverage;
+    String<unsigned>    _mergePoints;  // Stores the reference position of the merge point
+
+    MergePointMap_() : _varMapPtr(NULL), _mergeCoverage(), _mergePoints()
+    {}
+
+    MergePointMap_(TVariantMap & map) : _varMapPtr(&map), _mergeCoverage(), _mergePoints()
+    {
+//        resize(_mergeCoverage, length(map), false, Exact());
+        _mergeCoverage = 2;
+        resize(_mergePoints, 1);
+//        resize(_mergePoints, length(map), TValue(2));
+    }
+
+    // Copy constructor.
+//    MergePointMap_(MergePointMap_ const & other)
+//    {
+//        _copy(*this, other);
+//    }
+//
+//    // Assignment Operator.
+//    MergePointMap_ & operator=(MergePointMap_ const & other)
+//    {
+//        if (this != &other)
+//        {
+//
+//        }
+//
+//        return *this;
+//    }
+};
 
 struct ArtificialBeak
 {
@@ -126,148 +174,220 @@ struct WorkerFunctor
 // ==========================================================================
 // Functions
 // ==========================================================================
-
-template <typename TWorker>
-inline void _doWork(TWorker & worker)
-{
-//        std::cout << "DECREASE: " << length(queue) << std::endl;
-    CharString buff;
-    lexicalCast2(buff, omp_get_thread_num());
-    insert(buff, 0, "Thread ");
-    append(buff, ": Let me do this!\n");
-    worker.execBreak(buff);
-}
-
-
-template <typename TQueue, typename TList>
-inline void _master(TQueue & queue, TList const & breakPointList)
-{
-    typedef Pair<unsigned, ArtificialBeak> TPair;
-    ArtificialBeak shortBreak(0.05);
-    ArtificialBeak masterWorker;
-    unsigned queueSize = ((omp_get_num_threads() - 1) * 4) + 1;
-    unsigned lastPos = 0;
-    for (unsigned i = 0; i < length(breakPointList.breakPointString); ++i)
-    {
-            // The Master thread. -> Producer.
-        TPair pair = breakPointList.breakPointString[i];
-        for (unsigned j = lastPos; j < pair.i1; ++j)
-        {
-            shortBreak.execBreak(".");
-        }
-        appendValue(queue, pair.i2, Generous());
-
-        while(length(queue) > queueSize)
-        {
-            if (tryPopFront(masterWorker, queue, Parallel()))
-                _doWork(masterWorker);
-        }
-
-//        std::cout << "APPEND: " << length(queue) << std::endl;
-        lastPos = pair.i1;
-    }
-}
-
-template <typename TQueue, typename TWorkerArrays>
-inline void _workerIdle(TQueue & queue, TWorkerArrays & workers)
-{
-    printf("Thread %i: I slept well and are ready to work.\n", omp_get_thread_num());
-
-    while(popFront(workers[omp_get_thread_num()], queue))
-        _doWork(workers[omp_get_thread_num()]);
-}
-
-inline void
-traverse(BreakPointList const & breakPointList)
-{
-    typedef ConcurrentQueue<ArtificialBeak> TQueue;
-    TQueue queue;
-
-    ArtificialBeak workerBreak;
-    String<ArtificialBeak> workerArray;
-    resize(workerArray, omp_get_num_threads(), Exact());
-
-    SEQAN_OMP_PRAGMA(parallel)
-    {
-        // Single Producer -> master.
-        SEQAN_OMP_PRAGMA(master)
-        {
-            ScopedWriteLock<TQueue> writeLock(queue);
-
-            waitForWriters(queue, 1);  // Barrier for writers to set up.
-
-            _master(queue, breakPointList);
-        }  // At end of scope all locked writers are unlocked.
-
-        ScopedReadLock<TQueue> readLock(queue);
-        waitForFirstValue(queue);  // Barrier for reader to wait for writer.
-
-        SEQAN_OMP_PRAGMA(critical(cout))
-        {
-            printf("Thread %i: I slept well and are ready to work.\n", omp_get_thread_num());
-        }
-
-        while(popFront(workerArray[omp_get_thread_num()], queue))
-            _doWork(workerArray[omp_get_thread_num()]);
-
-        SEQAN_OMP_PRAGMA(critical(cout))
-        {
-            printf("Thread %i: I am tired and go home.\n", omp_get_thread_num());
-        }
-    }
-
-    if (!empty(queue))
-        std::cerr << "Back to work! There is still some' to do!!!" << std::endl;
-    else
-        std::cerr << "Great job! Enjoy your evening!" << std::endl;
+//
+//template <typename TWorker>
+//inline void _doWork(TWorker & worker)
+//{
+////        std::cout << "DECREASE: " << length(queue) << std::endl;
+//    CharString buff;
+//    lexicalCast2(buff, omp_get_thread_num());
+//    insert(buff, 0, "Thread ");
+//    append(buff, ": Let me do this!\n");
+//    worker.execBreak(buff);
+//}
+//
+//
+//template <typename TQueue, typename TList>
+//inline void _master(TQueue & queue, TList const & breakPointList)
+//{
+//    typedef Pair<unsigned, ArtificialBeak> TPair;
+//    ArtificialBeak shortBreak(0.05);
+//    ArtificialBeak masterWorker;
+//    unsigned queueSize = ((omp_get_num_threads() - 1) * 4) + 1;
 //    unsigned lastPos = 0;
-//
-//
-//        // Now we produce work and let it consume from some one.
-//
-//        {// Invoke parallel Worker
-//            Thread<WorkerFunctor> thread(pair.i2);
-//            thread.open();
+//    for (unsigned i = 0; i < length(breakPointList.breakPointString); ++i)
+//    {
+//            // The Master thread. -> Producer.
+//        TPair pair = breakPointList.breakPointString[i];
+//        for (unsigned j = lastPos; j < pair.i1; ++j)
+//        {
+//            shortBreak.execBreak(".");
 //        }
+//        appendValue(queue, pair.i2, Generous());
+//
+//        while(length(queue) > queueSize)
+//        {
+//            if (tryPopFront(masterWorker, queue, Parallel()))
+//                _doWork(masterWorker);
+//        }
+//
+////        std::cout << "APPEND: " << length(queue) << std::endl;
 //        lastPos = pair.i1;
 //    }
-}
+//}
+//
+//template <typename TQueue, typename TWorkerArrays>
+//inline void _workerIdle(TQueue & queue, TWorkerArrays & workers)
+//{
+//    printf("Thread %i: I slept well and are ready to work.\n", omp_get_thread_num());
+//
+//    while(popFront(workers[omp_get_thread_num()], queue))
+//        _doWork(workers[omp_get_thread_num()]);
+//}
+//
+//inline void
+//traverse(BreakPointList const & breakPointList)
+//{
+//    typedef ConcurrentQueue<ArtificialBeak> TQueue;
+//    TQueue queue;
+//
+//    ArtificialBeak workerBreak;
+//    String<ArtificialBeak> workerArray;
+//    resize(workerArray, omp_get_num_threads(), Exact());
+//
+//    SEQAN_OMP_PRAGMA(parallel)
+//    {
+//        // Single Producer -> master.
+//        SEQAN_OMP_PRAGMA(master)
+//        {
+//            ScopedWriteLock<TQueue> writeLock(queue);
+//
+//            waitForWriters(queue, 1);  // Barrier for writers to set up.
+//
+//            _master(queue, breakPointList);
+//        }  // At end of scope all locked writers are unlocked.
+//
+//        ScopedReadLock<TQueue> readLock(queue);
+//        waitForFirstValue(queue);  // Barrier for reader to wait for writer.
+//
+//        SEQAN_OMP_PRAGMA(critical(cout))
+//        {
+//            printf("Thread %i: I slept well and are ready to work.\n", omp_get_thread_num());
+//        }
+//
+//        while(popFront(workerArray[omp_get_thread_num()], queue))
+//            _doWork(workerArray[omp_get_thread_num()]);
+//
+//        SEQAN_OMP_PRAGMA(critical(cout))
+//        {
+//            printf("Thread %i: I am tired and go home.\n", omp_get_thread_num());
+//        }
+//    }
+//
+//    if (!empty(queue))
+//        std::cerr << "Back to work! There is still some' to do!!!" << std::endl;
+//    else
+//        std::cerr << "Great job! Enjoy your evening!" << std::endl;
+////    unsigned lastPos = 0;
+////
+////
+////        // Now we produce work and let it consume from some one.
+////
+////        {// Invoke parallel Worker
+////            Thread<WorkerFunctor> thread(pair.i2);
+////            thread.open();
+////        }
+////        lastPos = pair.i1;
+////    }
+//}
+//
+//void *PrintHello(void *threadid)
+//{
+//   long tid;
+//   tid = (long)threadid;
+//   printf("Hello World! It's me, thread #%ld!\n", tid);
+//   pthread_exit(NULL);
+//}
+//
+//struct PrintHelloFunctor
+//{
+//    long threadId;
+//
+//    PrintHelloFunctor()
+//    {}
+//
+//    PrintHelloFunctor(long id) : threadId(id)
+//    {}
+//
+//    void operator()()
+//    {
+//        if (threadId % 2 == 0)
+//        {
+//            ArtificialBeak breaker(1);
+//            breaker.execBreak("\nWho is waiting?\n");
+//        }
+//        printf("Hello World! It's me, thread #%ld!\n", threadId);
+//    }
+//};
 
-void *PrintHello(void *threadid)
+inline void _function()
 {
-   long tid;
-   tid = (long)threadid;
-   printf("Hello World! It's me, thread #%ld!\n", tid);
-   pthread_exit(NULL);
+    typedef String<char> TTest;
+//    typedef unsigned TTest;
+    typedef MergePointMap_<TTest> TMap;
+    typedef ConcurrentQueue<TTest> TQueue;
+
+    TTest test = "What a shit!";
+    TTest testB = "No shit at all!";
+
+
+    String<TTest> test2;
+//    test2.data_capacity = 10;
+    appendValue(test2, test, Exact());
+    appendValue(test2, test, Exact());
+    appendValue(test2, test, Exact());
+
+    String<TTest> test3;
+    appendValue(test3, testB, Exact());
+    appendValue(test3, testB, Exact());
+    appendValue(test3, testB, Exact());
+
+    replace(test2, 1, 2, test3);
+    replace(test2, 2, 5, test3);
+//    replace(test2, 0, 1, test3);
+//    replace(test2, 3, 5, test3);
+//    replace(test2, 3, 5, test3);
+//    replace(test2, 3, 5, test3);
+//    replace(test2, 3, 5, test3);
+//    replace(test2, 3, 5, test3);
+
+//    TQueue queue;
+//
+//    SEQAN_OMP_PRAGMA(parallel)
+//    {
+//
+//        if (omp_get_thread_num() == 0)
+//        {
+//            seqan::ScopedWriteLock<TQueue> writeLock(queue);
+//
+//            waitForWriters(queue, 1);
+//            for (unsigned i = 0; i < 5; ++i)
+//            {
+//                std::stringstream tmpStr;
+//                tmpStr << i;
+//                TTest copy = test;
+//                append(copy, tmpStr.str());
+//                appendValue(queue, copy);
+//            }
+//        }
+//
+//        seqan::ScopedReadLock<TQueue> readLock(queue);
+//        waitForFirstValue(queue);
+//        TTest threadLocalMap;
+//        while (popFront(threadLocalMap, queue, Parallel()))
+//        {
+//            SEQAN_OMP_PRAGMA(critical(cout))
+//            {
+//                printf("Thread %i is working!\n", omp_get_thread_num());
+//            }
+//        }
+//    }
+
+//    valueDestruct(begin(queue.data, Standard()));
+//
+//    std::cout << "That won't work" << std::endl;
+//    std::cout << *(begin(queue.data, Standard())) << std::endl;
+//    std::cout << "See!" << std::endl;
+//    queue.headPos = 1;
+//    std::cout << "Until here everything works" << std::endl;
 }
-
-struct PrintHelloFunctor
-{
-    long threadId;
-
-    PrintHelloFunctor()
-    {}
-
-    PrintHelloFunctor(long id) : threadId(id)
-    {}
-
-    void operator()()
-    {
-        if (threadId % 2 == 0)
-        {
-            ArtificialBeak breaker(1);
-            breaker.execBreak("\nWho is waiting?\n");
-        }
-        printf("Hello World! It's me, thread #%ld!\n", threadId);
-    }
-};
 // --------------------------------------------------------------------------
 // Function main()
 // --------------------------------------------------------------------------
 
 int main(int argc, char** argv)
 {
-    double progStart = sysTime();
+//    double progStart = sysTime();
     unsigned numThreads = 1;
     if (argc > 1)
     {
@@ -276,12 +396,13 @@ int main(int argc, char** argv)
         str >> numThreads;
     }
 
-    omp_set_num_threads(numThreads);
-    BreakPointList list;
+//    omp_set_num_threads(numThreads);
+//    BreakPointList list;
 
-    traverse(list);
+//    traverse(list);
+    _function();
 
-    std::cout << "Time needed: " << sysTime() - progStart << " s" << std::endl;
+//    std::cout << "Time needed: " << sysTime() - progStart << " s" << std::endl;
     return 0;
 
 //    typedef Thread<PrintHelloFunctor> TThread;
