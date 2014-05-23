@@ -142,6 +142,10 @@ public:
         SEQAN_ASSERT(empty(lock));
         SEQAN_ASSERT_EQ(writerCount, 0u);
 
+        TSize mask = roundSize - 1;
+        headPos &= mask;
+        tailPos &= mask;
+
         // wait for all pending readers to finish
         while (readerCount != 0)
         {}
