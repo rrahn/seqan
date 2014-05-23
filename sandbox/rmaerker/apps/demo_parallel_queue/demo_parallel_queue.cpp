@@ -71,7 +71,11 @@ struct ArtificialBeak
     {
         // Stops the process waiting for the given number of seconds.
         double startWatch = sysTime();
-        std::cout << message << std::flush;
+        SEQAN_OMP_PRAGMA(critical(cout))
+        {
+            std::cout << message << std::flush;
+        }
+
         while ((sysTime() - startWatch) < breakTime);
 
 
@@ -123,6 +127,18 @@ struct WorkerFunctor
 // Functions
 // ==========================================================================
 
+template <typename TWorker>
+inline void _doWork(TWorker & worker)
+{
+//        std::cout << "DECREASE: " << length(queue) << std::endl;
+    CharString buff;
+    lexicalCast2(buff, omp_get_thread_num());
+    insert(buff, 0, "Thread ");
+    append(buff, ": Let me do this!\n");
+    worker.execBreak(buff);
+}
+
+
 template <typename TQueue, typename TList>
 inline void _master(TQueue & queue, TList const & breakPointList)
 {
@@ -142,25 +158,14 @@ inline void _master(TQueue & queue, TList const & breakPointList)
         appendValue(queue, pair.i2, Generous());
 
         while(length(queue) > queueSize)
-            _doWork(queue, masterWorker);
+        {
+            if (tryPopFront(masterWorker, queue, Parallel()))
+                _doWork(masterWorker);
+        }
 
 //        std::cout << "APPEND: " << length(queue) << std::endl;
         lastPos = pair.i1;
     }
-}
-
-template <typename TQueue, typename TWorker>
-inline bool _doWork(TQueue & queue, TWorker & worker)
-{
-//        std::cout << "DECREASE: " << length(queue) << std::endl;
-    if (!tryPopFront(worker, queue, Parallel()))
-        return false;
-    CharString buff;
-    lexicalCast2(buff, omp_get_thread_num());
-    insert(buff, 0, "Thread ");
-    append(buff, ": Let me do this!\n");
-    worker.execBreak(buff);
-    return true;
 }
 
 template <typename TQueue, typename TWorkerArrays>
@@ -168,19 +173,15 @@ inline void _workerIdle(TQueue & queue, TWorkerArrays & workers)
 {
     printf("Thread %i: I slept well and are ready to work.\n", omp_get_thread_num());
 
-    while (true)
-    {
-        while(_doWork(queue, workers[omp_get_thread_num()]));
-        if (queue.writerCount == 0)
-            return;
-    }
+    while(popFront(workers[omp_get_thread_num()], queue))
+        _doWork(workers[omp_get_thread_num()]);
 }
 
 inline void
 traverse(BreakPointList const & breakPointList)
 {
-    ConcurrentQueue<ArtificialBeak> queue;
-    lockWriting(queue);
+    typedef ConcurrentQueue<ArtificialBeak> TQueue;
+    TQueue queue;
 
     ArtificialBeak workerBreak;
     String<ArtificialBeak> workerArray;
@@ -188,17 +189,31 @@ traverse(BreakPointList const & breakPointList)
 
     SEQAN_OMP_PRAGMA(parallel)
     {
-        // Single Producer.
+        // Single Producer -> master.
         SEQAN_OMP_PRAGMA(master)
-        _master(queue, breakPointList);
+        {
+            ScopedWriteLock<TQueue> writeLock(queue);
 
-        // Producer finished. Deregister the producer from the queue.
-        if (omp_get_thread_num() == 0)
-            unlockWriting(queue);
+            waitForWriters(queue, 1);  // Barrier for writers to set up.
 
-        // Multiple Consumers.
-        _workerIdle(queue, workerArray);
-        printf("Thread %i: I am tired and go home.\n", omp_get_thread_num());
+            _master(queue, breakPointList);
+        }  // At end of scope all locked writers are unlocked.
+
+        ScopedReadLock<TQueue> readLock(queue);
+        waitForFirstValue(queue);  // Barrier for reader to wait for writer.
+
+        SEQAN_OMP_PRAGMA(critical(cout))
+        {
+            printf("Thread %i: I slept well and are ready to work.\n", omp_get_thread_num());
+        }
+
+        while(popFront(workerArray[omp_get_thread_num()], queue))
+            _doWork(workerArray[omp_get_thread_num()]);
+
+        SEQAN_OMP_PRAGMA(critical(cout))
+        {
+            printf("Thread %i: I am tired and go home.\n", omp_get_thread_num());
+        }
     }
 
     if (!empty(queue))
