@@ -251,7 +251,6 @@ inline int _writeDataBlock(TStream & stream,
     {
         // Store the reference position.
         __uint32 deltaPos = *itDelta - lastRefPos;
-
         // Write SNP Data.
 //        TMappedDelta deltaInfo = mappedDelta(deltaMap, itDelta - itBegin);
         if (deltaType(itDelta) == DeltaType::DELTA_TYPE_SNP)

@@ -517,7 +517,7 @@ insert(DeltaMap<TValue, TAlphabet, TSpec> & deltaMap,
     typedef DeltaMap<TValue, TAlphabet, TSpec> TDeltaMap;
     typedef typename Position<TDeltaMap>::Type TPosition;
 
-    TPosition insPos = std::lower_bound(begin(deltaMap, Standard()), end(deltaMap, Standard()), key) -
+    TPosition insPos = std::upper_bound(begin(deltaMap, Standard()), end(deltaMap, Standard()), key) -
                        begin(deltaMap, Standard());
     addCoverage(deltaMap._deltaCoverageStore, deltaCoverage, insPos);
     _insert(deltaMap, key, insPos, delta);

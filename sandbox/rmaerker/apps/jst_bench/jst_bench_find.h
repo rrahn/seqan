@@ -71,13 +71,15 @@ struct HitCollector
     {
         typedef typename seqan::Positions<TTraverser>::Type TPosVec;
 
+        SEQAN_OMP_PRAGMA(critical(insert))
+        {
         TPosVec posVec = positions(finder);
         for (unsigned i = 0; i < length(posVec); ++i)
         {
             appendValue(hitPositionSet[posVec[i].i1], posVec[i].i2 + _vpBlock[posVec[i].i1]);
 //            std::cout << "Hit: " << posVec[i] << std::endl;
         }
-
+        }
     }
 
 //    void print()
@@ -723,7 +725,10 @@ int _findPatternOnline(JournaledStringTree<TDeltaMap, TStringTreeSpec> & stringT
     setHost(pattern, needle);
     TFinder finder(stringTree);
 
-    find(finder, pattern, hitCollector, findOptions.k);
+    if (findOptions.numThreads > 1)
+        find(finder, pattern, hitCollector, findOptions.k, Parallel());
+    else
+        find(finder, pattern, hitCollector, findOptions.k, Parallel());
     std::cout << "Time for find: " << sysTime() - timeBlockAll << " s." << std::endl;
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////

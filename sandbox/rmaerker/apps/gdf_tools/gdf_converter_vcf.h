@@ -144,7 +144,6 @@ inline void _resolveConflicts(DeltaMap<TValue, TAlphabet, TSpec> & varStore)
     TStoreIter itEnd = end(varStore, Standard());
     for (;it != itEnd; ++it)
     {
-//        TMappedDelta deltaInfoOuter = mappedDelta(varStore, it - itBegin);
         if (deltaType(it) == DeltaType::DELTA_TYPE_DEL)
         {  // Resolve all variants that fall into a previously deleted region.
             TPosition endPoint = deltaDel(it) + *it;

@@ -114,9 +114,9 @@ readFinderOptions(FindOptions & options, ArgumentParser const & parser)
     getOptionValue(options.referenceFile, parser, "reference");
     getOptionValue(options.filePattern, parser, "pattern");
     getOptionValue(options.outputFile, parser, "output");
-//    getOptionValue(options.numThreads, parser, "threads");
+    getOptionValue(options.numThreads, parser, "threads");
     // Parallelize with OpenMp
-//    omp_set_num_threads(options.numThreads);   // TODO(rmaerker): Maybe we use it first later.
+    omp_set_num_threads(options.numThreads);   // TODO(rmaerker): Maybe we use it first later.
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Online search program options.
@@ -191,8 +191,8 @@ ArgumentParser::ParseResult _setupAndParseArguments(FindOptions & options,
     addOption(parser,ArgParseOption("o", "output", "Output file", ArgParseArgument::STRING));
     setRequired(parser, "output", true);
 
-//    addOption(parser, ArgParseOption("t", "threads", "Number of threads used for parallel processing.", ArgParseArgument::INTEGER));
-//    setDefaultValue(parser, "threads", "1");
+    addOption(parser, ArgParseOption("t", "threads", "Number of threads used for parallel processing.", ArgParseArgument::INTEGER));
+    setDefaultValue(parser, "threads", "1");
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Section Online Search.
