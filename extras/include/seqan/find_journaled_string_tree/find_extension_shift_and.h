@@ -155,9 +155,9 @@ struct GetState<FinderExtensionPoint<TFinder, ShiftAnd> const>
 // ----------------------------------------------------------------------------
 
 template <typename TContainer, typename TNeedle, typename TSpec>
-struct RegisteredExtensionPoint<Finder2<TContainer, Pattern<TNeedle, ShiftAnd>, Jst<TSpec> > >
+struct RegisteredExtensionPoint<Finder_<TContainer, Pattern<TNeedle, ShiftAnd>, Jst<TSpec> > >
 {
-    typedef Finder2<TContainer, Pattern<TNeedle, ShiftAnd>, Jst<TSpec> > TFinder_;
+    typedef Finder_<TContainer, Pattern<TNeedle, ShiftAnd>, Jst<TSpec> > TFinder_;
     typedef FinderExtensionPoint<TFinder_, ShiftAnd> Type;
 };
 

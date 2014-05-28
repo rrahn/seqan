@@ -197,7 +197,7 @@ VALIDATE:
 	//validate current position
 	for (nit = nit_end; nit >= nit_begin; --nit)
 	{
-		if (*nit != *it_next)
+		if (*nit != getValue(it_next))
 		{//invalid!
 			goto MOVE_FURTHER;
 		}

@@ -248,10 +248,10 @@ struct RequireFullContext<FinderExtensionPoint<TFinder, MyersBitVector> > : Fals
 
 template <typename TContainer, typename TNeedle, typename TSpec, typename THasState, typename TFindBeginPatternSpec,
           typename TFinderSpec>
-struct RegisteredExtensionPoint<Finder2<TContainer, Pattern<TNeedle, Myers<TSpec, THasState, TFindBeginPatternSpec> >, Jst<TFinderSpec> > >
+struct RegisteredExtensionPoint<Finder_<TContainer, Pattern<TNeedle, Myers<TSpec, THasState, TFindBeginPatternSpec> >, Jst<TFinderSpec> > >
 {
     typedef Pattern<TNeedle, Myers<TSpec, THasState, TFindBeginPatternSpec> > TPattern_;
-    typedef Finder2<TContainer, TPattern_, Jst<TSpec> > TFinder_;
+    typedef Finder_<TContainer, TPattern_, Jst<TSpec> > TFinder_;
     typedef FinderExtensionPoint<TFinder_, MyersBitVector> Type;
 };
 

@@ -111,10 +111,10 @@ template <typename TFinder>
 struct FunctorPigeonholeFilter_;
 
 template <typename THaystack, typename TIndex, typename TSpec>
-struct FunctorPigeonholeFilter_<Finder2<THaystack, Pattern<TIndex, Jst<Pigeonhole<TSpec> > >, Jst<Pigeonhole<TSpec> > > >
+struct FunctorPigeonholeFilter_<Finder_<THaystack, Pattern<TIndex, Jst<Pigeonhole<TSpec> > >, Jst<Pigeonhole<TSpec> > > >
 {
     typedef Pattern<TIndex, Jst<Pigeonhole<TSpec> > > TPattern;
-    typedef Finder2<THaystack, TPattern, Jst<Pigeonhole<TSpec> > > TFinder;
+    typedef Finder_<THaystack, TPattern, Jst<Pigeonhole<TSpec> > > TFinder;
 
     TPattern & _pattern;
 
@@ -201,9 +201,9 @@ struct FunctorPigeonholeFilter_<Finder2<THaystack, Pattern<TIndex, Jst<Pigeonhol
 // ============================================================================
 
 template <typename THaystack, typename TPattern, typename TSpec>
-struct FinderFunctor<Finder2<THaystack, TPattern, Jst<Pigeonhole<TSpec> > > >
+struct FinderFunctor<Finder_<THaystack, TPattern, Jst<Pigeonhole<TSpec> > > >
 {
-    typedef FunctorPigeonholeFilter_<Finder2<THaystack, TPattern, Jst<Pigeonhole<TSpec> > > > Type;
+    typedef FunctorPigeonholeFilter_<Finder_<THaystack, TPattern, Jst<Pigeonhole<TSpec> > > > Type;
 };
 
 // ----------------------------------------------------------------------------
@@ -211,14 +211,14 @@ struct FinderFunctor<Finder2<THaystack, TPattern, Jst<Pigeonhole<TSpec> > > >
 // ----------------------------------------------------------------------------
 
 template <typename THaystack, typename TPattern, typename TSpec>
-struct InitStateForFinder<Finder2<THaystack, TPattern, Jst<Pigeonhole<TSpec> > > >
+struct InitStateForFinder<Finder_<THaystack, TPattern, Jst<Pigeonhole<TSpec> > > >
 {
     typedef FinderInitializationState<Pigeonhole<TSpec> > Type;
 };
 
 template <typename THaystack, typename TPattern, typename TSpec>
-struct InitStateForFinder<Finder2<THaystack, TPattern, Jst<Pigeonhole<TSpec> > > const>  :
-    InitStateForFinder<Finder2<THaystack, TPattern, Jst<Pigeonhole<TSpec> > > >{};
+struct InitStateForFinder<Finder_<THaystack, TPattern, Jst<Pigeonhole<TSpec> > > const>  :
+    InitStateForFinder<Finder_<THaystack, TPattern, Jst<Pigeonhole<TSpec> > > >{};
 
 // ============================================================================
 // Functions
@@ -230,7 +230,7 @@ struct InitStateForFinder<Finder2<THaystack, TPattern, Jst<Pigeonhole<TSpec> > >
 
 template <typename THaystack, typename TIndex, typename TPatternSpec, typename TSpec, typename TIterator>
 inline bool
-needInitHash(Finder2<THaystack, Pattern<TIndex, Pigeonhole<TPatternSpec> >, Jst<Pigeonhole<TSpec> > > const & finder)
+needInitHash(Finder_<THaystack, Pattern<TIndex, Pigeonhole<TPatternSpec> >, Jst<Pigeonhole<TSpec> > > const & finder)
 {
     return finder._patternComp._isFirstQGram;
 }
@@ -241,12 +241,12 @@ needInitHash(Finder2<THaystack, Pattern<TIndex, Pigeonhole<TPatternSpec> >, Jst<
 
 template <typename THaystack, typename TIndex, typename TPatternSpec, typename TSpec, typename TIterator>
 inline typename ComputeState< typename GetTraverserForFinder_<
-                              Finder2<THaystack, Pattern<TIndex, Pigeonhole<TPatternSpec> >,
+                              Finder_<THaystack, Pattern<TIndex, Pigeonhole<TPatternSpec> >,
                               Jst<Pigeonhole<TSpec> > > >::Type>::Type
-compute(Finder2<THaystack, Pattern<TIndex, Pigeonhole<TPatternSpec> >, Jst<Pigeonhole<TSpec> > > & finder,
+compute(Finder_<THaystack, Pattern<TIndex, Pigeonhole<TPatternSpec> >, Jst<Pigeonhole<TSpec> > > & finder,
         TIterator const & iter)
 {
-    typedef Finder2<THaystack, Pattern<TIndex, Pigeonhole<TPatternSpec> >, Jst<Pigeonhole<TSpec> > > TFinder;
+    typedef Finder_<THaystack, Pattern<TIndex, Pigeonhole<TPatternSpec> >, Jst<Pigeonhole<TSpec> > > TFinder;
     typedef typename GetTraverserForFinder_<TFinder>::Type  TTraverser;
     typedef typename ComputeState<TTraverser>::Type         TComputeState;
     typedef typename Fibre<TIndex, QGramShape>::Type        TShape;

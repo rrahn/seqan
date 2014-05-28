@@ -52,7 +52,7 @@ namespace seqan {
 // ----------------------------------------------------------------------------
 
 template <typename TContainer, typename TNeedle, typename TSpec>
-class FinderExtensionPoint<Finder2<TContainer, Pattern<TNeedle, Simple>, TSpec>, Simple>
+class FinderExtensionPoint<Finder_<TContainer, Pattern<TNeedle, Simple>, TSpec>, Simple>
 {
 public:
 
@@ -90,9 +90,9 @@ public:
 // ----------------------------------------------------------------------------
 
 template <typename TContainer, typename TNeedle, typename TSpec>
-struct RegisteredExtensionPoint<Finder2<TContainer, Pattern<TNeedle, Simple>, Jst<TSpec> > >
+struct RegisteredExtensionPoint<Finder_<TContainer, Pattern<TNeedle, Simple>, Jst<TSpec> > >
 {
-    typedef Finder2<TContainer, Pattern<TNeedle, Simple>, Jst<TSpec> > TFinder_;
+    typedef Finder_<TContainer, Pattern<TNeedle, Simple>, Jst<TSpec> > TFinder_;
     typedef FinderExtensionPoint<TFinder_, Simple> Type;
 };
 

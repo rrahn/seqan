@@ -141,7 +141,7 @@ template <typename T>
 struct GetPattern;
 
 template <typename TContainer, typename TPattern, typename TSpec>
-struct GetPattern<Finder2<TContainer, TPattern, TSpec> >
+struct GetPattern<Finder_<TContainer, TPattern, TSpec> >
 {
     typedef TPattern Type;
 };
@@ -154,8 +154,8 @@ template <typename TFinder>
 struct RegisteredExtensionPoint{};
 
 template <typename TContainer, typename TPattern, typename TSpec>
-struct RegisteredExtensionPoint<Finder2<TContainer, TPattern, TSpec> const > :
-    RegisteredExtensionPoint<Finder2<TContainer, TPattern, TSpec> >{};
+struct RegisteredExtensionPoint<Finder_<TContainer, TPattern, TSpec> const > :
+    RegisteredExtensionPoint<Finder_<TContainer, TPattern, TSpec> >{};
 
 // ----------------------------------------------------------------------------
 // Metafunction ExtensionRegistry_

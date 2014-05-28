@@ -119,7 +119,7 @@ bool _runTest(TMockGenerator & mockGen,
     typedef JournaledStringTree<DeltaMap<unsigned, TAlphabet>, StringTreeDefault> TContainer;
 
     typedef Pattern<TNeedle, TAlgorithm> TPattern;
-    typedef Finder2<TContainer, TPattern, Jst<> > TFinder;
+    typedef Finder_<TContainer, TPattern, Jst<> > TFinder;
     typedef typename Position<TContainer>::Type TPosition;
 
     typedef typename TMockGenerator::TJournalSet TJournalSet;
@@ -188,7 +188,7 @@ bool _runTest(TMockGenerator & mockGen,
     typedef JournaledStringTree<DeltaMap<unsigned, TAlphabet>, StringTreeDefault> TContainer;
 
     typedef Pattern<TNeedle, Myers<TMyersSpec, THasState, TBeginSpec> > TPattern;
-    typedef Finder2<TContainer, TPattern, Jst<> > TFinder;
+    typedef Finder_<TContainer, TPattern, Jst<> > TFinder;
     typedef typename Position<TContainer>::Type TPosition;
 
     typedef typename TMockGenerator::TJournalSet TJournalSet;

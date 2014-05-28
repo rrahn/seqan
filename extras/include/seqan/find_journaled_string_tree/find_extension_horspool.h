@@ -105,9 +105,9 @@ struct ContextIteratorPosition<FinderExtensionPoint<TFinder, Horspool> >
 // ----------------------------------------------------------------------------
 
 template <typename TContainer, typename TNeedle, typename TSpec>
-struct RegisteredExtensionPoint<Finder2<TContainer, Pattern<TNeedle, Horspool>, Jst<TSpec> > >
+struct RegisteredExtensionPoint<Finder_<TContainer, Pattern<TNeedle, Horspool>, Jst<TSpec> > >
 {
-    typedef Finder2<TContainer, Pattern<TNeedle, Horspool>, Jst<TSpec> > TFinder_;
+    typedef Finder_<TContainer, Pattern<TNeedle, Horspool>, Jst<TSpec> > TFinder_;
     typedef FinderExtensionPoint<TFinder_, Horspool> Type;
 };
 
