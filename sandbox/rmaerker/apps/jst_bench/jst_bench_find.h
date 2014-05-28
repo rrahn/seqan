@@ -66,18 +66,20 @@ struct HitCollector
         resize(_vpBlock, size, 0, Exact());
     }
 
-    template <typename TFinder>
-    inline void operator()(TFinder & finder)
+    template <typename TTraverser>
+    inline void operator()(TTraverser & finder)
     {
-        typedef typename seqan::Position<TFinder>::Type TPosVec;
+        typedef typename seqan::Positions<TTraverser>::Type TPosVec;
 
-        TPosVec posVec = position(finder);
+        SEQAN_OMP_PRAGMA(critical(insert))
+        {
+        TPosVec posVec = positions(finder);
         for (unsigned i = 0; i < length(posVec); ++i)
         {
             appendValue(hitPositionSet[posVec[i].i1], posVec[i].i2 + _vpBlock[posVec[i].i1]);
 //            std::cout << "Hit: " << posVec[i] << std::endl;
         }
-
+        }
     }
 
 //    void print()
@@ -258,14 +260,14 @@ _checkCorrectAlgorithm(TStringTree & stringTree,
     typedef typename Value<THost>::Type TAlphabet;
 
     typedef Pattern<THost, TMethod> TPattern;
-    typedef Finder2<TStringTree, TPattern, DataParallel<TMethod> > TFinder;
+    typedef Finder_<TStringTree, TPattern, Jst<TMethod> > TFinder;
 
     typedef ContainerView<TJournalString> TJournalStringView;
     typedef Finder<TJournalStringView> TTestFinder;
 
     Rng<MersenneTwister> rng(findOptions.seed);
     TPdf wlPdf(findOptions.wlRange.i1, findOptions.wlRange.i2);
-    TPdf deltaPdf(0, length(branchNodeMap(stringTree)) - 1);
+//    TPdf deltaPdf(0, length(container(stringTree)) - 1);
     TPdf errorPdf(0, std::abs(findOptions.k));
 
     ResultWriter_ writer(findOptions.outputFile);
@@ -275,9 +277,9 @@ _checkCorrectAlgorithm(TStringTree & stringTree,
     TJournalSet compareSet;
     setHost(compareSet, host(stringSet(stringTree)));
     if (findOptions.numThreads > 1)
-        adaptTo(compareSet, branchNodeMap(stringTree), 0, length(branchNodeMap(stringTree)), Parallel());
+        adaptTo(compareSet, container(stringTree), 0, length(container(stringTree)), Parallel());
     else
-        adaptTo(compareSet, branchNodeMap(stringTree), 0, length(branchNodeMap(stringTree)), Serial());
+        adaptTo(compareSet, container(stringTree), 0, length(container(stringTree)), Serial());
 
     unsigned errCount = 0;
 
@@ -289,7 +291,7 @@ _checkCorrectAlgorithm(TStringTree & stringTree,
     if (findOptions.verbosity > 1)
         std::cout << "Time for Journal Generation: " << sysTime() - timeJournalGeneration << std::endl;
 
-    unsigned numExp = _min(length(branchNodeMap(stringTree)), findOptions.patternCount);
+    unsigned numExp = _min(length(container(stringTree)), findOptions.patternCount);
     for (unsigned i = 1; i < numExp; ++i)
     {
         std::cerr << "\n########### Experiment " << i <<  " #############" << std::endl;
@@ -298,7 +300,7 @@ _checkCorrectAlgorithm(TStringTree & stringTree,
         std::cerr << "WindowSize: " << windowLength << std::endl;
 
         unsigned deltaPos = i; //pickRandomNumber(rng, deltaPdf);
-        std::cerr << "Delta: " << deltaPos << " -> " << branchNodeMap(stringTree)._keys[deltaPos] << std::endl;
+        std::cerr << "Delta: " << deltaPos << " -> " << container(stringTree)._keys[deltaPos] << std::endl;
 
         unsigned err = pickRandomNumber(rng, errorPdf);
         std::cerr << "Errors in needle: " << err << std::endl;
@@ -306,17 +308,17 @@ _checkCorrectAlgorithm(TStringTree & stringTree,
         unsigned relBeginPos = pickRandomNumber(rng, TPdf(0, windowLength + err -1));
         std::cerr << "RelBeginPos: " << relBeginPos << std::endl;
 
-        if (testAllZeros(deltaCoverage(iter(branchNodeMap(stringTree), deltaPos, Standard()))))
+        if (testAllZeros(deltaCoverage(iter(container(stringTree), deltaPos, Standard()))))
         {
             std::cerr << "Zero coverage! Continue!" << std::endl;
             continue;
         }
-        unsigned proxyId = bitScanForward(deltaCoverage(iter(branchNodeMap(stringTree), deltaPos, Standard())));
+        unsigned proxyId = bitScanForward(deltaCoverage(iter(container(stringTree), deltaPos, Standard())));
         std::cerr << "Proxy ID: " << proxyId << std::endl;
         TJournalString & js = value(compareSet, proxyId);
         TJournalIter itJs = begin(js, Standard());
-        unsigned hostPos = branchNodeMap(stringTree)._keys[deltaPos];
-        _mapHostToVirtual(itJs, js, branchNodeMap(stringTree), proxyId, hostPos);
+        unsigned hostPos = container(stringTree)._keys[deltaPos];
+        _mapHostToVirtual(itJs, js, container(stringTree), proxyId, hostPos);
 
         int beginPos = position(itJs) - relBeginPos;
         std::cerr << "VirtBeginPos: " << beginPos << std::endl;
@@ -363,7 +365,7 @@ _checkCorrectAlgorithm(TStringTree & stringTree,
         std::stringstream patternLable;
         patternLable << "Needle Information\t";
         patternLable << "WindowSize: " << windowLength << "\t";
-        patternLable << "Delta: " << deltaPos << " -> " << branchNodeMap(stringTree)._keys[deltaPos] << "\t";
+        patternLable << "Delta: " << deltaPos << " -> " << container(stringTree)._keys[deltaPos] << "\t";
         patternLable << "BeginPos: " << beginPos << "\t";
         patternLable << "Proxy ID: " << proxyId << "\t";
         patternLable << "Needle: " << needle << "\t";
@@ -713,7 +715,7 @@ int _findPatternOnline(JournaledStringTree<TDeltaMap, TStringTreeSpec> & stringT
 {
     typedef JournaledStringTree<TDeltaMap, TStringTreeSpec> TStringTree;
     typedef Pattern<TNeedle, TSearchSpec> TPattern;
-    typedef Finder2<TStringTree, TPattern, DataParallel<> > TFinder;
+    typedef Finder_<TStringTree, TPattern, Jst<> > TFinder;
 
     // Now we can process only blocks of variants.
     double timeBlockAll = sysTime();
@@ -723,7 +725,10 @@ int _findPatternOnline(JournaledStringTree<TDeltaMap, TStringTreeSpec> & stringT
     setHost(pattern, needle);
     TFinder finder(stringTree);
 
-    find(finder, pattern, hitCollector, findOptions.k);
+    if (findOptions.numThreads > 1)
+        find(finder, pattern, hitCollector, findOptions.k, Parallel());
+    else
+        find(finder, pattern, hitCollector, findOptions.k, Parallel());
     std::cout << "Time for find: " << sysTime() - timeBlockAll << " s." << std::endl;
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -757,13 +762,13 @@ int _findPatternOnline(JournaledStringTree<TDeltaMap, TStringTreeSpec> & stringT
 //        finderStore[needleId]._needReinit = false;
 //    }
 //
-//    unsigned chunkSize = length(keys(branchNodeMap(stringTree)));
+//    unsigned chunkSize = length(keys(container(stringTree)));
 //    if (findOptions.chunkSize != -1)
 //        chunkSize = findOptions.chunkSize;
 //
 //    int refLength = length(host(journalData(stringTree)));
 //    // Load in blocks and then process patterns per block.
-//    unsigned varEnd = length(keys(branchNodeMap(stringTree)));
+//    unsigned varEnd = length(keys(container(stringTree)));
 //    unsigned lastBlock;
 //    if (chunkSize > 0)
 //        lastBlock = std::ceil(static_cast<double>(varEnd) / static_cast<double>(chunkSize));
@@ -774,7 +779,7 @@ int _findPatternOnline(JournaledStringTree<TDeltaMap, TStringTreeSpec> & stringT
 //    {
 //        double timeBlockLoad = sysTime();
 //        unsigned blockBegin = blockId * chunkSize;
-//        unsigned blockEnd = _min(length(keys(branchNodeMap(stringTree))), (blockId + 1) * chunkSize);
+//        unsigned blockEnd = _min(length(keys(container(stringTree))), (blockId + 1) * chunkSize);
 //
 //        // We built the journal for the current block here.
 //        setBlockBegin(stringTree, blockBegin);
@@ -787,20 +792,20 @@ int _findPatternOnline(JournaledStringTree<TDeltaMap, TStringTreeSpec> & stringT
 //        // We now initialize the block we are currently running.
 //        TPosition hostEndPos = length(host(journalData(stringTree)));
 //        if (blockId + 1 != lastBlock)
-//            hostEndPos = keys(branchNodeMap(stringTree))[blockEnd];
+//            hostEndPos = keys(container(stringTree))[blockEnd];
 //
 //        // Go over each pattern and search within the current block.
 //        for (unsigned j = 0; j < length(finderStore); ++j)
 //        {
 //            if (blockId == 0) // First initialization.
 //            {
-//                _initSegment(traverserStore[j], begin(branchNodeMap(stringTree), Rooted()) + blockBegin,
-//                             begin(branchNodeMap(stringTree), Rooted()) + blockEnd, 0, hostEndPos);
+//                _initSegment(traverserStore[j], begin(container(stringTree), Rooted()) + blockBegin,
+//                             begin(container(stringTree), Rooted()) + blockEnd, 0, hostEndPos);
 //            }
 //            else  // Reinit the master and the branch node end.
 //            {
 //                traverserStore[j]._masterItEnd = begin(host(journalData(stringTree)), Rooted()) + hostEndPos;
-//                traverserStore[j]._branchNodeItEnd = begin(branchNodeMap(stringTree), Rooted()) + blockEnd;
+//                traverserStore[j]._branchNodeItEnd = begin(container(stringTree), Rooted()) + blockEnd;
 //            }
 //
 //            traverse(traverserStore[j], finderStore[j], collectorStore[j]);
@@ -1152,7 +1157,7 @@ int _findPattern(FindOptions const & findOptions,
 //        setHost(pattern, needle);
 //        _patternInit(pattern);
 //
-//        Finder2<TStringTree, TPattern, DataParallel<> > finder2(stringTree, pattern);
+//        Finder_<TStringTree, TPattern, Jst<> > finder2(stringTree, pattern);
 //
 //        double time = sysTime();
 //        find(finder2, pattern, hitCollector);

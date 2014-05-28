@@ -1,0 +1,12 @@
+Name: find_journaled_string_tree
+Author: Rene Rahn <rene.rahn@fu-berlin.de>
+Maintainer: Rene Rahn <rene.rahn@fu-berlin.de>
+License: BSD 3-clause
+Copyright: 2008-2014, FU Berlin
+Status: under development
+Description: Finder for searching multiple sequences simultaneously.
+ This module implements a finder class that can be extended with
+ external algorithms by implementing the JstFinderExtensionConcept.
+ .
+ The finder is based on the traversal over a Journaled String Tree
+ and supports block-wise processing of the journaled strings.
