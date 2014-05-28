@@ -218,6 +218,20 @@ struct Value<ContainerView<TContainer, TSpec> const> :
     public Value<ContainerView<TContainer const, TSpec> > {};
 
 // ----------------------------------------------------------------------------
+// Metafunction Reference
+// ----------------------------------------------------------------------------
+
+template <typename TContainer, typename TSpec>
+struct Reference<ContainerView<TContainer, TSpec> >
+{
+    typedef typename Reference<TContainer>::Type Type;
+};
+
+template <typename TContainer, typename TSpec>
+struct Reference<ContainerView<TContainer, TSpec> const> :
+    public Reference<ContainerView<TContainer const, TSpec> > {};
+
+// ----------------------------------------------------------------------------
 // Metafunction GetValue
 // ----------------------------------------------------------------------------
 
