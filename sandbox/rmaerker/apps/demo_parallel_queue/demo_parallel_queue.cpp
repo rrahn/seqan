@@ -317,69 +317,38 @@ inline void _function()
     typedef MergePointMap_<TTest> TMap;
     typedef ConcurrentQueue<TTest> TQueue;
 
-    TTest test = "What a shit!";
-    TTest testB = "No shit at all!";
+    TTest test = "This is a simple test!";
+    TQueue queue;
 
+    SEQAN_OMP_PRAGMA(parallel)
+    {
 
-    String<TTest> test2;
-//    test2.data_capacity = 10;
-    appendValue(test2, test, Exact());
-    appendValue(test2, test, Exact());
-    appendValue(test2, test, Exact());
+        if (omp_get_thread_num() == 0)
+        {
+            seqan::ScopedWriteLock<TQueue> writeLock(queue);
 
-    String<TTest> test3;
-    appendValue(test3, testB, Exact());
-    appendValue(test3, testB, Exact());
-    appendValue(test3, testB, Exact());
+            waitForWriters(queue, 1);
+            for (unsigned i = 0; i < 5; ++i)
+            {
+                std::stringstream tmpStr;
+                tmpStr << i;
+                TTest copy = test;
+                append(copy, tmpStr.str());
+                appendValue(queue, copy);
+            }
+        }
 
-    replace(test2, 1, 2, test3);
-    replace(test2, 2, 5, test3);
-//    replace(test2, 0, 1, test3);
-//    replace(test2, 3, 5, test3);
-//    replace(test2, 3, 5, test3);
-//    replace(test2, 3, 5, test3);
-//    replace(test2, 3, 5, test3);
-//    replace(test2, 3, 5, test3);
-
-//    TQueue queue;
-//
-//    SEQAN_OMP_PRAGMA(parallel)
-//    {
-//
-//        if (omp_get_thread_num() == 0)
-//        {
-//            seqan::ScopedWriteLock<TQueue> writeLock(queue);
-//
-//            waitForWriters(queue, 1);
-//            for (unsigned i = 0; i < 5; ++i)
-//            {
-//                std::stringstream tmpStr;
-//                tmpStr << i;
-//                TTest copy = test;
-//                append(copy, tmpStr.str());
-//                appendValue(queue, copy);
-//            }
-//        }
-//
-//        seqan::ScopedReadLock<TQueue> readLock(queue);
-//        waitForFirstValue(queue);
-//        TTest threadLocalMap;
-//        while (popFront(threadLocalMap, queue, Parallel()))
-//        {
-//            SEQAN_OMP_PRAGMA(critical(cout))
-//            {
-//                printf("Thread %i is working!\n", omp_get_thread_num());
-//            }
-//        }
-//    }
-
-//    valueDestruct(begin(queue.data, Standard()));
-//
-//    std::cout << "That won't work" << std::endl;
-//    std::cout << *(begin(queue.data, Standard())) << std::endl;
-//    std::cout << "See!" << std::endl;
-//    queue.headPos = 1;
-//    std::cout << "Until here everything works" << std::endl;
+        seqan::ScopedReadLock<TQueue> readLock(queue);
+        waitForFirstValue(queue);
+        TTest threadLocalMap;
+        while (popFront(threadLocalMap, queue, Parallel()))
+        {
+            SEQAN_OMP_PRAGMA(critical(cout))
+            {
+                printf("Thread %i is working!\n", omp_get_thread_num());
+            }
+        }
+    }
 }
 // --------------------------------------------------------------------------
 // Function main()
