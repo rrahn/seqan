@@ -725,10 +725,9 @@ int _findPatternOnline(JournaledStringTree<TDeltaMap, TStringTreeSpec> & stringT
     setHost(pattern, needle);
     TFinder finder(stringTree);
 
-    if (findOptions.numThreads > 1)
-        find(finder, pattern, hitCollector, findOptions.k, Parallel());
-    else
-        find(finder, pattern, hitCollector, findOptions.k, Parallel());
+    find(finder, pattern, hitCollector, findOptions.k, findOptions.numThreads);
+//    else
+//        find(finder, pattern, hitCollector, findOptions.k, Parallel());
     std::cout << "Time for find: " << sysTime() - timeBlockAll << " s." << std::endl;
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////

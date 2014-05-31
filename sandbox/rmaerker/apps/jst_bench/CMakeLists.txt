@@ -41,6 +41,9 @@ target_link_libraries (jst_bench ${SEQAN_LIBRARIES})
 # Add CXX flags found by find_package (SeqAn).
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SEQAN_CXX_FLAGS}")
 
+# Enable OpenMP.
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+
 # ----------------------------------------------------------------------------
 # Installation
 # ----------------------------------------------------------------------------

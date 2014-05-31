@@ -343,29 +343,17 @@ init(FinderExtensionPoint<TFinder, TExtensionSpec> & extensionFunctor,
 }
 
 // ----------------------------------------------------------------------------
-// Function find()                                                     [Serial]
+// Function _find()
 // ----------------------------------------------------------------------------
-
-/*!
- * @fn JstFinder#find
- * @headerfile <seqan/find_journaled_string_tree.h>
- * @brief Triggers the search over the haystack.
- *
- * @signature find(finder, pattern, delegate[, limit]);
- *
- * @param[in,out]   finder      The finder which manages the search.
- * @param[in,out]   pattern     The pattern to be searched. Of type @link Pattern @endlink.
- * @param[in,out]   delegate    An additional functor called on success. See @link JstFinderExtensionConcept#execute @endlink.
- * @param[in]       limit       An optional parameter setting the score limit (<tt><= 0</tt>).
- */
 
 template <typename TContainer, typename TPattern, typename TSpec, typename TDelegate, typename TParallel>
 inline void
-find(Finder_<TContainer, TPattern, Jst<TSpec> > & finder,
-     TPattern & pattern,
-     TDelegate & delegate,
-     int scoreLimit,
-     Tag<TParallel> tag)
+_find(Finder_<TContainer, TPattern, Jst<TSpec> > & finder,
+      TPattern & pattern,
+      TDelegate & delegate,
+      int scoreLimit,
+      unsigned numThreads,
+      Tag<TParallel> tag)
 {
     typedef Finder_<TContainer, TPattern, Jst<TSpec> > TFinder;
     typedef typename GetJstTraverser<TFinder>::Type TTraverser;
@@ -386,7 +374,7 @@ find(Finder_<TContainer, TPattern, Jst<TSpec> > & finder,
         std::cerr << "Time-C: " << sysTime() - timeBuild << " s" << std::endl;
         double timeSearch = sysTime();
 #endif
-        traverse(finder, delegate, traverser, tag);
+        traverse(finder, delegate, traverser, numThreads);
 #ifdef PROFILE_JST_INTERN
         std::cerr << "Time-S: " << sysTime() - timeSearch << " s" << std::endl;
         timeBuild = sysTime();
@@ -394,14 +382,45 @@ find(Finder_<TContainer, TPattern, Jst<TSpec> > & finder,
     }
 }
 
-template <typename TContainer, typename TPattern, typename TSpec, typename TDelegate, typename TParallel>
+// ----------------------------------------------------------------------------
+// Function find()                                                     [Serial]
+// ----------------------------------------------------------------------------
+
+/*!
+ * @fn JstFinder#find
+ * @headerfile <seqan/find_journaled_string_tree.h>
+ * @brief Triggers the search over the haystack.
+ *
+ * @signature find(finder, pattern, delegate[, limit]);
+ *
+ * @param[in,out]   finder      The finder which manages the search.
+ * @param[in,out]   pattern     The pattern to be searched. Of type @link Pattern @endlink.
+ * @param[in,out]   delegate    An additional functor called on success. See @link JstFinderExtensionConcept#execute @endlink.
+ * @param[in]       limit       An optional parameter setting the score limit (<tt><= 0</tt>).
+ */
+
+template <typename TContainer, typename TPattern, typename TSpec, typename TDelegate>
 inline void
 find(Finder_<TContainer, TPattern, Jst<TSpec> > & finder,
      TPattern & pattern,
      TDelegate & delegate,
-     Tag<TParallel> tag)
+     int scoreLimit,
+     unsigned numThreads)
 {
-    find(finder, pattern, delegate, 0, tag);
+    if (numThreads > 1)
+        _find(finder, pattern, delegate, scoreLimit, numThreads, Parallel());
+    else
+        _find(finder, pattern, delegate, scoreLimit, numThreads, Serial());
+}
+
+template <typename TContainer, typename TPattern, typename TSpec, typename TDelegate>
+inline void
+find(Finder_<TContainer, TPattern, Jst<TSpec> > & finder,
+     TPattern & pattern,
+     TDelegate & delegate,
+     unsigned numThreads)
+{
+    find(finder, pattern, delegate, 0, numThreads);
 }
 
 template <typename TContainer, typename TPattern, typename TSpec, typename TDelegate>
@@ -411,7 +430,7 @@ find(Finder_<TContainer, TPattern, Jst<TSpec> > & finder,
      TDelegate & delegate,
      int scoreLimit)
 {
-    find(finder, pattern, delegate, scoreLimit, Serial());
+    find(finder, pattern, delegate, scoreLimit, 1);
 }
 
 template <typename TContainer, typename TPattern, typename TSpec, typename TDelegate>
