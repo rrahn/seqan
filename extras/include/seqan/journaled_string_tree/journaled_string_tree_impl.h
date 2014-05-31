@@ -371,7 +371,6 @@ _doJournalBlock(JournaledStringTree<TDeltaMap, TSpec> const & jst,
                 Tag<TParallelTag> parallelTag = Serial())
 {
     typedef JournaledStringTree<TDeltaMap, TSpec > TJst;
-    typedef typename Iterator<TDeltaMap, Standard>::Type TMapIterator;
     typedef typename Iterator<TDeltaMap const, Standard>::Type TConstMapIterator;
 
     typedef typename DeltaCoverage<TDeltaMap>::Type TBitVec;

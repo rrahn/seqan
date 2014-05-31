@@ -441,7 +441,7 @@ SEQAN_BEGIN_TESTSUITE(test_journaled_string_tree)
 #if defined(_OPENMP)
     // Make sure parallelism is actually enabled.
     if (omp_get_max_threads() < 2)
-        omp_set_num_threads(2);
+        omp_set_num_threads(4);
 #endif
 
     // ----------------------------------------------------------------------------

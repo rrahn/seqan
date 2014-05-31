@@ -99,14 +99,14 @@ i += 1;
   #include <omp.h>
   #if defined(PLATFORM_WINDOWS_MINGW) || defined(PLATFORM_GCC)
     // GCC _Pragma operator
-    #define SEQAN_DO_PRAGMA(x) _Pragma(#x)
-    #define SEQAN_OMP_PRAGMA(x) SEQAN_DO_PRAGMA(omp x)
+    #define SEQAN_DO_PRAGMA(...) _Pragma(#__VA_ARGS__)
+    #define SEQAN_OMP_PRAGMA(...) SEQAN_DO_PRAGMA(omp __VA_ARGS__)
   #else  // #if defined(PLATFORM_WINDOWS_MINGW) || defined(PLATFORM_GCC)
     // MSVC __pragma-operator
-    #define SEQAN_OMP_PRAGMA(x) __pragma (omp x)
+    #define SEQAN_OMP_PRAGMA(...) __pragma (omp __VA_ARGS__)
   #endif // #if defined(PLATFORM_WINDOWS_MINGW) || defined(PLATFORM_GCC)
 #else  // #ifdef _OPENMP
-  #define SEQAN_OMP_PRAGMA(x)
+  #define SEQAN_OMP_PRAGMA(...)
 
   // low-level OpenMP runtime compatibility
   inline void omp_set_num_threads(int) {}

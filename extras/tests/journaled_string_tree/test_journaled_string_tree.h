@@ -459,14 +459,14 @@ SEQAN_DEFINE_TEST(test_journaled_string_tree_journal_next_block)
     deltaMap._deltaCoverageStore[4][3] = false;
 
     deltaMap._deltaCoverageStore[5][0] = false;
-    deltaMap._deltaCoverageStore[5][1] = false;
-    deltaMap._deltaCoverageStore[5][2] = true;
-    deltaMap._deltaCoverageStore[5][3] = false;
+    deltaMap._deltaCoverageStore[5][1] = true;
+    deltaMap._deltaCoverageStore[5][2] = false;
+    deltaMap._deltaCoverageStore[5][3] = true;
 
     deltaMap._deltaCoverageStore[6][0] = false;
-    deltaMap._deltaCoverageStore[6][1] = true;
-    deltaMap._deltaCoverageStore[6][2] = false;
-    deltaMap._deltaCoverageStore[6][3] = true;
+    deltaMap._deltaCoverageStore[6][1] = false;
+    deltaMap._deltaCoverageStore[6][2] = true;
+    deltaMap._deltaCoverageStore[6][3] = false;
 
     deltaMap._deltaCoverageStore[7][0] = false;
     deltaMap._deltaCoverageStore[7][1] = true;
@@ -547,14 +547,14 @@ SEQAN_DEFINE_TEST(test_journaled_string_tree_virtual_block_position)
     deltaMap._deltaCoverageStore[4][3] = false;
 
     deltaMap._deltaCoverageStore[5][0] = false;
-    deltaMap._deltaCoverageStore[5][1] = false;
-    deltaMap._deltaCoverageStore[5][2] = true;
-    deltaMap._deltaCoverageStore[5][3] = false;
+    deltaMap._deltaCoverageStore[5][1] = true;
+    deltaMap._deltaCoverageStore[5][2] = false;
+    deltaMap._deltaCoverageStore[5][3] = true;
 
     deltaMap._deltaCoverageStore[6][0] = false;
-    deltaMap._deltaCoverageStore[6][1] = true;
-    deltaMap._deltaCoverageStore[6][2] = false;
-    deltaMap._deltaCoverageStore[6][3] = true;
+    deltaMap._deltaCoverageStore[6][1] = false;
+    deltaMap._deltaCoverageStore[6][2] = true;
+    deltaMap._deltaCoverageStore[6][3] = false;
 
     deltaMap._deltaCoverageStore[7][0] = false;
     deltaMap._deltaCoverageStore[7][1] = true;
