@@ -56,7 +56,23 @@ namespace seqan {
 // Metafunctions
 // ============================================================================
 
-// TODO(holtgrew): One could implement an HasAtomicFunction<T, Function> Metafunction but that would probably be pretty useless.
+#ifdef SEQAN_CXX11_STANDARD
+
+template <typename T>
+struct Atomic
+{
+    typedef std::atomic<T> Type;
+};
+
+#else
+
+template <typename T>
+struct Atomic
+{
+    typedef volatile T Type;
+};
+
+#endif
 
 // ============================================================================
 // Functions
@@ -328,6 +344,8 @@ atomic
 ..include:seqan/parallel.h
  */
 
+#define SEQAN_CACHE_LINE_SIZE 128
+
 #if defined(PLATFORM_WINDOWS) && !defined(PLATFORM_WINDOWS_MINGW)
 
 // ----------------------------------------------------------------------------
@@ -514,8 +532,8 @@ template <typename T>   inline T atomicInc(T          & x,             Serial)  
 template <typename T>   inline T atomicPostInc(T      & x,             Serial)      { return x++;                    }
 template <typename T>   inline T atomicDec(T          & x,             Serial)      { return --x;                    }
 template <typename T>   inline T atomicPostDec(T      & x,             Serial)      { return x--;                    }
-template <typename T>   inline T atomicOr (T          & x, T y,        Serial)      { return x = x | y;              }
-template <typename T>   inline T atomicXor(T          & x, T y,        Serial)      { return x = x ^ y;              }
+template <typename T>   inline T atomicOr (T          & x, T y,        Serial)      { return x |= y;                 }
+template <typename T>   inline T atomicXor(T          & x, T y,        Serial)      { return x ^= y;                 }
 // In serial mode, there is no other thread changing cmp except us
 template <typename T>   inline T atomicCas(T          & x, T cmp, T y, Serial)      { if (x == cmp) x = y; return x; }
 //template <typename T>   inline bool atomicCasBool(T   & x, T cmp, T y, Serial)      { if (x == cmp) { x = y; return true; } return false; }
@@ -533,6 +551,21 @@ template <typename T>   inline bool atomicCasBool(T volatile & x, T cmp, T y, Pa
 template <typename T1, typename T2>   inline T1 atomicAdd(T1          & x, T2 y, Serial)    { return x = x + y; }
 template <typename T1, typename T2>   inline T1 atomicAdd(T1 volatile & x, T2 y, Parallel)  { return atomicAdd(x, y); }
 
+
+// C++11 atomic wrappers
+
+#ifdef SEQAN_CXX11_STANDARD
+template <typename T>   inline T atomicInc(std::atomic<T>        & x     )        { return ++x;                    }
+template <typename T>   inline T atomicPostInc(std::atomic<T>    & x     )        { return x++;                    }
+template <typename T>   inline T atomicDec(std::atomic<T>        & x     )        { return --x;                    }
+template <typename T>   inline T atomicPostDec(std::atomic<T>    & x     )        { return x--;                    }
+template <typename T>   inline T atomicOr (std::atomic<T>        & x, T y)        { return x |= y;                 }
+template <typename T>   inline T atomicXor(std::atomic<T>        & x, T y)        { return x ^= y;                 }
+template <typename T>   inline T atomicCas(std::atomic<T>        & x, T cmp, T y, Serial)   { if (x == cmp) x = y;             return x;   }
+template <typename T>   inline T atomicCas(std::atomic<T>        & x, T cmp, T y, Parallel) { x.compare_exchange_weak(cmp, y); return cmp; }
+template <typename T>   inline bool atomicCasBool(std::atomic<T> & x, T    , T y, Serial)   { x = y; return true;                          }
+template <typename T>   inline bool atomicCasBool(std::atomic<T> & x, T cmp, T y, Parallel) { return x.compare_exchange_weak(cmp, y);      }
+#endif
 
 } // namespace seqan
 

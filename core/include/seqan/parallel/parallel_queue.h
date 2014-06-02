@@ -81,49 +81,43 @@ template <typename TValue, typename TSpec = void>
 class ConcurrentQueue
 {
 public:
-    typedef typename Host<ConcurrentQueue>::Type    TString;
-    typedef typename Size<TString>::Type            TSize;
+    typedef typename Host<ConcurrentQueue>::Type                TString;
+    typedef typename Size<TString>::Type                        TSize;
+    typedef typename Atomic<TSize>::Type                        TAtomicSize;
+    typedef typename IsSameType<TSpec, Limit>::Type             TFixedCapacity;
+    typedef typename If<TFixedCapacity, Serial, Parallel>::Type TLockTag;
 
     TString                 data;
-    mutable ReadWriteLock   lock;
+    mutable ReadWriteLock   lock;           char pad1[SEQAN_CACHE_LINE_SIZE - sizeof(ReadWriteLock)];
+    volatile size_t         readerCount;
+    volatile size_t         writerCount;
 
-#ifdef SEQAN_CXX11_STANDARD
-    std::atomic<TSize> headPos;
-    std::atomic<TSize> headReadPos;
-    std::atomic<TSize> tailPos;
-    std::atomic<TSize> tailWritePos;
-    std::atomic<TSize> roundSize;
-#else
-    volatile TSize headPos;
-    volatile TSize headReadPos;
-    volatile TSize tailPos;
-    volatile TSize tailWritePos;
-    TSize roundSize;
-#endif
-
-    volatile unsigned readerCount;
-    volatile unsigned writerCount;
-    volatile bool virgin;
+    TAtomicSize headPos;                    char pad4[SEQAN_CACHE_LINE_SIZE - sizeof(TAtomicSize)];
+    TAtomicSize headReadPos;                char pad5[SEQAN_CACHE_LINE_SIZE - sizeof(TAtomicSize)];
+    TAtomicSize tailPos;                    char pad6[SEQAN_CACHE_LINE_SIZE - sizeof(TAtomicSize)];
+    TAtomicSize tailWritePos;               char pad7[SEQAN_CACHE_LINE_SIZE - sizeof(TAtomicSize)];
+    TAtomicSize roundSize;                  char pad8[SEQAN_CACHE_LINE_SIZE - sizeof(TAtomicSize)];
+    Atomic<bool>::Type virgin;              char pad9[SEQAN_CACHE_LINE_SIZE - sizeof(Atomic<bool>::Type)];
 
     ConcurrentQueue() :
+        readerCount(0),
+        writerCount(0),
         headPos(0),
         headReadPos(0),
         tailPos(0),
         tailWritePos(0),
         roundSize(0),
-        readerCount(0),
-        writerCount(0),
         virgin(true)
     {}
 
     // you can set the initial capacity here
     ConcurrentQueue(TSize initCapacity) :
+        readerCount(0),
+        writerCount(0),
         headPos(0),
         headReadPos(0),
         tailPos(0),
         tailWritePos(0),
-        readerCount(0),
-        writerCount(0),
         virgin(true)
     {
         reserve(data, initCapacity + 1, Exact());
@@ -132,12 +126,12 @@ public:
 
     ConcurrentQueue(TString & data):
         data(data),
+        readerCount(0),
+        writerCount(0),
         headPos(0),
         headReadPos(0),
         tailPos(length(data)),
         tailWritePos(length(data)),
-        readerCount(0),
-        writerCount(0),
         virgin(true)
     {
         roundSize = (TSize)1 << (log2(capacity(data) - 1) + 1);
@@ -171,6 +165,10 @@ public:
         }
         _setLength(data, 0);
     }
+
+private:
+    ConcurrentQueue(ConcurrentQueue const &);
+    void operator= (ConcurrentQueue const &);
 };
 
 // ============================================================================
@@ -288,10 +286,9 @@ template <typename TValue>
 inline TValue
 _cyclicInc(TValue value, TValue modulo, TValue roundSize)
 {
-    TValue newVal = value + 1;
-    if ((newVal & (roundSize - 1)) >= modulo)
-        newVal += roundSize - modulo;
-    return newVal;
+    if ((++value & (roundSize - 1)) >= modulo)
+        value += roundSize - modulo;
+    return value;
 }
 
 // ----------------------------------------------------------------------------
@@ -313,7 +310,10 @@ template <typename TValue, typename TSpec>
 inline bool
 empty(ConcurrentQueue<TValue, TSpec> const & me)
 {
-    ScopedWriteLock<> writeLock(me.lock);
+	typedef ConcurrentQueue<TValue, TSpec>  TQueue;
+    typedef typename TQueue::TLockTag       TLockTag;
+
+    ScopedWriteLock<ReadWriteLock, TLockTag> writeLock(me.lock);
     return me.headPos == me.tailPos;
 }
 
@@ -336,9 +336,11 @@ template <typename TValue, typename TSpec>
 inline typename Size<ConcurrentQueue<TValue, TSpec> >::Type
 length(ConcurrentQueue<TValue, TSpec> const & me)
 {
-    typedef typename Size<ConcurrentQueue<TValue, TSpec> >::Type TSize;
+	typedef ConcurrentQueue<TValue, TSpec>  TQueue;
+    typedef typename TQueue::TLockTag       TLockTag;
+    typedef typename Size<TQueue>::Type     TSize;
 
-    ScopedWriteLock<> writeLock(me.lock);
+    ScopedWriteLock<ReadWriteLock, TLockTag> writeLock(me.lock);
     TSize mask = me.roundSize - 1;
     if ((me.headPos & mask) <= (me.tailPos & mask))
         return me.tailPos - me.headPos;
@@ -367,7 +369,10 @@ template <typename TValue, typename TSpec>
 inline typename Size<ConcurrentQueue<TValue, TSpec> >::Type
 capacity(ConcurrentQueue<TValue, TSpec> const & me)
 {
-    ScopedReadLock<> writeLock(me.lock);
+	typedef ConcurrentQueue<TValue, TSpec>  TQueue;
+    typedef typename TQueue::TLockTag       TLockTag;
+
+    ScopedReadLock<ReadWriteLock, TLockTag> writeLock(me.lock);
     return capacity(me.data) - 1;
 }
 
@@ -409,38 +414,40 @@ template <typename TValue2, typename TValue, typename TSpec, typename TParallel>
 inline bool
 tryPopFront(TValue2 & result, ConcurrentQueue<TValue, TSpec> & me, Tag<TParallel> parallelTag)
 {
-    typedef ConcurrentQueue<TValue, TSpec>              TQueue;
-    typedef typename Host<TQueue>::Type                 TString;
-    typedef typename Size<TString>::Type                TSize;
-    typedef typename Iterator<TString, Standard>::Type  TIter;
+	typedef ConcurrentQueue<TValue, TSpec>              TQueue;
+    typedef typename TQueue::TLockTag                   TLockTag;
+	typedef typename Host<TQueue>::Type                 TString;
+	typedef typename Size<TString>::Type                TSize;
+	typedef typename Iterator<TString, Standard>::Type  TIter;
 
-    ignoreUnusedVariableWarning(parallelTag);
+	// try to extract a value
+	ScopedReadLock<ReadWriteLock, TLockTag> readLock(me.lock);
 
-    // try to extract a value
-    ScopedReadLock<> readLock(me.lock);
+	TSize cap = capacity(me.data);
+	TSize roundSize = me.roundSize;
+	TSize headReadPos;
+	TSize newHeadReadPos;
+    SpinDelay spinDelay;
 
-    TSize cap = capacity(me.data);
-    TSize roundSize = me.roundSize;
-    TSize headReadPos;
-    TSize newHeadReadPos;
+	// wait for queue to become filled
+	while (true)
+    {
+		headReadPos = me.headReadPos;
+		TSize tailPos = me.tailPos;
 
-    // wait for queue to become filled
-    do {
-//        headReadPos = me.headReadPos;
-        headReadPos = me.headReadPos;
-	SEQAN_ASSERT_LEQ(headReadPos, me.tailPos);
-        
-        // return if queue is empty?
-        if (headReadPos == me.tailPos)
-            return false;
+        SEQAN_ASSERT_LEQ(headReadPos, tailPos);
 
-        newHeadReadPos = _cyclicInc(headReadPos, cap, roundSize);
-    }
-#ifdef SEQAN_CXX11_STANDARD
-    while (!me.headReadPos.compare_exchange_strong(headReadPos, newHeadReadPos));
-#else
-    while (!atomicCasBool(me.headReadPos, headReadPos, newHeadReadPos, parallelTag));
-#endif
+		// return if queue is empty
+		if (headReadPos == tailPos)
+			return false;
+
+		newHeadReadPos = _cyclicInc(headReadPos, cap, roundSize);
+
+        if (atomicCasBool(me.headReadPos, headReadPos, newHeadReadPos, parallelTag))
+            break;
+
+        waitFor(spinDelay);
+	}
 
     // extract value and destruct it in the data string
     TIter it = begin(me.data, Standard()) + (headReadPos & (roundSize - 1));
@@ -448,12 +455,7 @@ tryPopFront(TValue2 & result, ConcurrentQueue<TValue, TSpec> & me, Tag<TParallel
     valueDestruct(it);
 
     // wait for pending previous reads and synchronize headPos to headReadPos
-#ifdef SEQAN_CXX11_STANDARD
-    while (!me.headPos.compare_exchange_strong(headReadPos, newHeadReadPos));
-#else
-    while (!atomicCasBool(me.headPos, headReadPos, newHeadReadPos, parallelTag))
-#endif
-    {}
+    spinCas(me.headPos, headReadPos, newHeadReadPos);
 
     return true;
 }
@@ -488,8 +490,11 @@ template <typename TValue, typename TSpec>
 inline void
 waitForWriters(ConcurrentQueue<TValue, TSpec> & me, unsigned writerCount)
 {
+    SpinDelay spinDelay;
     while (me.writerCount < writerCount)
-    {}
+    {
+        waitFor(spinDelay);
+    }
     me.virgin = false;
 }
 
@@ -510,8 +515,7 @@ template <typename TValue, typename TSpec>
 inline void
 waitForFirstValue(ConcurrentQueue<TValue, TSpec> & me)
 {
-    while (me.virgin)
-    {}
+    spinWhileEq(me.virgin, true);
 }
 
 // ----------------------------------------------------------------------------
@@ -542,10 +546,13 @@ template <typename TValue, typename TSpec, typename TParallel>
 inline bool
 popFront(TValue & result, ConcurrentQueue<TValue, TSpec> & me, Tag<TParallel> parallelTag)
 {
+    SpinDelay spinDelay;
+
     while (me.writerCount != 0)
     {
         if (tryPopFront(result, me, parallelTag))
             return true;
+        waitFor(spinDelay);
     }
     // we have to give it another try if the queue was empty inside the loop
     // but after the check a writer pushes a value and zeroes the writerCount
@@ -581,8 +588,12 @@ inline TValue SEQAN_FORWARD_RETURN
 popFront(ConcurrentQueue<TValue, TSpec> & me, Tag<TParallel> parallelTag)
 {
     TValue result;
+    SpinDelay spinDelay;
+
     while (!tryPopFront(result, me, parallelTag))
-    {}
+    {
+        waitFor(spinDelay);
+    }
     return SEQAN_MOVE(result);
 }
 
@@ -617,55 +628,60 @@ _queueOverflow(ConcurrentQueue<TValue, TSpec> & me,
                TValue2 SEQAN_FORWARD_CARG val,
                Tag<TExpand> expandTag)
 {
-    typedef ConcurrentQueue<TValue, TSpec>              TQueue;
-    typedef typename Host<TQueue>::Type                 TString;
-    typedef typename Size<TString>::Type                TSize;
-    typedef typename Iterator<TString, Standard>::Type  TIter;
+    typedef ConcurrentQueue<TValue, TSpec>                  TQueue;
+    typedef typename TQueue::TLockTag                       TLockTag;
+    typedef typename Host<TQueue>::Type                     TString;
+    typedef typename Size<TString>::Type                    TSize;
+    typedef typename Iterator<TString, Standard>::Type      TIter;
+
+    bool queueIsResizable = IsSameType<TLockTag, Parallel>::VALUE;
+    ignoreUnusedVariableWarning(queueIsResizable);
+    SEQAN_ASSERT(queueIsResizable);
 
     // try to extend capacity
 
-    ScopedWriteLock<> writeLock(me.lock);
+    ScopedWriteLock<ReadWriteLock, TLockTag> writeLock(me.lock);
     TSize cap = capacity(me.data);
+    TSize roundSize = me.roundSize;
+    TSize headPos = me.headPos;
+    TSize tailPos = me.tailPos;
 
-    SEQAN_ASSERT_EQ(me.tailPos, me.tailWritePos);
-    SEQAN_ASSERT_EQ(me.headPos, me.headReadPos);
+    SEQAN_ASSERT_EQ(tailPos, me.tailWritePos);
+    SEQAN_ASSERT_EQ(headPos, me.headReadPos);
 
     bool valueWasAppended = false;
 
     // did we reach the capacity limit (another thread could have done the upgrade already)?
-#ifdef SEQAN_CXX11_STANDARD
-    if (_cyclicInc(me.tailPos.load(), cap, me.roundSize.load()) >= me.headPos.load() + me.roundSize.load())
-#else
-    if (_cyclicInc(me.tailPos, cap, me.roundSize) >= me.headPos + me.roundSize)
-#endif
+    if (_cyclicInc((TSize)tailPos, cap, roundSize) >= headPos + roundSize)
     {
         if (cap != 0)
         {
-            TIter it = begin(me.data, Standard()) + (me.tailPos & (me.roundSize - 1));
+            TIter it = begin(me.data, Standard()) + (tailPos & (roundSize - 1));
             valueConstruct(it, SEQAN_FORWARD(TValue, val));
-            me.tailWritePos = me.tailPos = me.headPos + me.roundSize;
+            tailPos = headPos + roundSize;
             valueWasAppended = true;
         }
 
-        SEQAN_ASSERT_EQ(me.tailPos, me.headPos + me.roundSize);
+        SEQAN_ASSERT_EQ(tailPos, headPos + roundSize);
 
         // get positions of head/tail in current data sequence
-        TSize headIdx = me.headPos & (me.roundSize - 1);
-        TSize tailIdx = me.tailPos & (me.roundSize - 1);
+        TSize headIdx = headPos & (roundSize - 1);
+        TSize tailIdx = tailPos & (roundSize - 1);
 
         // increase capacity
         _setLength(me.data, cap);
         reserve(me.data, cap + 1, expandTag);
         TSize delta = capacity(me.data) - cap;
-        me.roundSize = (TSize)1 << (log2(capacity(me.data) - 1) + 1);
+        roundSize = (TSize)1 << (log2(capacity(me.data) - 1) + 1);
 
         // create a gap of delta many values between tail and head
         _clearSpace(me.data, delta, headIdx, headIdx, expandTag);
         if (cap != 0)
         {
             me.headReadPos = me.headPos = headIdx + delta;
-            me.tailWritePos = me.tailPos = tailIdx + me.roundSize;
+            me.tailWritePos = me.tailPos = tailIdx + roundSize;
         }
+        me.roundSize = roundSize;
     }
     return valueWasAppended;
 }
@@ -702,17 +718,18 @@ appendValue(ConcurrentQueue<TValue, TSpec> & me,
             Tag<TParallel> parallelTag)
 {
     typedef ConcurrentQueue<TValue, TSpec>              TQueue;
+    typedef typename TQueue::TLockTag                   TLockTag;
     typedef typename Host<TQueue>::Type                 TString;
     typedef typename Size<TString>::Type                TSize;
     typedef typename Iterator<TString, Standard>::Type  TIter;
 
-    ignoreUnusedVariableWarning(parallelTag);
+    SpinDelay spinDelay;
 
     while (true)
     {
         // try to append the value
         {
-            ScopedReadLock<> readLock(me.lock);
+            ScopedReadLock<ReadWriteLock, TLockTag> readLock(me.lock);
             TSize cap = capacity(me.data);
             TSize roundSize = me.roundSize;
 
@@ -720,35 +737,34 @@ appendValue(ConcurrentQueue<TValue, TSpec> & me,
             {
                 TSize tailWritePos = me.tailWritePos;
                 TSize newTailWritePos = _cyclicInc(tailWritePos, cap, roundSize);
-		SEQAN_ASSERT_LEQ(newTailWritePos, me.headPos + roundSize);
-                
-                if (newTailWritePos >= me.headPos + roundSize)
+                TSize headPos = me.headPos;
+
+                SEQAN_ASSERT_LEQ(newTailWritePos, headPos + roundSize + 1);
+
+                // break if we have a wrap around, i.e. queue is full
+                if (newTailWritePos >= headPos + roundSize)
                     break;
 
-#ifdef SEQAN_CXX11_STANDARD
-                if (me.tailWritePos.compare_exchange_strong(tailWritePos, newTailWritePos))
-#else
                 if (atomicCasBool(me.tailWritePos, tailWritePos, newTailWritePos, parallelTag))
-#endif
                 {
                     TIter it = begin(me.data, Standard()) + (tailWritePos & (roundSize - 1));
                     valueConstruct(it, SEQAN_FORWARD(TValue, val));
 
                     // wait for pending previous writes and synchronize tailPos to tailWritePos
-#ifdef SEQAN_CXX11_STANDARD
-                    while (!me.tailPos.compare_exchange_strong(tailWritePos, newTailWritePos))
-#else
-                    while (!atomicCasBool(me.tailPos, tailWritePos, newTailWritePos, parallelTag))
-#endif
-                    {}
+                    spinCas(me.tailPos, tailWritePos, newTailWritePos);
 
                     return;
                 }
+
+                waitFor(spinDelay);
             }
         }
 
+        // if possible extend capacity and return (spin loop otherwise)
         if (_queueOverflow(me, SEQAN_FORWARD(TValue, val), expandTag))
             return;
+
+        waitFor(spinDelay);
     }
 }
 
