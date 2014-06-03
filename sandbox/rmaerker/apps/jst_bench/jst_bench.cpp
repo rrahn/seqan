@@ -34,10 +34,10 @@
 // This tool implements online-pattern search over multiple genomes.
 // ==========================================================================
 
-#ifdef SEQAN_ENABLE_DEBUG
-#undef SEQAN_ENABLE_DEBUG
-#endif
-#define SEQAN_ENABLE_DEBUG 0
+//#ifdef SEQAN_ENABLE_DEBUG
+//#undef SEQAN_ENABLE_DEBUG
+//#endif
+//#define SEQAN_ENABLE_DEBUG 0
 //#define PROFILE_DATA_PARALLEL_INTERN
 //#define DEBUG_DATA_PARALLEL_2
 //#define DEBUG_DATA_PARALLEL

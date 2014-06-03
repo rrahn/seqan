@@ -321,15 +321,19 @@ struct GetStringSet<JournaledStringTree<TDeltaMap, TSpec> const>
 // ----------------------------------------------------------------------------
 
 template <typename TJournalString, typename TMapIter>
-void _journalNextVariant(TJournalString & jString, TMapIter const & it)
+inline void
+_journalNextVariant(TJournalString & jString, TMapIter const & it)
 {
-    if (deltaType(it) == DeltaType::DELTA_TYPE_SNP)
-    {
-        _journalSnp(jString, *it, deltaSnp(it));
-        return;
-    }
+//    if (deltaType(it) == )
+//    {
+//        _journalSnp(jString, *it, deltaSnp(it));
+//        return;
+//    }
     switch(deltaType(it))
     {
+        case DeltaType::DELTA_TYPE_SNP:
+            _journalSnp(jString, *it, deltaSnp(it));
+            break;
         case DeltaType::DELTA_TYPE_DEL:
             _journalDel(jString, *it, deltaDel(it));
             break;
@@ -382,9 +386,6 @@ _doJournalBlock(JournaledStringTree<TDeltaMap, TSpec> & jst,
     typedef typename Iterator<TJournalSet, Standard>::Type TJournalSetIter;
     typedef typename Size<TJournalSet>::Type TSize;
     typedef typename MakeSigned<TSize>::Type TSignedSize;
-    typedef typename Value<TJournalSet>::Type TJournalString;
-    typedef typename JournalType<TJournalString>::Type TJournalEntries;
-    typedef typename Value<TJournalEntries>::Type TJournalEntry;
 
     // Define the block limits.
     if ((jst._activeBlock * jst._blockSize) >= length(container(jst)))
@@ -427,19 +428,7 @@ _doJournalBlock(JournaledStringTree<TDeltaMap, TSpec> & jst,
             unsigned count = jobBegin;
             for (TJournalSetIter jIt = jSetSplitter[jobId]; jIt != jSetSplitter[jobId + 1]; ++jIt, ++count)
             {
-//               clear(*jIt);  // Reinitialize the journal strings.
-                if (length((*jIt)._journalEntries._journalNodes) == 0)
-                {
-                    clear(*jIt);
-                }
-                else
-                {
-                    _setLength((*jIt)._journalEntries._journalNodes, 1);
-                    (*jIt)._journalEntries._journalNodes[0] = TJournalEntry(SOURCE_ORIGINAL, 0, 0, 0, length(host(*jIt)));
-                    (*jIt)._journalEntries._originalStringLength = length(host(*jIt));
-                    clear((*jIt)._insertionBuffer);
-                    _setLength(*jIt, length(host(*jIt)));
-                }
+               clear(*jIt);  // Reinitialize the journal strings.
                 jst._blockVPOffset[count] += jst._activeBlockVPOffset[count];
             }
         }

@@ -38,6 +38,7 @@
 #define EXTRAS_APPS_JSEQ_TOOLS_JSEQ_TOOLS_FACADE_HEADER_H_
 
 #include <iostream>
+#include <algorithm>
 
 #include <seqan/basic.h>
 #include <seqan/sequence.h>

@@ -311,12 +311,12 @@ findJournalEntry(JournalEntries<TCargo, SortedArray> & journalEntries,
 // ----------------------------------------------------------------------------
 
 template <typename TCargo, typename TIterator>
-inline
-void _doRecordInsertion(JournalEntries<TCargo, SortedArray> & tree,
-                        TIterator iter,
-                        typename Position<TCargo>::Type virtualPosition,
-                        typename Position<TCargo>::Type physicalBeginPos,
-                        typename Size<TCargo>::Type len)
+inline void
+_doRecordInsertion(JournalEntries<TCargo, SortedArray> & tree,
+                   TIterator iter,
+                   typename Position<TCargo>::Type virtualPosition,
+                   typename Position<TCargo>::Type physicalBeginPos,
+                   typename Size<TCargo>::Type len)
 {
     typedef typename Position<TCargo>::Type TPos;
 
@@ -378,11 +378,10 @@ void _doRecordInsertion(JournalEntries<TCargo, SortedArray> & tree,
 // ----------------------------------------------------------------------------
 
 template <typename TCargo, typename TIter>
-inline
-void _doRecordErase(JournalEntries<TCargo, SortedArray> & tree,
-                    TIter it,
-                    typename Position<TCargo>::Type pos,
-                    typename Position<TCargo>::Type posEnd)
+inline void _doRecordErase(JournalEntries<TCargo, SortedArray> & tree,
+                           TIter it,
+                           typename Position<TCargo>::Type pos,
+                           typename Position<TCargo>::Type posEnd)
 {
     typedef typename Size<TCargo>::Type TSize;
     typedef typename Position<TCargo>::Type TPos;

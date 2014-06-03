@@ -360,7 +360,7 @@ _checkCorrectAlgorithm(TStringTree & stringTree,
 ////            find(finder, pattern, delegateParallel, findOptions.k, Parallel());
 //        else
         reinit(stringTree);
-        find(finder, pattern, delegateParallel, findOptions.k);
+        find(finder, pattern, delegateParallel, findOptions.k, findOptions.numThreads);
 
         std::stringstream patternLable;
         patternLable << "Needle Information\t";
@@ -377,8 +377,12 @@ _checkCorrectAlgorithm(TStringTree & stringTree,
         resize(dpPositions, length(stringSet(stringTree)));
 
         for (unsigned q = 0; q < length(dpPositions); ++q)
+        {
             for (unsigned p = 0; p < length(delegateParallel._hitCollectorSet); ++p)
                 append(dpPositions[q], delegateParallel._hitCollectorSet[p].hitPositionSet[q]);
+            if (!empty(dpPositions[q]))
+                std::sort(begin(dpPositions[q], Standard()), end(dpPositions[q], Standard()));
+        }
 
         if (!writer.writeFormatted(patternLable.str(), needle, dpPositions))
         {
@@ -397,11 +401,13 @@ _checkCorrectAlgorithm(TStringTree & stringTree,
         StringSet<String<unsigned> > hits;
         resize(hits, length(compareSet));
 
-        Splitter<unsigned> jSetSplitter(0, length(hits), Serial());
-        SEQAN_OMP_PRAGMA(parallel for)
+        omp_set_num_threads(findOptions.numThreads);
+        double counter = 0.0;
+        Splitter<unsigned> jSetSplitter(0, length(hits), Parallel());
+        SEQAN_OMP_PRAGMA(parallel for firstprivate(counter))
         for (unsigned jobId = 0; jobId < length(jSetSplitter); ++jobId)
         {
-            double counter = 0.0;
+            counter = 0.0;
             unsigned currentBlock = 0;
             double intervalBorder = (double) (jSetSplitter[jobId + 1] - jSetSplitter[jobId]) * 0.1;
             printf("Search Sequential: 0%%");
@@ -418,14 +424,14 @@ _checkCorrectAlgorithm(TStringTree & stringTree,
                 {
                     counter -= intervalBorder;
                     currentBlock += 10;
-                    printf(" %i%%", currentBlock);
+                    SEQAN_OMP_PRAGMA(critical(cout))
+                    {
+                        std::cout << " " << currentBlock << "%" << std::flush;
+                    }
                 }
             }
-            if (counter != 0)
-                printf(" 100%%\n");
-            else
-                printf("\n");
         }
+        std::cout << " 100%" << std::endl;
 
         // Compare the results found by both methods.
         // We might found multiple hits?
