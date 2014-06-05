@@ -370,7 +370,7 @@ _doRecordInsertion(JournalEntries<TCargo, SortedArray> & tree,
     }
     //std::cerr << __FILE__ << ":" << __LINE__ << " -- " << tree << std::endl;
 
-    SEQAN_ASSERT(_checkSortedArrayTree(tree));
+//    SEQAN_ASSERT(_checkSortedArrayTree(tree));
 }
 
 // ----------------------------------------------------------------------------
@@ -502,7 +502,7 @@ inline void _doRecordErase(JournalEntries<TCargo, SortedArray> & tree,
     }
 //  std::cerr << __FILE__ << ":" << __LINE__ << " -- " << tree << std::endl;
 
-    SEQAN_ASSERT(_checkSortedArrayTree(tree));
+//    SEQAN_ASSERT(_checkSortedArrayTree(tree));
 }
 
 // ----------------------------------------------------------------------------

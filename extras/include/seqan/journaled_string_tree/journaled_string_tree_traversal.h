@@ -1116,12 +1116,14 @@ _traverseBranch(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPositi
     typedef typename DeltaCoverage<TVariantMap>::Type TBitVector;
 
     TBranchStackEntry & deltaWindow = top(traverser._branchStack);
-
 #ifdef DEBUG_DATA_PARALLEL
+    bool check = false;
+    if (deltaWindow._branchProxyId == 1058 && position(deltaWindow._proxyIter) == 17669170)
+        check = true;
         std::cerr << "o Search Branch: " <<  deltaWindow._branchProxyId << std::endl;
         std::cerr << "Virtual Space: " << position(deltaWindow._proxyIter) - deltaWindow._prefixOffset << " - " << deltaWindow._proxyEndPos << std::endl;
         std::cerr << "Break Point: " << position(deltaWindow._proxyIter) << std::endl;
-        std::cerr << "Coverage: " << traverser._activeBranchCoverage << std::endl;
+//        std::cerr << "Coverage: " << traverser._activeBranchCoverage << std::endl;
 #endif
 
     // Select the next node.
@@ -1168,6 +1170,14 @@ _traverseBranch(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPositi
     // Note, we need the position of the iterator, because the journal string iterator never
     // exceeds the end of the journal string. And it might be faster than evaluating the iterator.
     unsigned branchPos = _contextEndPosition(traverser, StateTraverseBranch());
+#ifdef DEBUG_DATA_PARALLEL
+    if (check == true)
+    {
+        std::cerr << "The character: " << static_cast<int>(*traverser._branchIt) << " with ordValue: " << ordValue(*traverser._branchIt) << " at position: " << *traverser._branchIt._journalEntriesIterator << std::endl;
+        std::cerr << "The infix: " << deltaWindow._proxyIter._journalStringPtr->_insertionBuffer << std::endl;
+    }
+#endif
+
     TBitVector splitVec;
 
     while(branchPos < deltaWindow._proxyEndPos && branchPos < length(*(deltaWindow._proxyIter._journalStringPtr)))  // Check end condition.
@@ -1437,6 +1447,7 @@ _traverseBranchWithAlt(JstTraverser<TContainer, TState, JstTraverserSpec<TContex
     // At the begin determine the starting point of the branch.
     // This operation removes all ambiguous deltas. That is, if there was a deletion reaching into the current delta, and some sequences share both the prev del and the current delta.
 
+    SEQAN_ASSERT(empty(traverser._branchStack));
     TBranchStackEntry & nextBranch = createInitialEntry(traverser._branchStack);
 
     // We start by initializing the branch coverage and the active branch coverage.
@@ -1476,6 +1487,7 @@ _traverseBranchWithAlt(JstTraverser<TContainer, TState, JstTraverserSpec<TContex
 #ifdef DEBUG_DATA_PARALLEL
                 std::cerr << "Points directly into deleted area." << std::endl;
 #endif
+                reinit(traverser._branchStack);
                 return;  // Points directly into deleted area!
             }
             --contextSizeRight;
@@ -1548,6 +1560,8 @@ _traverseBranchWithAlt(JstTraverser<TContainer, TState, JstTraverserSpec<TContex
         setState(externalAlg, nextBranch._externalState);
         _traverseBranch(traverser, externalAlg, delegate);
     }
+
+    reinit(traverser._branchStack);
 }
 
 template <typename TContainer, typename TState, typename TExternal, typename TDelegate>
@@ -1571,7 +1585,7 @@ void _traverseBranchWithAlt(JstTraverser<TContainer, TState, JstTraverserSpec<Co
 
     // At the begin determine the starting point of the branch.
     // This operation removes all ambiguous deltas. That is, if there was a deletion reaching into the current delta, and some sequences share both the prev del and the current delta.
-
+    SEQAN_ASSERT(empty(traverser._branchStack));
     TBranchStackEntry & nextBranch = createInitialEntry(traverser._branchStack);
 
     nextBranch._branchCoverage = deltaCoverage(traverser._branchNodeIt);
@@ -1664,6 +1678,7 @@ void _traverseBranchWithAlt(JstTraverser<TContainer, TState, JstTraverserSpec<Co
         setState(externalAlg, nextBranch._externalState);
         _traverseBranch(traverser, externalAlg, delegate);
     }
+    reinit(traverser._branchStack);
 }
 
 // ----------------------------------------------------------------------------
@@ -1825,7 +1840,8 @@ _copyMinInfo(JstTraverser<TContainer, TState, TSpec> & target,
 template <typename TConcurrentQueue, typename TTraverserState, typename TExternal, typename TDelegate>
 inline void
 _produceOrConsume(TConcurrentQueue & queue,
-                  String<TTraverserState> & traverserStates,
+                  TTraverserState & traverser,
+                  /*String<TTraverserState> & traverserStates,*/
                   String<bool> & activeThreads,
                   TExternal & externalAlg,
                   TDelegate & delegate,
@@ -1838,14 +1854,14 @@ _produceOrConsume(TConcurrentQueue & queue,
 //        {
 //            printf("Produce job for %u -> %u\n", tId, activeThreads);
 //        }
-        _traverseBranchWithAlt(traverserStates[omp_get_thread_num()], externalAlg, delegate);
+        _traverseBranchWithAlt(traverser/*States[omp_get_thread_num()]*/, externalAlg, delegate);
         return;
     }
 //    SEQAN_OMP_PRAGMA(critical(cout))
 //    {
 //        printf("Produce job for %u -> %u\n", tId, activeThreads);
 //    }
-    _copy(traverserStates[tId], traverserStates[omp_get_thread_num()]);
+    _copy(traverser/*States[tId]*/, traverser/*States[omp_get_thread_num()]*/);
 
     SEQAN_OMP_PRAGMA(atomic write)
         activeThreads[tId] = true;
@@ -1864,13 +1880,14 @@ _produceOrConsume(TConcurrentQueue & queue,
 template <typename TConcurrentQueue, typename TTraverserState, typename TExternal, typename TDelegate>
 inline void
 _produceOrConsume(TConcurrentQueue & /*queue*/,
-                  String<TTraverserState> & traverserStates,
+                  TTraverserState & traverser,
+                  /*String<TTraverserState> & traverserStates,*/
                   String<bool> & /*activeThreads*/,
                   TExternal & externalAlg,
                   TDelegate & delegate,
                   Serial const & /*tag*/)
 {
-    _traverseBranchWithAlt(traverserStates[omp_get_thread_num()], externalAlg, delegate);
+    _traverseBranchWithAlt(traverser/*value(traverserStates, omp_get_thread_num())*/, externalAlg, delegate);
 }
 
 template <typename TContainer, typename TState, typename TSpec>
@@ -1897,7 +1914,8 @@ template <typename TConcurrentQueue, typename TContainer, typename TState, typen
           typename TRequireFullContext, typename TExternal, typename TDelegate, typename TParallelTag>
 inline void
 _execProducerThread(TConcurrentQueue & queue,
-                    String<JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosition, TRequireFullContext> > > & traverserStates,
+                    JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosition, TRequireFullContext> > & traverser,
+//                    String<JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosition, TRequireFullContext> > > & traverserStates,
                     String<bool> & activeThreads,
                     TExternal & externalAlg,
                     TDelegate & delegate,
@@ -1917,7 +1935,7 @@ _execProducerThread(TConcurrentQueue & queue,
     std::cerr << currentPercentage << "% " << std::flush;
 #endif //PROFILE_DATA_PARALLEL
 
-    TJstTraverser & traverser = traverserStates[omp_get_thread_num()];  // Access the traverser at this position.
+//    TJstTraverser & traverser = traverserStates[omp_get_thread_num()];  // Access the traverser at this position.
     traverser._lastMasterState = getState(externalAlg);
     // Loop over the branch nodes.
     while (traverser._branchNodeIt != traverser._branchNodeBlockEnd)
@@ -1930,7 +1948,7 @@ _execProducerThread(TConcurrentQueue & queue,
     std::cerr << "\n" << "#####################" << std::endl;
     std::cerr << "Search Master Segment: " << position(contextBegin(traverser, StateTraverseMaster())) << " - " << *traverser._branchNodeIt << std::endl;
     std::cerr << "Breakpoint: " << *traverser._branchNodeIt << std::endl;
-    std::cerr << "Coverage: " << traverser._activeMasterCoverage << std::endl;
+//    std::cerr << "Coverage: " << traverser._activeMasterCoverage << std::endl;
 #endif
         if (isMasterState(traverser))
         {
@@ -1954,7 +1972,7 @@ _execProducerThread(TConcurrentQueue & queue,
 #ifdef DEBUG_DATA_PARALLEL
         std::cerr << "#####################" << std::endl;
         std::cerr << "Search Branch Segment: " << std::endl;
-        std::cerr << "Master Branch Coverage: " << traverser._activeMasterCoverage << std::endl;
+//        std::cerr << "Master Branch Coverage: " << traverser._activeMasterCoverage << std::endl;
 #endif
 
 #ifdef PROFILE_DATA_PARALLEL_INTERN
@@ -1962,6 +1980,9 @@ _execProducerThread(TConcurrentQueue & queue,
 #endif
         _syncAndUpdateCoverage(traverser, StateTraverseMaster());
         traverser._lastMasterState = getState(externalAlg);  // Keep the last active caller state.
+
+        if (branchPosition == 17669150)
+            std::cerr << "Stop here!" << std::endl;
 
         // Search all haplotypes with the alternative allel at this position.
         while(traverser._branchNodeIt != traverser._branchNodeBlockEnd && *traverser._branchNodeIt == branchPosition)
@@ -1977,7 +1998,7 @@ _execProducerThread(TConcurrentQueue & queue,
                 double timeBranch1 = sysTime();
 #endif
                 _recordMergePointEnds(traverser);
-                _produceOrConsume(queue, traverserStates, activeThreads, externalAlg, delegate, TParallelTag());
+                _produceOrConsume(queue, traverser/*States*/, activeThreads, externalAlg, delegate, TParallelTag());
 #ifdef PROFILE_DATA_PARALLEL_INTERN
                 timeTable[1] += sysTime() - timeBranch1;
 #endif
@@ -2161,7 +2182,6 @@ _execTraversal(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPositio
     String<bool> activeThreads;
     resize(activeThreads, numThreads, false, Exact());
     unsigned wCount = numThreads - 1;
-
     ReadWriteLock lock;
 
 //    printf("New run with %u threads\n", numThreads);
@@ -2177,7 +2197,7 @@ _execTraversal(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPositio
                 ScopedReadLock<TQueue> readLock(queue);
                 if (wCount > 0)
                     waitForFirstValue(queue);
-                _execProducerThread(queue, stateVec, activeThreads, externalAlg, delegate, tag);
+                _execProducerThread(queue, traverser, activeThreads, externalAlg, delegate, tag);
             }
 //            printf("Master Waits: %u!\n", activeThreads);
 //            SEQAN_OMP_PRAGMA(critical(cout))

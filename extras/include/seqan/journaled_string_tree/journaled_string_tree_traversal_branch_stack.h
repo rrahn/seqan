@@ -257,6 +257,7 @@ inline typename Reference<JstBranchStack_<TJst, TState> >::Type
 createEntry(JstBranchStack_<TJst, TState> & stack)
 {
     typedef JstBranchStack_<TJst, TState> TStack;
+    typedef typename Value<TStack>::Type TStackEntry;
     typedef typename Position<TStack>::Type TPos;
     typedef typename TStack::TStackIndex TStackIndex;
     typedef typename Position<TStackIndex>::Type TIndPos;
@@ -272,6 +273,8 @@ createEntry(JstBranchStack_<TJst, TState> & stack)
         resize(stack._stack, id + 1);
 
     stack._stackIndex[id] = true;
+    // Hot Fix
+    stack._stack[id] = TStackEntry();  //Reinitialize with default constructed entry.
     return stack._stack[id];
 }
 
@@ -290,6 +293,7 @@ inline bool
 pop(JstBranchStack_<TJst, TState> & stack)
 {
     SEQAN_ASSERT_GT(length(stack._stack), static_cast<unsigned>(stack._activeId));
+    SEQAN_ASSERT_NOT(empty(stack));
 
     if (stack._activeId > -1 && !empty(stack._stack))
         stack._stackIndex[stack._activeId] = false;
@@ -313,6 +317,61 @@ top(JstBranchStack_<TJst, TState> & stack)
 
     return stack._stack[stack._activeId];
 }
+
+template <typename TJst, typename TState>
+inline void
+reinit(JstBranchStack_<TJst, TState> & stack)
+{
+        stack._activeId = -1;
+        clear(stack._stack);
+        arrayFill(begin(stack._stackIndex, Standard()), end(stack._stackIndex, Standard()), 0);
+}
+
+template <typename TJst, typename TState>
+inline bool
+empty(JstBranchStack_<TJst, TState> const & stack)
+{
+    if (empty(host(stack._stackIndex)))
+        return true;
+    if (stack._activeId != -1 || !testAllZeros(stack._stackIndex))
+    {
+        std::cout << "activeId = " << stack._activeId << " staackIndex = " << stack._stackIndex << std::endl;
+        return false;
+    }
+
+    return true;
+}
+
+
+//template <typename TJst, typename TState>
+//inline bool
+//operator==(JstBranchStackEntry_<TJst, TState> const & lhs, JstBranchStackEntry_<TJst, TState> const & rhs)
+//{
+//
+//    if (lhs._branchProxyId != rhs._branchProxyId)
+//        return false;
+//    if (lhs._mappedHostPos != rhs._mappedHostPos)
+//        return false;
+//    if (lhs._proxyEndPosDiff != rhs._proxyEndPosDiff)
+//        return false;
+//    if (lhs._firstWindowBranchNode != rhs._firstWindowBranchNode)
+//        return false;
+//
+//    // Poxy data.
+//    if (lhs._proxyIter != rhs._proxyIter)
+//        return false
+//    if (lhs._proxyEndPos != rhs._proxyEndPos)
+//        return false;
+//    if (lhs._prefixOffset != rhs._prefixOffset)
+//        return false;
+//    if (lhs._branchCoverage != rhs._branchCoverage)
+//        return false;
+//
+//    // Additional data.
+//    if (lhs._externalState != rhs._externalState)
+//        return false;
+//    return true;
+//}
 
 }
 #endif // EXTRAS_INCLUDE_SEQAN_JOURNALED_STRING_TREE_JOURNALED_STRING_TREE_TRAVERSAL_BRANCH_STACK_H_
