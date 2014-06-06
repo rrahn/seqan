@@ -119,15 +119,18 @@ class JstBranchStack_
 {
 public:
 
-    typedef typename Value<JstBranchStack_>::Type TStackEntry;
+    typedef typename Value<JstBranchStack_>::Type                                    TStackEntry;
+    typedef String<TStackEntry>                                                      TStack;
     typedef typename MakeSigned<typename Position<TJournaledStringTree>::Type>::Type TPosition;
-    typedef String<bool, Packed<> > TStackIndex;
+    typedef typename Iterator<TStack, Standard>::Type                                TStackIter;
+    typedef String<bool, Packed<> >                                                  TStackIndex;
 
     String<TStackEntry> _stack;
     TStackIndex         _stackIndex;
+    TStackIter          _currEntry;
     TPosition           _activeId;
 
-    JstBranchStack_() : _stack(), _stackIndex(), _activeId(-1)
+    JstBranchStack_() : _stack(), _stackIndex(), _currEntry(), _activeId(-1)
     {}
 
     // Copy constructor.
@@ -209,6 +212,26 @@ template <typename TJournaledStringTree, typename TState>
 struct Position<JstBranchStack_<TJournaledStringTree, TState> const > :
     Position<JstBranchStack_<TJournaledStringTree, TState> >{};
 
+// ----------------------------------------------------------------------------
+// Metafunction Iterator
+// ----------------------------------------------------------------------------
+
+template <typename TJournaledStringTree, typename TState>
+struct Iterator<JstBranchStack_<TJournaledStringTree, TState>, Standard>
+{
+    typedef JstBranchStack_<TJournaledStringTree, TState> TStack_;
+    typedef typename TStack_::TStack                      TData_;
+    typedef typename Iterator<TData_, Standard>::Type     Type;
+};
+
+template <typename TJournaledStringTree, typename TState>
+struct Iterator<JstBranchStack_<TJournaledStringTree, TState> const, Standard >
+{
+    typedef JstBranchStack_<TJournaledStringTree, TState> TStack_;
+    typedef typename TStack_::TStack const                TData_;
+    typedef typename Iterator<TData_, Standard>::Type     Type;
+};
+
 // ============================================================================
 // Functions
 // ============================================================================
@@ -246,18 +269,17 @@ inline void
 _copy(JstBranchStack_<TJournaledStringTree, TState> & stack,
       JstBranchStack_<TJournaledStringTree, TState> const & other)
 {
-    stack._stack = other._stack;
+    stack._stack      = other._stack;
     stack._stackIndex = other._stackIndex;
-    stack._activeId = other._activeId;
+    stack._currEntry  = other._currEntry;
+    stack._activeId   = other._activeId;
 }
-
 
 template <typename TJst, typename TState>
 inline typename Reference<JstBranchStack_<TJst, TState> >::Type
 createEntry(JstBranchStack_<TJst, TState> & stack)
 {
     typedef JstBranchStack_<TJst, TState> TStack;
-    typedef typename Value<TStack>::Type TStackEntry;
     typedef typename Position<TStack>::Type TPos;
     typedef typename TStack::TStackIndex TStackIndex;
     typedef typename Position<TStackIndex>::Type TIndPos;
@@ -270,11 +292,15 @@ createEntry(JstBranchStack_<TJst, TState> & stack)
     }
 
     if (id >= length(stack._stack))
-        resize(stack._stack, id + 1);
+    {
+        TPos oldPos = 0;
+        if (length(stack._stack) > 0)
+            oldPos = position(stack._currEntry, stack._stack);
+        resize(stack._stack, id + 1, Generous());
+        stack._currEntry = iter(stack._stack, oldPos, Standard());  // Update the iterator in case the string was reallocated.
+    }
 
     stack._stackIndex[id] = true;
-    // Hot Fix
-    stack._stack[id] = TStackEntry();  //Reinitialize with default constructed entry.
     return stack._stack[id];
 }
 
@@ -283,39 +309,29 @@ inline typename Reference<JstBranchStack_<TJst, TState> >::Type
 createInitialEntry(JstBranchStack_<TJst, TState> & stack)
 {
     clear(stack._stackIndex);
-    stack._activeId = 0;
-    return createEntry(stack);
+    createEntry(stack);
+    stack._currEntry = begin(stack._stack, Standard());
+    return *stack._currEntry;
 }
 
 
 template <typename TJst, typename TState>
-inline bool
+inline void
 pop(JstBranchStack_<TJst, TState> & stack)
 {
-    SEQAN_ASSERT_GT(length(stack._stack), static_cast<unsigned>(stack._activeId));
-    SEQAN_ASSERT_NOT(empty(stack));
+    SEQAN_ASSERT_NOT(empty(stack._stackIndex));
 
-    if (stack._activeId > -1 && !empty(stack._stack))
-        stack._stackIndex[stack._activeId] = false;
-
-    if (testAllZeros(stack._stackIndex))
-    {
-        stack._activeId = -1;
-        return false;
-    }
-
-    stack._activeId = bitScanReverse(stack._stackIndex);
-    return true;
+    stack._stackIndex[position(stack._currEntry, stack._stack)] = false;
+    if (empty(stack))
+        return;
+    stack._currEntry = iter(stack._stack, bitScanReverse(stack._stackIndex), Standard());
 }
 
 template <typename TJst, typename TState>
 inline typename Reference<JstBranchStack_<TJst, TState> >::Type
 top(JstBranchStack_<TJst, TState> & stack)
 {
-    SEQAN_ASSERT_NOT(stack._activeId == -1);
-    SEQAN_ASSERT_GT(length(stack._stack), static_cast<unsigned>(stack._activeId));
-
-    return stack._stack[stack._activeId];
+    return *stack._currEntry;
 }
 
 template <typename TJst, typename TState>
@@ -323,6 +339,7 @@ inline void
 reinit(JstBranchStack_<TJst, TState> & stack)
 {
         stack._activeId = -1;
+        clear(stack._currEntry);
         clear(stack._stack);
         arrayFill(begin(stack._stackIndex, Standard()), end(stack._stackIndex, Standard()), 0);
 }
@@ -333,45 +350,8 @@ empty(JstBranchStack_<TJst, TState> const & stack)
 {
     if (empty(host(stack._stackIndex)))
         return true;
-    if (stack._activeId != -1 || !testAllZeros(stack._stackIndex))
-    {
-        std::cout << "activeId = " << stack._activeId << " staackIndex = " << stack._stackIndex << std::endl;
-        return false;
-    }
-
-    return true;
+    return testAllZeros(stack._stackIndex) ? true : false;
 }
-
-
-//template <typename TJst, typename TState>
-//inline bool
-//operator==(JstBranchStackEntry_<TJst, TState> const & lhs, JstBranchStackEntry_<TJst, TState> const & rhs)
-//{
-//
-//    if (lhs._branchProxyId != rhs._branchProxyId)
-//        return false;
-//    if (lhs._mappedHostPos != rhs._mappedHostPos)
-//        return false;
-//    if (lhs._proxyEndPosDiff != rhs._proxyEndPosDiff)
-//        return false;
-//    if (lhs._firstWindowBranchNode != rhs._firstWindowBranchNode)
-//        return false;
-//
-//    // Poxy data.
-//    if (lhs._proxyIter != rhs._proxyIter)
-//        return false
-//    if (lhs._proxyEndPos != rhs._proxyEndPos)
-//        return false;
-//    if (lhs._prefixOffset != rhs._prefixOffset)
-//        return false;
-//    if (lhs._branchCoverage != rhs._branchCoverage)
-//        return false;
-//
-//    // Additional data.
-//    if (lhs._externalState != rhs._externalState)
-//        return false;
-//    return true;
-//}
 
 }
 #endif // EXTRAS_INCLUDE_SEQAN_JOURNALED_STRING_TREE_JOURNALED_STRING_TREE_TRAVERSAL_BRANCH_STACK_H_
