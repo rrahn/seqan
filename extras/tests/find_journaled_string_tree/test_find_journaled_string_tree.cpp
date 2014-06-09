@@ -118,6 +118,5 @@ SEQAN_BEGIN_TESTSUITE(find_journaled_string_tree)
     SEQAN_CALL_TEST(test_find_journaled_string_tree_del_occ_myers_ukkonen_infix_3_errors_block);
     SEQAN_CALL_TEST(test_find_journaled_string_tree_fuzzy_occ_myers_ukkonen_infix_0_errors_block);
     SEQAN_CALL_TEST(test_find_journaled_string_tree_fuzzy_occ_myers_ukkonen_infix_3_errors_block);
-
 }
 SEQAN_END_TESTSUITE

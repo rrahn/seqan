@@ -346,40 +346,26 @@ init(FinderExtensionPoint<TFinder, TExtensionSpec> & extensionFunctor,
 // Function _find()
 // ----------------------------------------------------------------------------
 
-template <typename TContainer, typename TPattern, typename TSpec, typename TDelegate, typename TParallel>
+template <typename TContainer, typename TPattern, typename TSpec, typename TDelegate>
 inline void
 _find(Finder_<TContainer, TPattern, Jst<TSpec> > & finder,
       TPattern & pattern,
       TDelegate & delegate,
       int scoreLimit,
-      unsigned numThreads,
-      Tag<TParallel> tag)
+      unsigned numThreads)
 {
     typedef Finder_<TContainer, TPattern, Jst<TSpec> > TFinder;
     typedef typename GetJstTraverser<TFinder>::Type TTraverser;
 
     // Set up the journaled string tree traversal.
     TTraverser traverser(container(finder), length(needle(pattern)) - scoreLimit);
-#ifdef PROFILE_JST_INTERN
-    double timeBuild = sysTime();
-#endif
-    while (journalNextBlock(container(finder), contextSize(traverser), tag))  // Generating the journal index for the next block.
+
+    if (finder._needReinit)
     {
-        if (finder._needReinit)
-        {
-            init(finder._extensionFunctor, pattern, scoreLimit);
-            finder._needReinit = false;
-        }
-#ifdef PROFILE_JST_INTERN
-        std::cerr << "Time-C: " << sysTime() - timeBuild << " s" << std::endl;
-        double timeSearch = sysTime();
-#endif
-        traverse(finder, delegate, traverser, numThreads);
-#ifdef PROFILE_JST_INTERN
-        std::cerr << "Time-S: " << sysTime() - timeSearch << " s" << std::endl;
-        timeBuild = sysTime();
-#endif
+        init(finder._extensionFunctor, pattern, scoreLimit);
+        finder._needReinit = false;
     }
+    traverse(finder, delegate, traverser, numThreads);
 }
 
 // ----------------------------------------------------------------------------
@@ -399,48 +385,49 @@ _find(Finder_<TContainer, TPattern, Jst<TSpec> > & finder,
  * @param[in]       limit       An optional parameter setting the score limit (<tt><= 0</tt>).
  */
 
-template <typename TContainer, typename TPattern, typename TSpec, typename TDelegate>
-inline void
-find(Finder_<TContainer, TPattern, Jst<TSpec> > & finder,
-     TPattern & pattern,
-     TDelegate & delegate,
-     int scoreLimit,
-     unsigned numThreads)
-{
-    if (numThreads > 1)
-        _find(finder, pattern, delegate, scoreLimit, numThreads, Parallel());
-    else
-        _find(finder, pattern, delegate, scoreLimit, numThreads, Serial());
-}
+//template <typename TContainer, typename TPattern, typename TSpec, typename TDelegate>
+//inline void
+//find(Finder_<TContainer, TPattern, Jst<TSpec> > & finder,
+//     TPattern & pattern,
+//     TDelegate & delegate,
+//     int scoreLimit,
+//     unsigned numThreads)
+//{
+//    if (numThreads > 1)
+//        _find(finder, pattern, delegate, scoreLimit, numThreads);
+//    else
+//        _find(finder, pattern, delegate, scoreLimit, numThreads);
+//}
 
 template <typename TContainer, typename TPattern, typename TSpec, typename TDelegate>
 inline void
 find(Finder_<TContainer, TPattern, Jst<TSpec> > & finder,
      TPattern & pattern,
      TDelegate & delegate,
-     unsigned numThreads)
+     int scoreLimit = 0,
+     unsigned numThreads = 1)
 {
-    find(finder, pattern, delegate, 0, numThreads);
+    _find(finder, pattern, delegate, scoreLimit, numThreads);
 }
 
-template <typename TContainer, typename TPattern, typename TSpec, typename TDelegate>
-inline void
-find(Finder_<TContainer, TPattern, Jst<TSpec> > & finder,
-     TPattern & pattern,
-     TDelegate & delegate,
-     int scoreLimit)
-{
-    find(finder, pattern, delegate, scoreLimit, 1);
-}
-
-template <typename TContainer, typename TPattern, typename TSpec, typename TDelegate>
-inline void
-find(Finder_<TContainer, TPattern, Jst<TSpec> > & finder,
-     TPattern & pattern,
-     TDelegate & delegate)
-{
-    find(finder, pattern, delegate, 0);
-}
+//template <typename TContainer, typename TPattern, typename TSpec, typename TDelegate>
+//inline void
+//find(Finder_<TContainer, TPattern, Jst<TSpec> > & finder,
+//     TPattern & pattern,
+//     TDelegate & delegate,
+//     int scoreLimit)
+//{
+//    find(finder, pattern, delegate, scoreLimit, 1);
+//}
+//
+//template <typename TContainer, typename TPattern, typename TSpec, typename TDelegate>
+//inline void
+//find(Finder_<TContainer, TPattern, Jst<TSpec> > & finder,
+//     TPattern & pattern,
+//     TDelegate & delegate)
+//{
+//    find(finder, pattern, delegate, 0);
+//}
 
 }
 

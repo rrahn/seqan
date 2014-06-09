@@ -401,7 +401,7 @@ _checkCorrectAlgorithm(TStringTree & stringTree,
         StringSet<String<unsigned> > hits;
         resize(hits, length(compareSet));
 
-        omp_set_num_threads(findOptions.numThreads);
+        omp_set_num_threads(8);
         double counter = 0.0;
         Splitter<unsigned> jSetSplitter(0, length(hits), Parallel());
         SEQAN_OMP_PRAGMA(parallel for firstprivate(counter))

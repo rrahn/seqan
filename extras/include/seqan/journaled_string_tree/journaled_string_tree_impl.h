@@ -627,9 +627,14 @@ bool journalNextBlock(JournaledStringTree<TDeltaMap, StringTreeDefault> & string
 
 template <typename TDeltaMap, typename TSpec, typename TSize>
 bool journalNextBlock(JournaledStringTree<TDeltaMap, TSpec> & stringTree,
-                      TSize contextSize)
+                      TSize contextSize,
+                      unsigned numThreads = 1)
 {
-    return journalNextBlock(stringTree, contextSize, Serial());
+    omp_set_num_threads(numThreads);
+    if (numThreads > 1)
+        return journalNextBlock(stringTree, contextSize, Parallel());
+    else
+        return journalNextBlock(stringTree, contextSize, Serial());
 }
 
 // ----------------------------------------------------------------------------

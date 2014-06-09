@@ -70,9 +70,16 @@ struct FindResultsTester_
     {
         typedef typename seqan::Positions<TTraverser>::Type TPositionVec;
 
+//        std::cout << "Coverage before: " << coverage(traverser) << std::endl;
         TPositionVec posVec = positions(traverser);
+//        std::cout << "Coverage after: " << coverage(traverser) << std::endl;
+//        std::cout << "Positions:";
         for (unsigned i = 0; i < length(posVec); ++i)
+        {
             appendValue(_hitStringSet[posVec[i].i1], posVec[i].i2);
+//            std::cout << " " << posVec[i].i1 << ": " << posVec[i].i2;
+        }
+//        std::cout << std::endl;
     }
 };
 

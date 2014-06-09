@@ -1599,7 +1599,7 @@ void _traverseBranchWithAlt(JstTraverser<TContainer, TState, JstTraverserSpec<Co
             TIndel & indel = deltaIndel(traverser._branchNodeIt);
             top(traverser._branchStack)._proxyEndPosDiff = indel.i1;
             top(traverser._branchStack)._proxyEndPosDiff -= static_cast<int>(length(indel.i2));
-            contextSizeRight += length(indel.i2);
+            contextSizeRight += length(indel.i2) - 1;
             if (indel.i1 > 1)
                 top(traverser._branchStack)._mappedHostPos += indel.i1 - 1;  // Moves right by the size of the deletion.
             break;
@@ -1793,7 +1793,8 @@ template <typename TContainer, typename TState, typename TContextPosition, typen
 inline void
 _execTraversal(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosition, TRequireFullContext> > & traverser,
                TExternal & externalAlg,
-               TDelegate & delegate)
+               TDelegate & delegate,
+               unsigned numThreads)
 {
     typedef typename Container<TContainer>::Type TDeltaMap;
     typedef typename DeltaCoverage<TDeltaMap>::Type TBitVector;
@@ -1914,8 +1915,9 @@ _execTraversal(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPositio
     std::cerr << "--- position: " << position(contextBegin(traverser, StateTraverseMaster())) << std::endl;
 #endif
     }
+
     // Synchronize master coverage in the end.
-    _updateMergePoints(traverser._mergePointStack, position(contextBegin(traverser, StateTraverseMaster())));
+    _updateMergePoints(traverser._mergePointStack, clippedContextBeginPosition(traverser, StateTraverseMaster()));
     transform(traverser._activeMasterCoverage, traverser._activeMasterCoverage,
               traverser._mergePointStack._mergeCoverage,
               FunctorNested<FunctorBitwiseAnd, FunctorIdentity, FunctorBitwiseNot>());
@@ -2043,14 +2045,28 @@ inline
 SEQAN_FUNC_ENABLE_IF(Is<JstTraversalConcept<TOperator> >, void)
 traverse(TOperator & traversalCaller,
          TDelegate & delegate,
-         JstTraverser<TContainer, TState, TSpec> & traverser)
+         JstTraverser<TContainer, TState, TSpec> & traverser,
+         unsigned numThreads = 1)
 {
-    while(journalNextBlock(container(traverser), contextSize(traverser)))
+#ifdef PROFILE_JST_INTERN
+    double timeBuild = sysTime();
+#endif
+
+    while(journalNextBlock(container(traverser), contextSize(traverser), numThreads))
     {
         _reinitBlockEnd(traverser);
-        _execTraversal(traverser, traversalCaller, delegate);
+#ifdef PROFILE_JST_INTERN
+    std::cerr << "Time-C: " << sysTime() - timeBuild << " s" << std::endl;
+    double timeSearch = sysTime();
+#endif
+        _execTraversal(traverser, traversalCaller, delegate, numThreads);
+#ifdef PROFILE_JST_INTERN
+    std::cerr << "Time-S: " << sysTime() - timeSearch << " s" << std::endl;
+    timeBuild = sysTime();
+#endif
     }
 }
+
 
 // ----------------------------------------------------------------------------
 // Function setContextSize()
