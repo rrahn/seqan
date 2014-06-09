@@ -62,72 +62,13 @@ struct DummyCaller_
 template <typename T> SEQAN_CONCEPT_IMPL((JstTraversalConcept), DummyCaller_<T>);
 template <typename T> SEQAN_CONCEPT_IMPL((JstTraversalConcept), DummyCaller_<T> const);
 
-template <typename TPair>
-struct CompareLessFunctor_
-{
-    CompareLessFunctor_()
-    {}
-
-    inline bool
-    operator()(TPair const & lhs, TPair const & rhs)
-    {
-        return lhs.i1 < rhs.i1;
-    }
-};
-
-template <typename TValue>
+template <typename TValue, typename TTestSeq>
 struct DummyDelegator_
 {
-    typedef Pair<unsigned, TValue> TPair;
+    StringSet<String<TValue> > _processedSeq;
+    TTestSeq                   _testSeq;
 
-    StringSet<String<TPair> > _processedSeq;
-
-    DummyDelegator_(unsigned size)
-    {
-        resize(_processedSeq, size, Exact());
-    }
-
-    template <typename TTraverser>
-    void operator()(TTraverser & traverser)
-    {
-        typedef typename Positions<TTraverser>::Type TPosVec;
-        SEQAN_OMP_PRAGMA(critical(insert))
-        {
-#ifdef TEST_DEBUG_OUTPUT
-            printf("Thread: %i position(%p): ", omp_get_thread_num(), getObjectId(traverser));
-#endif
-            TPosVec posVec = positions(traverser);
-            for (unsigned i = 0; i < length(posVec); ++i)
-            {
-#ifdef TEST_DEBUG_OUTPUT
-                    printf("(%lu, %lu)",posVec[i].i1, posVec[i].i2);
-#endif
-                appendValue(_processedSeq[posVec[i].i1],
-                            TPair(posVec[i].i2, value(stringSet(container(traverser)), posVec[i].i1)[posVec[i].i2]));
-            }
-#ifdef TEST_DEBUG_OUTPUT
-        printf("\n");
-#endif
-        }
-    }
-
-    void postProcess()
-    {
-        for (unsigned i = 0; i < length(_processedSeq); ++i)
-            sort(_processedSeq[i], CompareLessFunctor_<TPair>());
-    }
-
-};
-
-template <typename TValue, typename TTestSeq>
-struct DummyDelegatorBlock_
-{
-    typedef Pair<unsigned, TValue> TPair;
-
-    StringSet<String<TPair> > _processedSeq;
-    TTestSeq                  _testSeq;
-
-    DummyDelegatorBlock_(unsigned size, TTestSeq const & testSeq)
+    DummyDelegator_(unsigned size, TTestSeq const & testSeq)
     {
         resize(_processedSeq, size, Exact());
         _testSeq = testSeq;
@@ -137,31 +78,20 @@ struct DummyDelegatorBlock_
     void operator()(TTraverser & traverser)
     {
         typedef typename Positions<TTraverser>::Type TPosVec;
-        SEQAN_OMP_PRAGMA(critical(insert))
+#ifdef TEST_DEBUG_OUTPUT
+        std::cerr << "position(traverser): ";
+#endif
+        TPosVec posVec = positions(traverser);
+        for (unsigned i = 0; i < length(posVec); ++i)
         {
 #ifdef TEST_DEBUG_OUTPUT
-            printf("Thread: %i position(traverser): ", omp_get_thread_num());
+            std::cerr << "("<< posVec[i].i1 << ", " <<  posVec[i].i2 << ")" << "; ";
 #endif
-            TPosVec posVec = positions(traverser);
-            for (unsigned i = 0; i < length(posVec); ++i)
-            {
-#ifdef TEST_DEBUG_OUTPUT
-                printf("(%lu, %lu) ",posVec[i].i1, posVec[i].i2);
-#endif
-                appendValue(_processedSeq[posVec[i].i1],
-                            TPair(posVec[i].i2, value(_testSeq, posVec[i].i1)[posVec[i].i2]));
-            }
-
-#ifdef TEST_DEBUG_OUTPUT
-            printf("\n");
-#endif
+            appendValue(_processedSeq[posVec[i].i1], value(_testSeq, posVec[i].i1)[posVec[i].i2]);
         }
-    }
-
-    void postProcess()
-    {
-        for (unsigned i = 0; i < length(_processedSeq); ++i)
-            sort(_processedSeq[i], CompareLessFunctor_<TPair>());
+#ifdef TEST_DEBUG_OUTPUT
+        std::cerr << std::endl;
+#endif
     }
 };
 
@@ -221,54 +151,44 @@ setState(DummyCaller_<TContainer> & /*dummy*/,
 }
 
 template <typename TTestSeq, typename TCompareSeq, typename TSize>
-bool compareResults(TTestSeq const & testSeq, TCompareSeq const & compSeq, TSize const & /*windowSize*/)
+bool compareResults(TTestSeq const & testSeq, TCompareSeq const & compSeq, TSize const & windowSize)
 {
     SEQAN_ASSERT_EQ(length(testSeq), length(compSeq));
     for (unsigned i = 0; i < length(testSeq); ++i)
-        for (unsigned j = 0; j < length(testSeq[i]); ++j)
-        {
-            if (testSeq[i][j].i2 != compSeq[i][j])
-                return false;
-        }
-//        if (isNotEqual(testSeq[i].i2, prefix(compSeq[i], length(compSeq[i]) - (windowSize -1))))
-//            return false;
+        if (isNotEqual(testSeq[i], prefix(compSeq[i], length(compSeq[i]) - (windowSize -1))))
+            return false;
     return true;
 }
+
 
 template <typename TMock, typename TTester, typename TSize>
 void _printDebugInfo(TMock const & mockGen, TTester const & dpTester, TSize const & windowSize)
 {
     std::cerr << "Host: " << host(mockGen._seqData) << std::endl;
     for (unsigned i = 0; i < length(dpTester._processedSeq); ++i)
-    {
-        std::cerr << "Traversed: ";
-        for (unsigned j = 0; j < length(dpTester._processedSeq[i]); ++j)
-           std::cerr << dpTester._processedSeq[i][j].i2;
-        std::cerr << "\nGenerated: " << prefix(mockGen._seqData[i], length(mockGen._seqData[i]) - (windowSize - 1)) <<
-                     "\n" << std::endl;
-    }
+        std::cerr << "Compare 1: " << dpTester._processedSeq[i] << "\nCompare 2: "
+        << prefix(mockGen._seqData[i], length(mockGen._seqData[i]) - (windowSize - 1)) << "\n" << std::endl;
 }
 
-template <typename TInt>
 bool _runTestForConfiguration(unsigned posConf,
                               unsigned varConf,
                               unsigned covConf,
                               unsigned refLength,
                               unsigned windowSize,
-                              seqan::StringTreeDefault const & /*stringTreeTag*/,
-                              TInt numThreads)
+                              unsigned blockSize,
+                              seqan::StringTreeDefault const & /*stringTreeTag*/)
 {
     using namespace seqan;
-
-    typedef DummyDelegator_<char> TSequenceAppender;
 
     typedef String<MockVariantData<char> > TVarData;
     typedef String<String<bool, Packed<> > > TCovData;
     typedef MockGenerator_<unsigned, char> TMockGenerator;
 
-    typedef typename TMockGenerator::TStringTree TStringTree;
+    typedef TMockGenerator::TStringTree TStringTree;
     typedef JstTraverser<TStringTree, Nothing, JstTraverserSpec<> > TTraverser;
     typedef DummyCaller_<TStringTree> TDummyCaller;
+    typedef GetStringSet<TStringTree>::Type TJournalSet;
+    typedef DummyDelegator_<char, TJournalSet> TSequenceAppender;
 
     TVarData varData;
     TCovData covData;
@@ -280,72 +200,16 @@ bool _runTestForConfiguration(unsigned posConf,
     mockGen.generate(varData, covData, refLength);
 
     TStringTree jst(host(mockGen._seqData), mockGen._varStore);
-    journalNextBlock(jst, windowSize);
+    if (blockSize > 0)
+        setBlockSize(jst, blockSize);
 
-    TSequenceAppender seqAppender(length(mockGen._seqData));
-    TTraverser traverser(jst, windowSize);
-    TDummyCaller dummyCaller(jst);
-
-    traverse(dummyCaller, seqAppender, traverser, numThreads);
-
-    seqAppender.postProcess();
-    bool res = compareResults(seqAppender._processedSeq, mockGen._seqData, windowSize);
-
-#ifdef TEST_DEBUG_OUTPUT_RES
-    if (!res)
-        _printDebugInfo(mockGen, seqAppender, windowSize);
-#endif
-    return res;
-}
-
-bool _runTestForConfiguration(unsigned posConf, unsigned varConf, unsigned covConf, unsigned refLength, unsigned windowSize,
-                              seqan::StringTreeDefault const & stringTreeTag)
-{
-    return _runTestForConfiguration(posConf, varConf, covConf, refLength, windowSize, stringTreeTag, 1);
-}
-
-template <typename TInt>
-bool _runTestForConfigurationBlock(unsigned posConf,
-                                  unsigned varConf,
-                                  unsigned covConf,
-                                  unsigned refLength,
-                                  unsigned windowSize,
-                                  seqan::StringTreeDefault const & /*stringTreeTag*/,
-                                  TInt numThreads)
-{
-    using namespace seqan;
-
-    typedef String<String<bool, Packed<> > > TCovData;
-    typedef MockGenerator_<unsigned, char> TMockGenerator;
-
-    typedef typename TMockGenerator::TStringTree TStringTree;
-    typedef JstTraverser<TStringTree, Nothing, JstTraverserSpec<> > TTraverser;
-    typedef DummyCaller_<TStringTree> TDummyCaller;
-    typedef typename GetStringSet<TStringTree>::Type TJournalSet;
-
-    typedef String<MockVariantData<char> > TVarData;
-    typedef DummyDelegatorBlock_<char, TJournalSet> TSequenceAppender;
-
-    TVarData varData;
-    TCovData covData;
-    testConfig.getTestConfiguration(varData, covData, posConf, varConf, covConf);
-
-    // Initialize the mock generator.
-    TMockGenerator mockGen;
-    // Generate the mock for the current configuration.
-    mockGen.generate(varData, covData, refLength);
-
-    TStringTree jst(host(mockGen._seqData), mockGen._varStore);
-    setBlockSize(jst, 2);
-
+//    TSequenceAppender seqAppender(length(mockGen._seqData));
     TSequenceAppender seqAppender(length(mockGen._seqData), mockGen._seqData);
     TTraverser traverser(jst, windowSize);
     TDummyCaller dummyCaller(jst);
 
-    while(journalNextBlock(jst, windowSize))
-        traverse(dummyCaller, seqAppender, traverser, numThreads);
+    traverse(dummyCaller, seqAppender, traverser);
 
-    seqAppender.postProcess();
     bool res = compareResults(seqAppender._processedSeq, mockGen._seqData, windowSize);
 
 #ifdef TEST_DEBUG_OUTPUT_RES
@@ -355,16 +219,20 @@ bool _runTestForConfigurationBlock(unsigned posConf,
     return res;
 }
 
-bool _runTestForConfigurationBlock(unsigned posConf,
-                                  unsigned varConf,
-                                  unsigned covConf,
-                                  unsigned refLength,
-                                  unsigned windowSize,
-                                  seqan::StringTreeDefault const & stringTreeTag)
+inline
+bool _runTestForConfiguration(unsigned posConf,
+                              unsigned varConf,
+                              unsigned covConf,
+                              unsigned refLength,
+                              unsigned windowSize,
+                              seqan::StringTreeDefault const & stringTreeTag)
 {
-    return _runTestForConfigurationBlock(posConf, varConf, covConf, refLength, windowSize, stringTreeTag, 1);
+    return _runTestForConfiguration(posConf, varConf, covConf, refLength, windowSize, 0, stringTreeTag);
 }
 
+// ----------------------------------------------------------------------------
+// Test Traversal Concept.
+// ----------------------------------------------------------------------------
 
 SEQAN_DEFINE_TEST(test_journaled_string_tree_jst_traversal_concept)
 {
@@ -423,38 +291,38 @@ SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_0_5_jou
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_0_0_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 0, 0, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 0, 0, 101, 10, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 0, 0, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 0, 0, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_0_1_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 0, 1, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 0, 1, 101, 10, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 0, 1, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 0, 1, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_0_2_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 0, 2, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 0, 2, 101, 10, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 0, 2, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 0, 2, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_0_3_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 0, 3, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 0, 3, 101, 10, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 0, 3, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 0, 3, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_0_4_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 0, 4, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 0, 4, 101, 10, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 0, 4, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 0, 4, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_0_5_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 0, 5, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 0, 5, 101, 10, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 0, 5, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 0, 5, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 // Test all at position 30, all snps, different coverages.
@@ -497,38 +365,38 @@ SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_0_5_jou
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_0_0_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 0, 0, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 0, 0, 101, 10, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 0, 0, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 0, 0, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_0_1_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 0, 1, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 0, 1, 101, 10, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 0, 1, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 0, 1, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_0_2_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 0, 2, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 0, 2, 101, 10, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 0, 2, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 0, 2, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_0_3_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 0, 3, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 0, 3, 101, 10, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 0, 3, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 0, 3, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_0_4_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 0, 4, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 0, 4, 101, 10, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 0, 4, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 0, 4, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_0_5_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 0, 5, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 0, 5, 101, 10, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 0, 5, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 0, 5, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 // Test all at position 30, all snps, different coverages.
@@ -571,39 +439,40 @@ SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_0_5_jou
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_0_0_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 0, 0, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 0, 0, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 0, 0, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 0, 0, 101, 50, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_0_1_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 0, 1, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 0, 1, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 0, 1, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 0, 1, 101, 50, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_0_2_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 0, 2, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 0, 2, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 0, 2, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 0, 2, 101, 50, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_0_3_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 0, 3, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 0, 3, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 0, 3, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 0, 3, 101, 50, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_0_4_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 0, 4, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 0, 4, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 0, 4, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 0, 4, 101, 50, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_0_5_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 0, 5, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 0, 5, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 0, 5, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 0, 5, 101, 50, 2, seqan::StringTreeDefault()));
 }
+
 
 // Test different positions including 0, all snps, different coverages.
 
@@ -651,44 +520,44 @@ SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_0_5_jou
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_0_0_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 0, 0, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 0, 0, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 0, 0, 101, 30, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 0, 0, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 0, 0, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 0, 0, 101, 30, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_0_1_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 0, 1, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 0, 1, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 0, 1, 101, 30, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 0, 1, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 0, 1, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 0, 1, 101, 30, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_0_2_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 0, 2, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 0, 2, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 0, 2, 101, 30, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 0, 2, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 0, 2, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 0, 2, 101, 30, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_0_3_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 0, 3, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 0, 3, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 0, 3, 101, 30, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 0, 3, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 0, 3, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 0, 3, 101, 30, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_0_4_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 0, 4, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 0, 4, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 0, 4, 101, 30, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 0, 4, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 0, 4, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 0, 4, 101, 30, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_0_5_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 0, 5, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 0, 5, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 0, 5, 101, 30, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 0, 5, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 0, 5, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 0, 5, 101, 30, 2, seqan::StringTreeDefault()));
 }
 
 // Test different positions including 0, all snps, different coverages.
@@ -737,44 +606,44 @@ SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_0_5_jou
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_0_0_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 0, 0, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 0, 0, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 0, 0, 101, 30, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 0, 0, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 0, 0, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 0, 0, 101, 30, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_0_1_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 0, 1, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 0, 1, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 0, 1, 101, 30, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 0, 1, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 0, 1, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 0, 1, 101, 30, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_0_2_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 0, 2, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 0, 2, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 0, 2, 101, 30, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 0, 2, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 0, 2, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 0, 2, 101, 30, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_0_3_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 0, 3, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 0, 3, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 0, 3, 101, 30, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 0, 3, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 0, 3, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 0, 3, 101, 30, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_0_4_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 0, 4, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 0, 4, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 0, 4, 101, 30, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 0, 4, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 0, 4, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 0, 4, 101, 30, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_0_5_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 0, 5, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 0, 5, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 0, 5, 101, 30, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 0, 5, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 0, 5, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 0, 5, 101, 30, 2, seqan::StringTreeDefault()));
 }
 
 // ----------------------------------------------------------------------------
@@ -821,38 +690,38 @@ SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_1_5_jou
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_1_0_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 1, 0, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 1, 0, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 1, 0, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 1, 0, 101, 50, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_1_1_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 1, 1, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 1, 1, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 1, 1, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 1, 1, 101, 50, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_1_2_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 1, 2, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 1, 2, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 1, 2, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 1, 2, 101, 50, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_1_3_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 1, 3, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 1, 3, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 1, 3, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 1, 3, 101, 50, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_1_4_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 1, 4, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 1, 4, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 1, 4, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 1, 4, 101, 50, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_1_5_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 1, 5, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 1, 5, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 1, 5, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 1, 5, 101, 50, 2, seqan::StringTreeDefault()));
 }
 
 // Test all at position 30, all snps, different coverages.
@@ -895,39 +764,40 @@ SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_1_5_jou
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_1_0_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 1, 0, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 1, 0, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 1, 0, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 1, 0, 101, 50, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_1_1_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 1, 1, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 1, 1, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 1, 1, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 1, 1, 101, 50, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_1_2_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 1, 2, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 1, 2, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 1, 2, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 1, 2, 101, 50, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_1_3_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 1, 3, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 1, 3, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 1, 3, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 1, 3, 101, 50, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_1_4_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 1, 4, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 1, 4, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 1, 4, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 1, 4, 101, 50, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_1_5_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 1, 5, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 1, 5, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 1, 5, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 1, 5, 101, 50, 2, seqan::StringTreeDefault()));
 }
+
 
 // Test all at position 30, all snps, different coverages.
 
@@ -969,38 +839,38 @@ SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_1_5_jou
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_1_0_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 1, 0, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 1, 0, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 1, 0, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 1, 0, 101, 50, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_1_1_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 1, 1, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 1, 1, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 1, 1, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 1, 1, 101, 50, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_1_2_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 1, 2, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 1, 2, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 1, 2, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 1, 2, 101, 50, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_1_3_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 1, 3, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 1, 3, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 1, 3, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 1, 3, 101, 50, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_1_4_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 1, 4, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 1, 4, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 1, 4, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 1, 4, 101, 50, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_1_5_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 1, 5, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 1, 5, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 1, 5, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 1, 5, 101, 50, 2, seqan::StringTreeDefault()));
 }
 
 // Test different positions including 0, all snps, different coverages.
@@ -1049,44 +919,44 @@ SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_1_5_jou
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_1_0_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 1, 0, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 1, 0, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 1, 0, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 1, 0, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 1, 0, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 1, 0, 101, 50, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_1_1_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 1, 1, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 1, 1, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 1, 1, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 1, 1, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 1, 1, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 1, 1, 101, 50, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_1_2_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 1, 2, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 1, 2, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 1, 2, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 1, 2, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 1, 2, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 1, 2, 101, 50, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_1_3_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 1, 3, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 1, 3, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 1, 3, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 1, 3, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 1, 3, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 1, 3, 101, 50, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_1_4_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 1, 4, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 1, 4, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 1, 4, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 1, 4, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 1, 4, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 1, 4, 101, 50, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_1_5_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 1, 5, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 1, 5, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 1, 5, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 1, 5, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 1, 5, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 1, 5, 101, 50, 2, seqan::StringTreeDefault()));
 }
 
 // Test different positions including 0, all deletions, different coverages.
@@ -1135,44 +1005,44 @@ SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_1_5_jou
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_1_0_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 1, 0, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 1, 0, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 1, 0, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 1, 0, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 1, 0, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 1, 0, 101, 50, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_1_1_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 1, 1, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 1, 1, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 1, 1, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 1, 1, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 1, 1, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 1, 1, 101, 50, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_1_2_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 1, 2, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 1, 2, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 1, 2, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 1, 2, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 1, 2, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 1, 2, 101, 50, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_1_3_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 1, 3, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 1, 3, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 1, 3, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 1, 3, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 1, 3, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 1, 3, 101, 50, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_1_4_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 1, 4, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 1, 4, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 1, 4, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 1, 4, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 1, 4, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 1, 4, 101, 50, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_1_5_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 1, 5, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 1, 5, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 1, 5, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 1, 5, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 1, 5, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 1, 5, 101, 50, 2, seqan::StringTreeDefault()));
 }
 
 // ----------------------------------------------------------------------------
@@ -1217,38 +1087,38 @@ SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_2_5_jou
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_2_0_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 2, 0, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 2, 0, 101, 10, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 2, 0, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 2, 0, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_2_1_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 2, 1, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 2, 1, 101, 10, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 2, 1, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 2, 1, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_2_2_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 2, 2, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 2, 2, 101, 10, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 2, 2, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 2, 2, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_2_3_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 2, 3, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 2, 3, 101, 10, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 2, 3, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 2, 3, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_2_4_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 2, 4, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 2, 4, 101, 10, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 2, 4, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 2, 4, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_2_5_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 2, 5, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 2, 5, 101, 10, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 2, 5, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 2, 5, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 // Test all at position 30, all snps, different coverages.
@@ -1291,38 +1161,38 @@ SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_2_5_jou
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_2_0_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 2, 0, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 2, 0, 101, 10, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 2, 0, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 2, 0, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_2_1_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 2, 1, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 2, 1, 101, 10, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 2, 1, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 2, 1, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_2_2_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 2, 2, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 2, 2, 101, 10, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 2, 2, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 2, 2, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_2_3_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 2, 3, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 2, 3, 101, 10, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 2, 3, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 2, 3, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_2_4_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 2, 4, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 2, 4, 101, 10, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 2, 4, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 2, 4, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_2_5_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 2, 5, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 2, 5, 101, 10, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 2, 5, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 2, 5, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 // Test all at position 30, all snps, different coverages.
@@ -1365,38 +1235,38 @@ SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_2_5_jou
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_2_0_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 2, 0, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 2, 0, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 2, 0, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 2, 0, 101, 50, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_2_1_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 2, 1, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 2, 1, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 2, 1, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 2, 1, 101, 50, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_2_2_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 2, 2, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 2, 2, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 2, 2, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 2, 2, 101, 50, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_2_3_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 2, 3, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 2, 3, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 2, 3, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 2, 3, 101, 50, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_2_4_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 2, 4, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 2, 4, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 2, 4, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 2, 4, 101, 50, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_2_5_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 2, 5, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 2, 5, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 2, 5, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 2, 5, 101, 50, 2, seqan::StringTreeDefault()));
 }
 
 // Test different positions including 0, all snps, different coverages.
@@ -1445,44 +1315,44 @@ SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_2_5_jou
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_2_0_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 2, 0, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 2, 0, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 2, 0, 101, 30, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 2, 0, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 2, 0, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 2, 0, 101, 30, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_2_1_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 2, 1, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 2, 1, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 2, 1, 101, 30, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 2, 1, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 2, 1, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 2, 1, 101, 30, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_2_2_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 2, 2, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 2, 2, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 2, 2, 101, 30, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 2, 2, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 2, 2, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 2, 2, 101, 30, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_2_3_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 2, 3, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 2, 3, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 2, 3, 101, 30, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 2, 3, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 2, 3, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 2, 3, 101, 30, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_2_4_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 2, 4, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 2, 4, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 2, 4, 101, 30, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 2, 4, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 2, 4, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 2, 4, 101, 30, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_2_5_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 2, 5, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 2, 5, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 2, 5, 101, 30, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 2, 5, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 2, 5, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 2, 5, 101, 30, 2, seqan::StringTreeDefault()));
 }
 
 // Test different positions including 0, all snps, different coverages.
@@ -1531,44 +1401,44 @@ SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_2_5_jou
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_2_0_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 2, 0, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 2, 0, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 2, 0, 101, 30, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 2, 0, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 2, 0, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 2, 0, 101, 30, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_2_1_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 2, 1, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 2, 1, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 2, 1, 101, 30, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 2, 1, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 2, 1, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 2, 1, 101, 30, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_2_2_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 2, 2, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 2, 2, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 2, 2, 101, 30, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 2, 2, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 2, 2, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 2, 2, 101, 30, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_2_3_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 2, 3, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 2, 3, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 2, 3, 101, 30, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 2, 3, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 2, 3, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 2, 3, 101, 30, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_2_4_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 2, 4, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 2, 4, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 2, 4, 101, 30, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 2, 4, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 2, 4, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 2, 4, 101, 30, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_2_5_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 2, 5, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 2, 5, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 2, 5, 101, 30, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 2, 5, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 2, 5, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 2, 5, 101, 30, 2, seqan::StringTreeDefault()));
 }
 
 // ----------------------------------------------------------------------------
@@ -1615,38 +1485,38 @@ SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_6_5_jou
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_6_0_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 6, 0, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 6, 0, 101, 10, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 6, 0, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 6, 0, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_6_1_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 6, 1, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 6, 1, 101, 10, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 6, 1, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 6, 1, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_6_2_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 6, 2, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 6, 2, 101, 10, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 6, 2, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 6, 2, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_6_3_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 6, 3, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 6, 3, 101, 10, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 6, 3, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 6, 3, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_6_4_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 6, 4, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 6, 4, 101, 10, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 6, 4, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 6, 4, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_6_5_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 6, 5, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 6, 5, 101, 10, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 6, 5, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(0, 6, 5, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 // Test all at position 30, all replacements, different coverages.
@@ -1689,38 +1559,38 @@ SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_6_5_jou
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_6_0_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 6, 0, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 6, 0, 101, 10, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 6, 0, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 6, 0, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_6_1_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 6, 1, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 6, 1, 101, 10, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 6, 1, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 6, 1, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_6_2_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 6, 2, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 6, 2, 101, 10, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 6, 2, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 6, 2, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_6_3_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 6, 3, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 6, 3, 101, 10, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 6, 3, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 6, 3, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_6_4_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 6, 4, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 6, 4, 101, 10, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 6, 4, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 6, 4, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_6_5_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 6, 5, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 6, 5, 101, 10, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 6, 5, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(1, 6, 5, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 // Test all at position 30, all replacements, different coverages.
@@ -1763,38 +1633,38 @@ SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_6_5_jou
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_6_0_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 6, 0, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 6, 0, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 6, 0, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 6, 0, 101, 50, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_6_1_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 6, 1, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 6, 1, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 6, 1, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 6, 1, 101, 50, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_6_2_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 6, 2, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 6, 2, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 6, 2, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 6, 2, 101, 50, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_6_3_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 6, 3, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 6, 3, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 6, 3, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 6, 3, 101, 50, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_6_4_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 6, 4, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 6, 4, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 6, 4, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 6, 4, 101, 50, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_6_5_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 6, 5, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 6, 5, 101, 50, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 6, 5, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(2, 6, 5, 101, 50, 2, seqan::StringTreeDefault()));
 }
 
 // Test different positions including 0, all replacements, different coverages.
@@ -1843,44 +1713,44 @@ SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_6_5_jou
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_6_0_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 6, 0, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 6, 0, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 6, 0, 101, 30, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 6, 0, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 6, 0, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 6, 0, 101, 30, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_6_1_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 6, 1, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 6, 1, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 6, 1, 101, 30, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 6, 1, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 6, 1, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 6, 1, 101, 30, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_6_2_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 6, 2, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 6, 2, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 6, 2, 101, 30, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 6, 2, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 6, 2, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 6, 2, 101, 30, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_6_3_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 6, 3, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 6, 3, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 6, 3, 101, 30, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 6, 3, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 6, 3, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 6, 3, 101, 30, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_6_4_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 6, 4, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 6, 4, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 6, 4, 101, 30, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 6, 4, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 6, 4, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 6, 4, 101, 30, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_6_5_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 6, 5, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 6, 5, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 6, 5, 101, 30, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 6, 5, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 6, 5, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(3, 6, 5, 101, 30, 2, seqan::StringTreeDefault()));
 }
 
 // Test different positions including 0, all replacements, different coverages.
@@ -1929,44 +1799,44 @@ SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_6_5_jou
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_6_0_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 6, 0, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 6, 0, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 6, 0, 101, 30, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 6, 0, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 6, 0, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 6, 0, 101, 30, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_6_1_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 6, 1, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 6, 1, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 6, 1, 101, 30, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 6, 1, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 6, 1, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 6, 1, 101, 30, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_6_2_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 6, 2, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 6, 2, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 6, 2, 101, 30, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 6, 2, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 6, 2, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 6, 2, 101, 30, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_6_3_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 6, 3, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 6, 3, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 6, 3, 101, 30, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 6, 3, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 6, 3, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 6, 3, 101, 30, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_6_4_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 6, 4, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 6, 4, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 6, 4, 101, 30, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 6, 4, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 6, 4, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 6, 4, 101, 30, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_6_5_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 6, 5, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 6, 5, 101, 20, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 6, 5, 101, 30, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 6, 5, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 6, 5, 101, 20, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(4, 6, 5, 101, 30, 2, seqan::StringTreeDefault()));
 }
 
 
@@ -2013,38 +1883,38 @@ SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_5_3_5_jou
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_5_3_0_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(5, 3, 0, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(5, 3, 0, 101, 10, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(5, 3, 0, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(5, 3, 0, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_5_3_1_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(5, 3, 1, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(5, 3, 1, 101, 10, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(5, 3, 1, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(5, 3, 1, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_5_3_2_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(5, 3, 2, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(5, 3, 2, 101, 10, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(5, 3, 2, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(5, 3, 2, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_5_3_3_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(5, 3, 3, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(5, 3, 3, 101, 10, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(5, 3, 3, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(5, 3, 3, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_5_3_4_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(5, 3, 4, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(5, 3, 4, 101, 10, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(5, 3, 4, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(5, 3, 4, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_5_3_5_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(5, 3, 5, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(5, 3, 5, 101, 10, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(5, 3, 5, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(5, 3, 5, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_6_4_3_journaled_string_tree)
@@ -2061,14 +1931,14 @@ SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_7_4_3_jou
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_6_4_3_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(6, 4, 3, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(6, 4, 3, 101, 10, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(6, 4, 3, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(6, 4, 3, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_7_4_3_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(7, 4, 3, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(7, 4, 3, 101, 10, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(7, 4, 3, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(7, 4, 3, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 
@@ -2098,1770 +1968,26 @@ SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_9_5_5_jou
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_9_5_1_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(9, 5, 1, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(9, 5, 1, 101, 10, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(9, 5, 1, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(9, 5, 1, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_9_5_3_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(9, 5, 3, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(9, 5, 3, 101, 10, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(9, 5, 3, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(9, 5, 3, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_9_5_4_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(9, 5, 4, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(9, 5, 4, 101, 10, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(9, 5, 4, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(9, 5, 4, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_9_5_5_journaled_string_tree_block)
 {
-    SEQAN_ASSERT(_runTestForConfigurationBlock(9, 5, 5, 101, 3, seqan::StringTreeDefault()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(9, 5, 5, 101, 10, seqan::StringTreeDefault()));
-}
-
-// ============================================================================
-// Test parallel traversal.
-// ============================================================================
-
-// ----------------------------------------------------------------------------
-// Test all SNPs.
-// ----------------------------------------------------------------------------
-
-// Test all at position 0, all snps, different coverages.
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_0_0_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(0, 0, 0, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(0, 0, 0, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_0_1_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(0, 0, 1, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(0, 0, 1, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_0_2_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(0, 0, 2, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(0, 0, 2, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_0_3_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(0, 0, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(0, 0, 3, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_0_4_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(0, 0, 4, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(0, 0, 4, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_0_5_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(0, 0, 5, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(0, 0, 5, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_0_0_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(0, 0, 0, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(0, 0, 0, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_0_1_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(0, 0, 1, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(0, 0, 1, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_0_2_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(0, 0, 2, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(0, 0, 2, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_0_3_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(0, 0, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(0, 0, 3, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_0_4_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(0, 0, 4, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(0, 0, 4, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_0_5_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(0, 0, 5, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(0, 0, 5, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-// Test all at position 30, all snps, different coverages.
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_0_0_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(1, 0, 0, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(1, 0, 0, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_0_1_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(1, 0, 1, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(1, 0, 1, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_0_2_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(1, 0, 2, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(1, 0, 2, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_0_3_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(1, 0, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(1, 0, 3, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_0_4_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(1, 0, 4, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(1, 0, 4, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_0_5_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(1, 0, 5, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(1, 0, 5, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_0_0_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 0, 0, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 0, 0, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_0_1_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 0, 1, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 0, 1, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_0_2_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 0, 2, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 0, 2, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_0_3_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 0, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 0, 3, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_0_4_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 0, 4, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 0, 4, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_0_5_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 0, 5, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 0, 5, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-// Test all at position 30, all snps, different coverages.
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_0_0_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(2, 0, 0, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(2, 0, 0, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_0_1_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(2, 0, 1, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(2, 0, 1, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_0_2_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(2, 0, 2, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(2, 0, 2, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_0_3_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(2, 0, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(2, 0, 3, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_0_4_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(2, 0, 4, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(2, 0, 4, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_0_5_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(2, 0, 5, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(2, 0, 5, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_0_0_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 0, 0, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 0, 0, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_0_1_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 0, 1, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 0, 1, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_0_2_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 0, 2, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 0, 2, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_0_3_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 0, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 0, 3, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_0_4_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 0, 4, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 0, 4, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_0_5_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 0, 5, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 0, 5, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-// Test different positions including 0, all snps, different coverages.
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_0_0_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(3, 0, 0, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 0, 0, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 0, 0, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_0_1_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(3, 0, 1, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 0, 1, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 0, 1, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_0_2_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(3, 0, 2, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 0, 2, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 0, 2, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_0_3_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(3, 0, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 0, 3, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 0, 3, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_0_4_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(3, 0, 4, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 0, 4, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 0, 4, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_0_5_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(3, 0, 5, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 0, 5, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 0, 5, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_0_0_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 0, 0, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 0, 0, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 0, 0, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_0_1_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 0, 1, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 0, 1, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 0, 1, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_0_2_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 0, 2, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 0, 2, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 0, 2, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_0_3_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 0, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 0, 3, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 0, 3, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_0_4_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 0, 4, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 0, 4, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 0, 4, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_0_5_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 0, 5, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 0, 5, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 0, 5, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-// Test different positions including 0, all snps, different coverages.
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_0_0_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(4, 0, 0, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 0, 0, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 0, 0, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_0_1_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(4, 0, 1, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 0, 1, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 0, 1, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_0_2_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(4, 0, 2, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 0, 2, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 0, 2, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_0_3_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(4, 0, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 0, 3, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 0, 3, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_0_4_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(4, 0, 4, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 0, 4, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 0, 4, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_0_5_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(4, 0, 5, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 0, 5, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 0, 5, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_0_0_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 0, 0, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 0, 0, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 0, 0, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_0_1_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 0, 1, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 0, 1, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 0, 1, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_0_2_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 0, 2, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 0, 2, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 0, 2, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_0_3_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 0, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 0, 3, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 0, 3, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_0_4_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 0, 4, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 0, 4, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 0, 4, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_0_5_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 0, 5, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 0, 5, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 0, 5, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-// ----------------------------------------------------------------------------
-// Test all deletions.
-// ----------------------------------------------------------------------------
-
-// Test all beginning at position 0, all dels, different coverages.
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_1_0_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(0, 1, 0, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(0, 1, 0, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_1_1_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(0, 1, 1, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(0, 1, 1, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_1_2_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(0, 1, 2, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(0, 1, 2, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_1_3_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(0, 1, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(0, 1, 3, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_1_4_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(0, 1, 4, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(0, 1, 4, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_1_5_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(0, 1, 5, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(0, 1, 5, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_1_0_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 1, 0, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 1, 0, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_1_1_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 1, 1, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 1, 1, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_1_2_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 1, 2, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 1, 2, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_1_3_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 1, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 1, 3, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_1_4_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 1, 4, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 1, 4, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_1_5_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 1, 5, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 1, 5, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-// Test all at position 30, all snps, different coverages.
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_1_0_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(1, 1, 0, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(1, 1, 0, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_1_1_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(1, 1, 1, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(1, 1, 1, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_1_2_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(1, 1, 2, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(1, 1, 2, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_1_3_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(1, 1, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(1, 1, 3, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_1_4_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(1, 1, 4, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(1, 1, 4, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_1_5_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(1, 1, 5, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(1, 1, 5, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_1_0_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 1, 0, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 1, 0, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_1_1_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 1, 1, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 1, 1, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_1_2_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 1, 2, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 1, 2, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_1_3_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 1, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 1, 3, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_1_4_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 1, 4, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 1, 4, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_1_5_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 1, 5, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 1, 5, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-// Test all at position 30, all snps, different coverages.
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_1_0_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(2, 1, 0, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(2, 1, 0, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_1_1_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(2, 1, 1, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(2, 1, 1, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_1_2_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(2, 1, 2, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(2, 1, 2, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_1_3_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(2, 1, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(2, 1, 3, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_1_4_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(2, 1, 4, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(2, 1, 4, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_1_5_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(2, 1, 5, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(2, 1, 5, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_1_0_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 1, 0, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 1, 0, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_1_1_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 1, 1, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 1, 1, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_1_2_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 1, 2, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 1, 2, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_1_3_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 1, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 1, 3, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_1_4_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 1, 4, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 1, 4, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_1_5_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 1, 5, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 1, 5, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-// Test different positions including 0, all snps, different coverages.
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_1_0_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(3, 1, 0, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 1, 0, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 1, 0, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_1_1_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(3, 1, 1, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 1, 1, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 1, 1, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_1_2_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(3, 1, 2, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 1, 2, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 1, 2, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_1_3_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(3, 1, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 1, 3, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 1, 3, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_1_4_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(3, 1, 4, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 1, 4, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 1, 4, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_1_5_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(3, 1, 5, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 1, 5, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 1, 5, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_1_0_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 1, 0, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 1, 0, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 1, 0, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_1_1_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 1, 1, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 1, 1, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 1, 1, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_1_2_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 1, 2, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 1, 2, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 1, 2, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_1_3_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 1, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 1, 3, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 1, 3, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_1_4_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 1, 4, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 1, 4, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 1, 4, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_1_5_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 1, 5, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 1, 5, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 1, 5, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-// Test different positions including 0, all deletions, different coverages.
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_1_0_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(4, 1, 0, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 1, 0, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 1, 0, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_1_1_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(4, 1, 1, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 1, 1, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 1, 1, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_1_2_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(4, 1, 2, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 1, 2, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 1, 2, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_1_3_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(4, 1, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 1, 3, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 1, 3, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_1_4_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(4, 1, 4, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 1, 4, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 1, 4, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_1_5_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(4, 1, 5, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 1, 5, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 1, 5, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_1_0_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 1, 0, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 1, 0, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 1, 0, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_1_1_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 1, 1, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 1, 1, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 1, 1, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_1_2_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 1, 2, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 1, 2, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 1, 2, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_1_3_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 1, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 1, 3, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 1, 3, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_1_4_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 1, 4, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 1, 4, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 1, 4, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_1_5_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 1, 5, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 1, 5, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 1, 5, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-// ----------------------------------------------------------------------------
-// Test all Insertions.
-// ----------------------------------------------------------------------------
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_2_0_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(0, 2, 0, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(0, 2, 0, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_2_1_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(0, 2, 1, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(0, 2, 1, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_2_2_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(0, 2, 2, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(0, 2, 2, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_2_3_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(0, 2, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(0, 2, 3, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_2_4_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(0, 2, 4, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(0, 2, 4, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_2_5_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(0, 2, 5, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(0, 2, 5, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_2_0_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 2, 0, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 2, 0, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_2_1_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 2, 1, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 2, 1, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_2_2_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 2, 2, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 2, 2, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_2_3_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 2, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 2, 3, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_2_4_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 2, 4, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 2, 4, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_2_5_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 2, 5, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 2, 5, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-// Test all at position 30, all snps, different coverages.
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_2_0_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(1, 2, 0, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(1, 2, 0, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_2_1_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(1, 2, 1, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(1, 2, 1, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_2_2_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(1, 2, 2, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(1, 2, 2, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_2_3_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(1, 2, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(1, 2, 3, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_2_4_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(1, 2, 4, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(1, 2, 4, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_2_5_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(1, 2, 5, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(1, 2, 5, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_2_0_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 2, 0, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 2, 0, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_2_1_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 2, 1, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 2, 1, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_2_2_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 2, 2, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 2, 2, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_2_3_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 2, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 2, 3, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_2_4_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 2, 4, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 2, 4, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_2_5_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 2, 5, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 2, 5, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-// Test all at position 30, all snps, different coverages.
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_2_0_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(2, 2, 0, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(2, 2, 0, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_2_1_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(2, 2, 1, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(2, 2, 1, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_2_2_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(2, 2, 2, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(2, 2, 2, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_2_3_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(2, 2, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(2, 2, 3, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_2_4_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(2, 2, 4, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(2, 2, 4, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_2_5_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(2, 2, 5, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(2, 2, 5, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_2_0_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 2, 0, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 2, 0, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_2_1_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 2, 1, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 2, 1, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_2_2_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 2, 2, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 2, 2, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_2_3_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 2, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 2, 3, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_2_4_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 2, 4, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 2, 4, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_2_5_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 2, 5, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 2, 5, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-// Test different positions including 0, all snps, different coverages.
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_2_0_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(3, 2, 0, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 2, 0, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 2, 0, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_2_1_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(3, 2, 1, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 2, 1, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 2, 1, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_2_2_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(3, 2, 2, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 2, 2, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 2, 2, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_2_3_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(3, 2, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 2, 3, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 2, 3, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_2_4_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(3, 2, 4, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 2, 4, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 2, 4, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_2_5_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(3, 2, 5, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 2, 5, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 2, 5, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_2_0_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 2, 0, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 2, 0, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 2, 0, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_2_1_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 2, 1, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 2, 1, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 2, 1, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_2_2_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 2, 2, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 2, 2, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 2, 2, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_2_3_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 2, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 2, 3, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 2, 3, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_2_4_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 2, 4, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 2, 4, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 2, 4, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_2_5_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 2, 5, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 2, 5, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 2, 5, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-// Test different positions including 0, all snps, different coverages.
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_2_0_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(4, 2, 0, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 2, 0, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 2, 0, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_2_1_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(4, 2, 1, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 2, 1, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 2, 1, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_2_2_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(4, 2, 2, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 2, 2, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 2, 2, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_2_3_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(4, 2, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 2, 3, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 2, 3, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_2_4_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(4, 2, 4, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 2, 4, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 2, 4, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_2_5_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(4, 2, 5, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 2, 5, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 2, 5, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_2_0_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 2, 0, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 2, 0, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 2, 0, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_2_1_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 2, 1, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 2, 1, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 2, 1, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_2_2_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 2, 2, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 2, 2, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 2, 2, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_2_3_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 2, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 2, 3, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 2, 3, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_2_4_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 2, 4, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 2, 4, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 2, 4, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_2_5_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 2, 5, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 2, 5, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 2, 5, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-// ----------------------------------------------------------------------------
-// Test all Replacements.
-// ----------------------------------------------------------------------------
-
-// Test all at position 0, all replacements, different coverages.
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_6_0_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(0, 6, 0, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(0, 6, 0, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_6_1_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(0, 6, 1, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(0, 6, 1, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_6_2_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(0, 6, 2, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(0, 6, 2, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_6_3_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(0, 6, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(0, 6, 3, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_6_4_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(0, 6, 4, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(0, 6, 4, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_6_5_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(0, 6, 5, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(0, 6, 5, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_6_0_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 6, 0, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 6, 0, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_6_1_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 6, 1, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 6, 1, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_6_2_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 6, 2, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 6, 2, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_6_3_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 6, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 6, 3, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_6_4_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 6, 4, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 6, 4, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_0_6_5_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 6, 5, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(0, 6, 5, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-// Test all at position 30, all replacements, different coverages.
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_6_0_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(1, 6, 0, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(1, 6, 0, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_6_1_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(1, 6, 1, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(1, 6, 1, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_6_2_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(1, 6, 2, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(1, 6, 2, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_6_3_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(1, 6, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(1, 6, 3, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_6_4_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(1, 6, 4, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(1, 6, 4, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_6_5_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(1, 6, 5, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(1, 6, 5, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_6_0_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 6, 0, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 6, 0, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_6_1_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 6, 1, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 6, 1, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_6_2_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 6, 2, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 6, 2, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_6_3_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 6, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 6, 3, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_6_4_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 6, 4, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 6, 4, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_1_6_5_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 6, 5, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(1, 6, 5, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-// Test all at position 30, all replacements, different coverages.
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_6_0_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(2, 6, 0, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(2, 6, 0, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_6_1_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(2, 6, 1, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(2, 6, 1, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_6_2_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(2, 6, 2, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(2, 6, 2, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_6_3_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(2, 6, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(2, 6, 3, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_6_4_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(2, 6, 4, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(2, 6, 4, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_6_5_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(2, 6, 5, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(2, 6, 5, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_6_0_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 6, 0, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 6, 0, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_6_1_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 6, 1, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 6, 1, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_6_2_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 6, 2, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 6, 2, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_6_3_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 6, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 6, 3, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_6_4_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 6, 4, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 6, 4, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_2_6_5_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 6, 5, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(2, 6, 5, 101, 50, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-// Test different positions including 0, all replacements, different coverages.
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_6_0_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(3, 6, 0, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 6, 0, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 6, 0, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_6_1_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(3, 6, 1, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 6, 1, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 6, 1, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_6_2_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(3, 6, 2, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 6, 2, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 6, 2, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_6_3_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(3, 6, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 6, 3, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 6, 3, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_6_4_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(3, 6, 4, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 6, 4, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 6, 4, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_6_5_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(3, 6, 5, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 6, 5, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(3, 6, 5, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_6_0_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 6, 0, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 6, 0, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 6, 0, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_6_1_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 6, 1, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 6, 1, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 6, 1, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_6_2_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 6, 2, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 6, 2, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 6, 2, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_6_3_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 6, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 6, 3, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 6, 3, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_6_4_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 6, 4, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 6, 4, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 6, 4, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_3_6_5_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 6, 5, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 6, 5, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(3, 6, 5, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-// Test different positions including 0, all replacements, different coverages.
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_6_0_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(4, 6, 0, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 6, 0, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 6, 0, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_6_1_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(4, 6, 1, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 6, 1, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 6, 1, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_6_2_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(4, 6, 2, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 6, 2, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 6, 2, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_6_3_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(4, 6, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 6, 3, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 6, 3, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_6_4_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(4, 6, 4, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 6, 4, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 6, 4, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_6_5_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(4, 6, 5, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 6, 5, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(4, 6, 5, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_6_0_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 6, 0, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 6, 0, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 6, 0, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_6_1_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 6, 1, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 6, 1, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 6, 1, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_6_2_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 6, 2, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 6, 2, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 6, 2, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_6_3_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 6, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 6, 3, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 6, 3, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_6_4_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 6, 4, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 6, 4, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 6, 4, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_4_6_5_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 6, 5, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 6, 5, 101, 20, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(4, 6, 5, 101, 30, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-
-// ----------------------------------------------------------------------------
-// Test special variant combinations.
-// ----------------------------------------------------------------------------
-
-// Test all deletions with different size.
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_5_3_0_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(5, 3, 0, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(5, 3, 0, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_5_3_1_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(5, 3, 1, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(5, 3, 1, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_5_3_2_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(5, 3, 2, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(5, 3, 2, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_5_3_3_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(5, 3, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(5, 3, 3, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_5_3_4_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(5, 3, 4, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(5, 3, 4, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_5_3_5_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(5, 3, 5, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(5, 3, 5, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_5_3_0_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(5, 3, 0, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(5, 3, 0, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_5_3_1_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(5, 3, 1, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(5, 3, 1, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_5_3_2_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(5, 3, 2, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(5, 3, 2, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_5_3_3_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(5, 3, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(5, 3, 3, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_5_3_4_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(5, 3, 4, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(5, 3, 4, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_5_3_5_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(5, 3, 5, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(5, 3, 5, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_6_4_3_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(6, 4, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(6, 4, 3, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_7_4_3_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(7, 4, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(7, 4, 3, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_6_4_3_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(6, 4, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(6, 4, 3, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_7_4_3_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(7, 4, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(7, 4, 3, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_9_5_1_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(9, 5, 1, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(9, 5, 1, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_9_5_3_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(9, 5, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(9, 5, 3, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_9_5_4_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(9, 5, 4, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(9, 5, 4, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_9_5_5_journaled_string_tree_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfiguration(9, 5, 5, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfiguration(9, 5, 5, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_9_5_1_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(9, 5, 1, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(9, 5, 1, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_9_5_3_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(9, 5, 3, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(9, 5, 3, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_9_5_4_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(9, 5, 4, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(9, 5, 4, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
-}
-
-SEQAN_DEFINE_TEST(test_journaled_journaled_string_tree_traverse_config_9_5_5_journaled_string_tree_block_parallel)
-{
-    SEQAN_ASSERT(_runTestForConfigurationBlock(9, 5, 5, 101, 3, seqan::StringTreeDefault(), omp_get_max_threads()));
-    SEQAN_ASSERT(_runTestForConfigurationBlock(9, 5, 5, 101, 10, seqan::StringTreeDefault(), omp_get_max_threads()));
+    SEQAN_ASSERT(_runTestForConfiguration(9, 5, 5, 101, 3, 2, seqan::StringTreeDefault()));
+    SEQAN_ASSERT(_runTestForConfiguration(9, 5, 5, 101, 10, 2, seqan::StringTreeDefault()));
 }
 
 #endif  // EXTRAS_TESTS_JOURNALED_STRING_TREE_TEST_JOURNALED_STRING_TREE_TRAVERSE_H_

@@ -154,7 +154,6 @@ template <typename TDeltaMap, typename TTreeSpec, typename TState, typename TSpe
 class JstTraverser<JournaledStringTree<TDeltaMap, TTreeSpec>, TState, TSpec>
 {
 public:
-    typedef JstTraverser<JournaledStringTree<TDeltaMap, TTreeSpec>, TState, TSpec> TTraverser;
     typedef JournaledStringTree<TDeltaMap, TTreeSpec> TContainer;
     typedef typename GetStringSet<TContainer>::Type TJournalSet;
     typedef typename Host<TJournalSet>::Type TReference;
@@ -215,20 +214,6 @@ public:
         _isSynchronized(false)
     {
         init(*this, haystack);
-    }
-
-    // Copy constructor.
-    JstTraverser(TTraverser const & other)
-    {
-        _copy(*this, other);
-    }
-
-    // Assignment Operator.
-    JstTraverser & operator=(TTraverser const & other)
-    {
-        if (this != &other)
-            _copy(*this, other);
-        return *this;
     }
 };
 
@@ -1115,7 +1100,6 @@ _traverseBranch(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPositi
     typedef typename Container<TContainer>::Type TVariantMap;
     typedef typename DeltaCoverage<TVariantMap>::Type TBitVector;
 
-//    TBranchStackEntry* deltaWindow = &top(traverser._branchStack);
 #ifdef DEBUG_DATA_PARALLEL
     bool check = false;
     if (top(traverser._branchStack)._branchProxyId == 1058 && position(top(traverser._branchStack)._proxyIter) == 17669170)
@@ -1192,10 +1176,8 @@ _traverseBranch(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPositi
             // Check if found split point effects the current branch.
             if (!testAllZeros(splitVec) && !_testEqual(splitVec, top(traverser._branchStack)._branchCoverage))
             {
-
                 // Appending to the branch stack might invalidate the current pointer.
                 TBranchStackEntry & splitProxyWindow = createEntry(traverser._branchStack);
-//                deltaWindow = &top(traverser._branchStack);
                 splitProxyWindow._mappedHostPos = *traverser._proxyBranchNodeIt;  // The host position of the split point, where we spawn the search tree.
                 splitProxyWindow._proxyEndPosDiff = top(traverser._branchStack)._proxyEndPosDiff;
                 splitProxyWindow._externalState = getState(externalAlg); // Current state before the split.
@@ -1510,7 +1492,6 @@ _traverseBranchWithAlt(JstTraverser<TContainer, TState, JstTraverserSpec<TContex
     pop(traverser._branchStack);
     while (!empty(traverser._branchStack))
     {
-//        nextBranch = &top(traverser._branchStack);
         // We first check if we need to update the current branch split.
         if (top(traverser._branchStack)._prefixOffset <= 0)  // The branch starts directly within the variant.
         {
@@ -1634,8 +1615,6 @@ void _traverseBranchWithAlt(JstTraverser<TContainer, TState, JstTraverserSpec<Co
     pop(traverser._branchStack);
     while (!empty(traverser._branchStack))
     {
-        // Here we setup the new branch.
-//        TBranchStackEntry & nextBranch = top(traverser._branchStack);
         // Now we come back with the reduced branch coverage.
         SEQAN_ASSERT(!testAllZeros(top(traverser._branchStack)._branchCoverage));  // The coverage cannot be empty.
 
@@ -1663,7 +1642,6 @@ void _traverseBranchWithAlt(JstTraverser<TContainer, TState, JstTraverserSpec<Co
         _traverseBranch(traverser, externalAlg, delegate);
         pop(traverser._branchStack);
     }
-//    reinit(traverser._branchStack);
 }
 
 // ----------------------------------------------------------------------------
@@ -1786,92 +1764,9 @@ _syncAndUpdateCoverage(JstTraverser<TContainer, TState, TSpec> const & traverser
                    FunctorNested<FunctorBitwiseAnd, FunctorIdentity, FunctorBitwiseNot>());
 }
 
-template <typename TContainer, typename TState, typename TSpec>
-inline void
-_copyMinInfo(JstTraverser<TContainer, TState, TSpec> & target,
-             JstTraverser<TContainer, TState, TSpec> const & source)
-{
-    target._traversalState = source._traversalState;
-    target._haystackPtr = source._haystackPtr;  // Pointer to the underlying data parallel facade.
-
-    // Sequence iterators.
-    target._masterIt = source._masterIt;
-    target._masterItEnd = source._masterItEnd;
-    target._branchIt = source._branchIt;
-
-    // Coverage information.
-    target._activeMasterCoverage = source._activeMasterCoverage;  // Active master coverage.
-//    target._activeBranchCoverage = source._activeBranchCoverage;  // Active coverage of the branch.
-
-    // Branch-node information.
-    target._branchNodeIt = source._branchNodeIt;
-    target._branchNodeBlockEnd = source._branchNodeBlockEnd;
-    target._proxyBranchNodeIt = source._proxyBranchNodeIt;
-    target._branchNodeInContextIt = source._branchNodeInContextIt;  // Points to left node within context or behind the context.
-
-    // Auxiliary structures.
-    target._mergePointStack = source._mergePointStack;  // Stores merge points, when deletions are connected to the master branch.
-//    target._branchStack = source._branchStack;  // Handles the branches of the current tree.
-    target._contextSize = source._contextSize;
-    target._needInit = source._needInit;
-    target._isSynchronized = source._isSynchronized;
-    target._lastMasterState = source._lastMasterState;
-}
-
 // ----------------------------------------------------------------------------
-// Function _produceOrConsume()
+// Function _recordMergePointEnds()
 // ----------------------------------------------------------------------------
-
-template <typename TConcurrentQueue, typename TTraverserState, typename TExternal, typename TDelegate>
-inline void
-_produceOrConsume(TConcurrentQueue & queue,
-                  String<TTraverserState> & traverserStates,
-                  String<bool> & activeThreads,
-                  TExternal & externalAlg,
-                  TDelegate & delegate,
-                  Parallel tag)
-{
-    unsigned tId;
-    if (!popFront(tId, queue, tag))
-    {
-//        SEQAN_OMP_PRAGMA(critical(cout))
-//        {
-//            printf("Produce job for %u -> %u\n", tId, activeThreads);
-//        }
-        _traverseBranchWithAlt(traverserStates[omp_get_thread_num()], externalAlg, delegate);
-        return;
-    }
-//    SEQAN_OMP_PRAGMA(critical(cout))
-//    {
-//        printf("Produce job for %u -> %u\n", tId, activeThreads);
-//    }
-    _copy(traverserStates[tId], traverserStates[omp_get_thread_num()]);
-
-    SEQAN_OMP_PRAGMA(atomic write)
-        activeThreads[tId] = true;
-
-
-    // Add the current traversal state to the queue.
-//    appendValue(queue, traverser);
-//    while(length(queue) >= maxQueueSize)
-//    {
-//        TTraverser tmp;
-//        if (tryPopFront(tmp, queue, tag))
-//            _traverseBranchWithAlt(tmp, externalAlg, delegate);
-//    }
-}
-
-template <typename TConcurrentQueue, typename TTraverserState, typename TExternal, typename TDelegate>
-inline void
-_produceOrConsume(TConcurrentQueue & /*queue*/,
-                  String<TTraverserState> & traverserStates,
-                  String<bool> & /*activeThreads*/,
-                  TExternal & externalAlg,
-                  TDelegate & delegate,
-                  Serial const & /*tag*/)
-{
-    _traverseBranchWithAlt(value(traverserStates, omp_get_thread_num()), externalAlg, delegate);
-}
 
 template <typename TContainer, typename TState, typename TSpec>
 inline void
@@ -1890,22 +1785,18 @@ _recordMergePointEnds(JstTraverser<TContainer, TState, TSpec> & traverser)
 }
 
 // ----------------------------------------------------------------------------
-// Function _execProducerThread()
+// Function _execTraversal()
 // ----------------------------------------------------------------------------
 
-template <typename TConcurrentQueue, typename TContainer, typename TState, typename TContextPosition,
-          typename TRequireFullContext, typename TExternal, typename TDelegate, typename TParallelTag>
+template <typename TContainer, typename TState, typename TContextPosition, typename TRequireFullContext,
+          typename TExternal, typename TDelegate>
 inline void
-_execProducerThread(TConcurrentQueue & queue,
-                    String<JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosition, TRequireFullContext> > > & traverserStates,
-                    String<bool> & activeThreads,
-                    TExternal & externalAlg,
-                    TDelegate & delegate,
-                    TParallelTag const & /*tag*/)
+_execTraversal(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosition, TRequireFullContext> > & traverser,
+               TExternal & externalAlg,
+               TDelegate & delegate)
 {
     typedef typename Container<TContainer>::Type TDeltaMap;
     typedef typename DeltaCoverage<TDeltaMap>::Type TBitVector;
-    typedef JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosition, TRequireFullContext> > TJstTraverser;
 
 #ifdef PROFILE_DATA_PARALLEL_INTERN
     String<double> timeTable;
@@ -1917,8 +1808,8 @@ _execProducerThread(TConcurrentQueue & queue,
     std::cerr << currentPercentage << "% " << std::flush;
 #endif //PROFILE_DATA_PARALLEL
 
-    TJstTraverser & traverser = traverserStates[omp_get_thread_num()];  // Access the traverser at this position.
     traverser._lastMasterState = getState(externalAlg);
+
     // Loop over the branch nodes.
     while (traverser._branchNodeIt != traverser._branchNodeBlockEnd)
     {
@@ -1930,7 +1821,7 @@ _execProducerThread(TConcurrentQueue & queue,
     std::cerr << "\n" << "#####################" << std::endl;
     std::cerr << "Search Master Segment: " << position(contextBegin(traverser, StateTraverseMaster())) << " - " << *traverser._branchNodeIt << std::endl;
     std::cerr << "Breakpoint: " << *traverser._branchNodeIt << std::endl;
-//    std::cerr << "Coverage: " << traverser._activeMasterCoverage << std::endl;
+    std::cerr << "Coverage: " << traverser._activeMasterCoverage << std::endl;
 #endif
         if (isMasterState(traverser))
         {
@@ -1950,11 +1841,11 @@ _execProducerThread(TConcurrentQueue & queue,
 
         // Processing the current node.
         unsigned branchPosition = *traverser._branchNodeIt;
-//        printf("Master starts at %u\n", branchPosition);
+
 #ifdef DEBUG_DATA_PARALLEL
         std::cerr << "#####################" << std::endl;
         std::cerr << "Search Branch Segment: " << std::endl;
-//        std::cerr << "Master Branch Coverage: " << traverser._activeMasterCoverage << std::endl;
+        std::cerr << "Master Branch Coverage: " << traverser._activeMasterCoverage << std::endl;
 #endif
 
 #ifdef PROFILE_DATA_PARALLEL_INTERN
@@ -1969,15 +1860,16 @@ _execProducerThread(TConcurrentQueue & queue,
 #ifdef DEBUG_DATA_PARALLEL
             std::cerr << "Coverage: " << traverser._activeBranchCoverage << std::endl;
 #endif
-
             TBitVector& mappedCov = deltaCoverage(traverser._branchNodeIt); //mappedCoverage(container(container(traverser)), position(traverser._branchNodeIt));
             if (!testAllZeros(mappedCov))
             {
+                // We know search in the delta until we have reached the end position of this delta: x, if INS/SNP or x-1 if DEL
+                // What if multiple deletions at the same position?
 #ifdef PROFILE_DATA_PARALLEL_INTERN
                 double timeBranch1 = sysTime();
 #endif
                 _recordMergePointEnds(traverser);
-                _produceOrConsume(queue, traverserStates, activeThreads, externalAlg, delegate, TParallelTag());
+                _traverseBranchWithAlt(traverser, externalAlg, delegate);
 #ifdef PROFILE_DATA_PARALLEL_INTERN
                 timeTable[1] += sysTime() - timeBranch1;
 #endif
@@ -1998,7 +1890,6 @@ _execProducerThread(TConcurrentQueue & queue,
 #endif //PROFILE_DATA_PARALLEL
         }
         traverser._traversalState = JST_TRAVERSAL_STATE_MASTER;
-
 #ifdef PROFILE_DATA_PARALLEL_INTERN
         timeTable[2] += sysTime() - timeBranchAll;
 #endif
@@ -2043,196 +1934,6 @@ _execProducerThread(TConcurrentQueue & queue,
 }
 
 // ----------------------------------------------------------------------------
-// Function _execConsumerThread()
-// ----------------------------------------------------------------------------
-
-template <typename TValue, typename TTraverser, typename TExternal, typename TDelegate>
-inline void
-_execConsumerThread(ConcurrentQueue<TValue> & queue,
-                    String<TTraverser> & traverserStates,
-                    String<bool> & activeThreads,
-                    TExternal & externalAlg,
-                    TDelegate & delegate,
-                    Parallel /*tag*/)
-{
-    TValue activeThread = omp_get_thread_num();
-//    const unsigned ACTIVE_THREAD_MASK = 1 << activeThread;
-//    const unsigned INACTIVE_THREAD_MASK = ~ACTIVE_THREAD_MASK;
-    bool writeStatus;
-    unsigned rCount = 0;
-
-    SEQAN_OMP_PRAGMA(atomic read)
-        rCount = queue.readerCount;
-
-//    SEQAN_OMP_PRAGMA(critical(cout))
-//    {
-      // printf(" ");//Thread: %i; activeThread %u; rCount %u\n", omp_get_thread_num(), activeThread, rCount);
-//    }
-
-    while (rCount != 0)
-    {
-//        SEQAN_OMP_PRAGMA(critical(cout))
-//        {
-//            printf("Threads & ACTIVE_THREAD_MASK = %u & %u = %u\n", activeThreads, ACTIVE_THREAD_MASK, activeThreads & ACTIVE_THREAD_MASK);
-//        }
-        SEQAN_OMP_PRAGMA(atomic read)
-            writeStatus = activeThreads[activeThread];
-
-        if (writeStatus)
-        {
-//            SEQAN_OMP_PRAGMA(critical(cout))
-//            {
-//                printf("Thread %u: Start Traversal (%u)!\n", activeThread, activeThreads);
-//            }
-            _traverseBranchWithAlt(traverserStates[activeThread], externalAlg, delegate);
-//            SEQAN_OMP_PRAGMA(atomic write)
-                activeThreads[activeThread] = false;  // Deactivate thread.
-
-            appendValue(queue, activeThread);  // Make thread available again.
-//            SEQAN_OMP_PRAGMA(critical(cout))
-//            {
-//                printf("Thread %u: All done (%u; %u)!\n", activeThread, activeThreads, queue.readerCount);
-//            }
-        }
-        SEQAN_OMP_PRAGMA(atomic read)
-            rCount = queue.readerCount;
-    }
-//    SEQAN_OMP_PRAGMA(critical(cout))
-//    {
-//            printf("Thread %i: last Check\n", omp_get_thread_num());
-////            printf("Thread %i: length(queue) = %lu\n", omp_get_thread_num(), length(queue));
-//    }
-    SEQAN_OMP_PRAGMA(atomic read)
-        writeStatus = activeThreads[activeThread];
-
-    if (writeStatus)
-    {
-        _traverseBranchWithAlt(traverserStates[activeThread], externalAlg, delegate);
-//        SEQAN_OMP_PRAGMA(atomic write)
-            activeThreads[activeThread] = false;  // Deactivate thread.
-        appendValue(queue, activeThread);  // Make thread available again.
-    }
-}
-
-template <typename TValue, typename TTraverser, typename TExternal, typename TDelegate>
-inline void
-_execConsumerThread(ConcurrentQueue<TValue> & /*queue*/,
-                    String<TTraverser> & /*traverserStates*/,
-                    String<bool> /*activeThreads*/,
-                    TExternal & /*externalAlg*/,
-                    TDelegate & /*delegate*/,
-                    Serial /*tag*/)
-{
-    // no-op
-}
-
-// ----------------------------------------------------------------------------
-// Function _execTraversal()
-// ----------------------------------------------------------------------------
-
-template <typename TContainer, typename TState, typename TContextPosition, typename TRequireFullContext,
-          typename TExternal, typename TDelegate, typename TParallelTag>
-inline void
-_execTraversal(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosition, TRequireFullContext> > & traverser,
-               TExternal externalAlg,
-               TDelegate & delegate,
-               unsigned numThreads,
-               Tag<TParallelTag> tag)
-{
-    typedef JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosition, TRequireFullContext> > TTraverserState;
-//    typedef ConcurrentQueue<TTraverserState> TQueue;
-    typedef ConcurrentQueue<unsigned> TQueue;
-    typedef String<TTraverserState> TStateVec;
-//    typedef typename Size<TQueue>::Type TQueueSize;
-
-#ifdef PROFILE_DATA_PARALLEL_INTERN
-    String<double> timeTable;
-    resize(timeTable, 3, 0.0, Exact());
-    double timeAll = sysTime();
-    unsigned counter = 0;
-    unsigned currentPercentage = 0;
-    unsigned fivePercentInterval = ((traverser._branchNodeBlockEnd - traverser._branchNodeIt) * 5) / 100;
-    std::cerr << currentPercentage << "% " << std::flush;
-#endif //PROFILE_DATA_PARALLEL
-
-    TQueue queue(numThreads);  // Concurrently scheduling the jobs.
-    TStateVec stateVec;
-    resize(stateVec, numThreads, traverser, Exact());
-    String<bool> activeThreads;
-    resize(activeThreads, numThreads, false, Exact());
-    unsigned wCount = numThreads - 1;
-    ReadWriteLock lock;
-
-//    printf("New run with %u threads\n", numThreads);
-    // Parallelize with SPMC-model.
-    // Everyone works on its own external Algorithm.
-    omp_set_num_threads(numThreads);
-    SEQAN_OMP_PRAGMA(parallel firstprivate(externalAlg, wCount), shared(activeThreads, stateVec, lock))
-    {
-        // Call the function for the producer
-        if (omp_get_thread_num() == 0)
-        {
-            {
-                ScopedReadLock<TQueue> readLock(queue);
-                if (wCount > 0)
-                    waitForFirstValue(queue);
-                _execProducerThread(queue, stateVec, activeThreads, externalAlg, delegate, tag);
-            }
-//            printf("Master Waits: %u!\n", activeThreads);
-//            SEQAN_OMP_PRAGMA(critical(cout))
-//            {
-//                printf("Master Stops: %u, %u!\n", queue.readerCount, lock.readers);
-//            }
-//            unsigned readers = wCount;
-//            while (readers != 0)
-//            {
-//                SEQAN_OMP_PRAGMA(atomic read)
-//                    readers = lock.readers;
-//            }
-        }
-        else
-        {
-            unsigned rCount = 0;
-
-            while (rCount == 0)
-            {
-                SEQAN_OMP_PRAGMA(atomic read)
-                    rCount = queue.readerCount;
-            }
-
-//            SEQAN_OMP_PRAGMA(critical(cout))
-//            {
-//                printf("Thread: %i and Reader Count: %u!\n", omp_get_thread_num(), rCount);
-//            }
-
-            ScopedWriteLock<TQueue> writeLock(queue);
-            appendValue(queue, omp_get_thread_num());
-            lockReading(lock);
-
-            waitForWriters(queue, wCount);  // Barrier for writers until all are registered to the queue.
-            _execConsumerThread(queue, stateVec, activeThreads, externalAlg, delegate, tag);
-
-            unsigned lCount = wCount;
-
-            unlockReading(lock);
-
-            while (lCount != 0)
-            {
-                SEQAN_OMP_PRAGMA(atomic read)
-                    lCount = lock.readers;
-            }
-
-//            while (length(queue) != writerCount);
-//
-//            SEQAN_ASSERT(length(queue) == writerCount);
-        }
-    }
-    _copy(traverser, stateVec[0]);
-    SEQAN_ASSERT(length(queue) == wCount);
-
-}
-
-// ----------------------------------------------------------------------------
 // Function _initSegment()
 // ----------------------------------------------------------------------------
 
@@ -2271,42 +1972,6 @@ _reinitBlockEnd(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPositi
         traverser._masterItEnd = end(host(container(traverser)), Rooted());
     else
         traverser._masterItEnd = begin(host(container(traverser)), Rooted()) + value(traverser._branchNodeBlockEnd);
-}
-
-// ----------------------------------------------------------------------------
-// Function _copy()
-// ----------------------------------------------------------------------------
-
-template <typename TContainer, typename TState, typename TContextPosition, typename TRequireFullContext>
-inline void
-_copy(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosition, TRequireFullContext> > & traverser,
-      JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosition, TRequireFullContext> > const & other)
-{
-        traverser._traversalState = other._traversalState;
-        traverser._haystackPtr = other._haystackPtr;  // Pointer to the underlying data parallel facade.
-
-        // Sequence iterators.
-        traverser._masterIt = other._masterIt;
-        traverser._masterItEnd = other._masterItEnd;
-        traverser._branchIt = other._branchIt;
-
-        // Coverage information.
-        traverser._activeMasterCoverage = other._activeMasterCoverage;  // Active master coverage.
-        traverser._activeBranchCoverage = other._activeBranchCoverage;  // Active coverage of the branch.
-
-        // Branch-node information.
-        traverser._branchNodeIt = other._branchNodeIt;
-        traverser._branchNodeBlockEnd = other._branchNodeBlockEnd;
-        traverser._proxyBranchNodeIt = other._proxyBranchNodeIt;
-        traverser._branchNodeInContextIt = other._branchNodeInContextIt;  // Points to left node within context or behind the context.
-
-        // Auxiliary structures.
-        traverser._mergePointStack = other._mergePointStack;  // Stores merge points, when deletions are connected to the master branch.
-        traverser._branchStack = other._branchStack;  // Handles the branches of the current tree.
-        traverser._contextSize = other._contextSize;
-        traverser._needInit = other._needInit;
-        traverser._isSynchronized = other._isSynchronized;
-        traverser._lastMasterState = other._lastMasterState;
 }
 
 // ----------------------------------------------------------------------------
@@ -2366,28 +2031,12 @@ init(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosition, TRequir
  * @headerfile <seqan/journaled_string_tree.h>
  * @brief Triggers the traversal.
  *
- * @signature traverse(ext, delegate, traverser[, t]);
+ * @signature traverse(ext, delegate, traverser);
  *
- * @param[in]      ext       An external algorithm. Has to implement the @link JstTraversalConcept @endlink.
+ * @param[in,out]  ext       An external algorithm. Has to implement the @link JstTraversalConcept @endlink.
  * @param[in,out]  delegate  A functor which is called by the external algorithm.
  * @param[in,out]  traverser The traverser that manages the traverser. Has to be of type @link JstTraverser @endlink.
- * @param[in]      t         Optional parameter to set number of threads to be used. Defaults to <tt>1<\tt>.
  */
-
-template <typename TOperator, typename TDelegate, typename TContainer, typename TState, typename TSpec>
-inline
-SEQAN_FUNC_ENABLE_IF(Is<JstTraversalConcept<TOperator> >, void)
-traverse(TOperator & traversalCaller,
-         TDelegate & delegate,
-         JstTraverser<TContainer, TState, TSpec> & traverser,
-         unsigned  numThreads)
-{
-    _reinitBlockEnd(traverser);
-    if (numThreads > 1)
-        _execTraversal(traverser, traversalCaller, delegate, numThreads, Parallel());
-    else
-        _execTraversal(traverser, traversalCaller, delegate, 1, Serial());
-}
 
 template <typename TOperator, typename TDelegate, typename TContainer, typename TState, typename TSpec>
 inline
@@ -2396,7 +2045,11 @@ traverse(TOperator & traversalCaller,
          TDelegate & delegate,
          JstTraverser<TContainer, TState, TSpec> & traverser)
 {
-    traverse(traversalCaller, delegate, traverser, 1);
+    while(journalNextBlock(container(traverser), contextSize(traverser)))
+    {
+        _reinitBlockEnd(traverser);
+        _execTraversal(traverser, traversalCaller, delegate);
+    }
 }
 
 // ----------------------------------------------------------------------------
@@ -2408,7 +2061,7 @@ traverse(TOperator & traversalCaller,
  * @headerfile <seqan/journaled_string_tree.h>
  * @brief Sets the context size of the context.
  *
- * @signature TContainer setContextSize(traverser, w);
+ * @signature TContainer setsetContextSize(traverser, w);
  * @param[in,out]  traverser The traverser to set the context size to.
  * @param[in]       w         The context size.
  *
@@ -2500,17 +2153,6 @@ inline typename Container<JstTraverser<TContainer, TState, TSpec> const>::Type &
 container(JstTraverser<TContainer, TState, TSpec> const & traverser)
 {
     return *traverser._haystackPtr;
-}
-
-// ----------------------------------------------------------------------------
-// Function getObjId()
-// ----------------------------------------------------------------------------
-
-template <typename TContainer, typename TState, typename TSpec>
-inline void const *
-getObjectId(JstTraverser<TContainer, TState, TSpec> const & obj)
-{
-    return static_cast<void const *>(&obj);
 }
 
 #ifdef DEBUG_DATA_PARALLEL

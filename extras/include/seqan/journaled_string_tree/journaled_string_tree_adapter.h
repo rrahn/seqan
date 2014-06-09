@@ -133,7 +133,8 @@ _journalSnp(TTarget & target,
     appendValue(target._insertionBuffer, snp);
     _doRecordInsertion(target._journalEntries, entryIt, virtPos, length(target._insertionBuffer) - 1, 1u);
     entryIt = end(_journalEntries(target), Standard()) -1;
-    _doRecordErase(target._journalEntries, entryIt, virtPos + 1, virtPos + 2);
+    ++virtPos;
+    _doRecordErase(target._journalEntries, entryIt, virtPos, virtPos + 1);
 }
 
 // ----------------------------------------------------------------------------
