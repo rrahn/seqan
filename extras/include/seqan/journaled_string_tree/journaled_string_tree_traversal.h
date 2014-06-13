@@ -520,6 +520,38 @@ _copy(JstTraverser<TJst, TState, TSpec> & me,
     me._mergePointStack = other._mergePointStack;
 }
 
+template <typename TJst, typename TState, typename TSpec>
+inline void
+_copy(JstTraverser<TJst, TState, TSpec> & me,
+      JstTraverser<TJst, TState, TSpec> const & other)
+{
+    me._traversalState = other._traversalState;
+    me._haystackPtr = other._haystackPtr;  // Pointer to the underlying data parallel facade.
+
+    // Sequence iterators.
+    me._masterIt = other._masterIt;
+    me._masterItEnd = other._masterItEnd;
+    me._branchIt = other._branchIt;
+
+    // Coverage information.
+    me._activeMasterCoverage = other._activeMasterCoverage;  // Active master coverage.
+    me._activeBranchCoverage = other._activeBranchCoverage;  // Active coverage of the branch.
+
+    // Branch-node information.
+    me._branchNodeIt = other._branchNodeIt;
+    me._branchNodeBlockEnd = other._branchNodeBlockEnd;
+    me._proxyBranchNodeIt = other._proxyBranchNodeIt;
+    me._branchNodeInContextIt = other._branchNodeInContextIt;  // Points to left node within context or behind the context.
+
+    // Auxiliary structures.
+    me._mergePointStack = other._mergePointStack;  // Stores merge points, when deletions are connected to the master branch.
+    me._branchStack = other._branchStack;  // Handles the branches of the current tree.
+    me._contextSize = other._contextSize;
+    me._needInit = other._needInit;
+    me._isSynchronized = other._isSynchronized;
+    me._lastMasterState = other._lastMasterState;
+}
+
 // ----------------------------------------------------------------------------
 // Function _contextBeginPosition()                        [StateTraverseMaster]
 // ----------------------------------------------------------------------------
@@ -2225,10 +2257,10 @@ _execTraversal(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPositio
             _execProducerThread(queue, jobs[omp_get_thread_num()], externalAlg, delegate, parallelTag);
         }
 
-//        SEQAN_OMP_PRAGMA(critical(cout))
-//        {
-//            printf("Thread: %i registered for popping.\n", omp_get_thread_num());
-//        }
+        SEQAN_OMP_PRAGMA(critical(cout))
+        {
+            printf("Thread: %i registered for popping.\n", omp_get_thread_num());
+        }
         ScopedReadLock<TQueue> readLock(queue);
         waitForFirstValue(queue); // Barrier to wait for all writers to set up.
 

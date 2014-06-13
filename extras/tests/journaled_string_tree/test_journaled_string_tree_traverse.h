@@ -103,11 +103,17 @@ struct DummyDelegator_
 #ifdef TEST_DEBUG_OUTPUT
             std::cerr << "("<< posVec[i].i1 << ", " <<  posVec[i].i2 << ")" << "; ";
 #endif
-            appendValue(_processedSeq[posVec[i].i1], value(_testSeq, posVec[i].i1)[posVec[i].i2]);
+            appendValue(_processedSeq[posVec[i].i1], TPair(posVec[i].i2, value(_testSeq, posVec[i].i1)[posVec[i].i2]));
         }
 #ifdef TEST_DEBUG_OUTPUT
         std::cerr << std::endl;
 #endif
+    }
+
+    inline void postProcess()
+    {
+        for (unsigned i = 0; i < length(_processedSeq); ++i)
+            std::sort(begin(_processedSeq[i], Standard()), end(_processedSeq[i], Standard()), CompareLessFunctor_<TPair>());
     }
 
 };
@@ -175,12 +181,15 @@ initState(DummyCaller_<TContainer> & /*dummy*/)
 }
 
 template <typename TTestSeq, typename TCompareSeq, typename TSize>
-bool compareResults(TTestSeq const & testSeq, TCompareSeq const & compSeq, TSize const & windowSize)
+bool compareResults(TTestSeq const & testSeq, TCompareSeq const & compSeq, TSize const & )
 {
     SEQAN_ASSERT_EQ(length(testSeq), length(compSeq));
     for (unsigned i = 0; i < length(testSeq); ++i)
-        if (isNotEqual(testSeq[i], prefix(compSeq[i], length(compSeq[i]) - (windowSize -1))))
-            return false;
+        for (unsigned j = 0; j < length(testSeq); ++j)
+            if (testSeq[i][j].i2 != compSeq[i][j])
+                return false;
+//        if (isNotEqual(testSeq[i], prefix(compSeq[i], length(compSeq[i]) - (windowSize -1))))
+//            return false;
     return true;
 }
 
@@ -190,8 +199,12 @@ void _printDebugInfo(TMock const & mockGen, TTester const & dpTester, TSize cons
 {
     std::cerr << "Host: " << host(mockGen._seqData) << std::endl;
     for (unsigned i = 0; i < length(dpTester._processedSeq); ++i)
-        std::cerr << "Compare 1: " << dpTester._processedSeq[i] << "\nCompare 2: "
-        << prefix(mockGen._seqData[i], length(mockGen._seqData[i]) - (windowSize - 1)) << "\n" << std::endl;
+    {
+        std::cerr << "Compare 1:";
+        for (unsigned j = 0; j < length(dpTester._processedSeq[i]); ++j )
+            std::cerr << " " << dpTester._processedSeq[i][j].i2;
+        std::cerr << "\nCompare 2: " << prefix(mockGen._seqData[i], length(mockGen._seqData[i]) - (windowSize - 1)) << "\n" << std::endl;
+    }
 }
 
 // With block size and parallel tag.
