@@ -188,8 +188,6 @@ bool compareResults(TTestSeq const & testSeq, TCompareSeq const & compSeq, TSize
         for (unsigned j = 0; j < length(testSeq); ++j)
             if (testSeq[i][j].i2 != compSeq[i][j])
                 return false;
-//        if (isNotEqual(testSeq[i], prefix(compSeq[i], length(compSeq[i]) - (windowSize -1))))
-//            return false;
     return true;
 }
 
