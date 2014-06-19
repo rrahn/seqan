@@ -317,14 +317,25 @@ getState(FinderExtensionPoint<TFinder, MyersBitVector> const & extensionFunctor)
 
 template <typename TFinder>
 inline void
-setState(FinderExtensionPoint<TFinder, MyersBitVector>  & extensionFunctor,
-                  typename GetState<FinderExtensionPoint<TFinder, MyersBitVector> >::Type const & state)
+setState(FinderExtensionPoint<TFinder, MyersBitVector> & extensionFunctor,
+         typename GetState<FinderExtensionPoint<TFinder, MyersBitVector> >::Type const & state)
 {
     extensionFunctor._state = state;
 }
 
 // ----------------------------------------------------------------------------
-// Function _reinit()
+// Function initState()
+// ----------------------------------------------------------------------------
+
+template <typename TFinder>
+inline void
+initState(FinderExtensionPoint<TFinder, MyersBitVector> & extensionFunctor)
+{
+    _patternInit(extensionFunctor._pattern, extensionFunctor._state, extensionFunctor);  // Initialize the states.
+}
+
+// ----------------------------------------------------------------------------
+// Function init()
 // ----------------------------------------------------------------------------
 
 template <typename TFinder, typename TScore>

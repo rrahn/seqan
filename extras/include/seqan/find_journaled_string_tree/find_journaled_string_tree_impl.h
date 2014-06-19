@@ -223,29 +223,6 @@ struct GetJstTraverser<Finder_<TContainer, TPattern, TSpec> >
 // ============================================================================
 
 // ----------------------------------------------------------------------------
-// Function getGetState()
-// ----------------------------------------------------------------------------
-
-template <typename TFinder, typename TSpec>
-inline typename GetState<FinderExtensionPoint<TFinder, TSpec> >::Type
-getState(FinderExtensionPoint<TFinder, TSpec> const & /*extensionFunctor*/)
-{
-    return typename GetState<FinderExtensionPoint<TFinder, TSpec> >::Type();
-}
-
-// ----------------------------------------------------------------------------
-// Function setGetState()
-// ----------------------------------------------------------------------------
-
-template <typename TFinder, typename TSpec, typename TState>
-inline void
-setState(FinderExtensionPoint<TFinder, TSpec> const & /*extensionFunctor*/,
-         TState const & /*state*/)
-{
-    // no-op function.
-}
-
-// ----------------------------------------------------------------------------
 // Function getState()
 // ----------------------------------------------------------------------------
 
@@ -266,6 +243,17 @@ setState(Finder_<TContainer, TPattern, Jst<TSpec> > & finder,
          TState const & state)
 {
     setState(finder._extensionFunctor, state);  // Delegates to extension functor.
+}
+
+// ----------------------------------------------------------------------------
+// Function initState()
+// ----------------------------------------------------------------------------
+
+template <typename TContainer, typename TPattern, typename TSpec>
+inline void
+initState(Finder_<TContainer, TPattern, Jst<TSpec> > & finder)
+{
+    initState(finder._extensionFunctor);  // Delegates to extension functor.
 }
 
 // ----------------------------------------------------------------------------
@@ -342,31 +330,19 @@ init(FinderExtensionPoint<TFinder, TExtensionSpec> & extensionFunctor,
     init(extensionFunctor, pattern);
 }
 
-// ----------------------------------------------------------------------------
-// Function _find()
-// ----------------------------------------------------------------------------
-
-template <typename TContainer, typename TPattern, typename TSpec, typename TDelegate>
-inline void
-_find(Finder_<TContainer, TPattern, Jst<TSpec> > & finder,
-      TPattern & pattern,
-      TDelegate & delegate,
-      int scoreLimit,
-      unsigned numThreads)
-{
-    typedef Finder_<TContainer, TPattern, Jst<TSpec> > TFinder;
-    typedef typename GetJstTraverser<TFinder>::Type TTraverser;
-
-    // Set up the journaled string tree traversal.
-    TTraverser traverser(container(finder), length(needle(pattern)) - scoreLimit);
-
-    if (finder._needReinit)
-    {
-        init(finder._extensionFunctor, pattern, scoreLimit);
-        finder._needReinit = false;
-    }
-    traverse(finder, delegate, traverser, numThreads);
-}
+//// ----------------------------------------------------------------------------
+//// Function _find()
+//// ----------------------------------------------------------------------------
+//
+//template <typename TContainer, typename TPattern, typename TSpec, typename TDelegate>
+//inline void
+//_find(Finder_<TContainer, TPattern, Jst<TSpec> > & finder,
+//      TPattern & pattern,
+//      TDelegate & delegate,
+//      int scoreLimit,
+//      Tag<T>)
+//{
+//}
 
 // ----------------------------------------------------------------------------
 // Function find()                                                     [Serial]
@@ -385,29 +361,36 @@ _find(Finder_<TContainer, TPattern, Jst<TSpec> > & finder,
  * @param[in]       limit       An optional parameter setting the score limit (<tt><= 0</tt>).
  */
 
-//template <typename TContainer, typename TPattern, typename TSpec, typename TDelegate>
-//inline void
-//find(Finder_<TContainer, TPattern, Jst<TSpec> > & finder,
-//     TPattern & pattern,
-//     TDelegate & delegate,
-//     int scoreLimit,
-//     unsigned numThreads)
-//{
-//    if (numThreads > 1)
-//        _find(finder, pattern, delegate, scoreLimit, numThreads);
-//    else
-//        _find(finder, pattern, delegate, scoreLimit, numThreads);
-//}
+template <typename TContainer, typename TPattern, typename TSpec, typename TDelegate, typename TParallel>
+inline void
+find(Finder_<TContainer, TPattern, Jst<TSpec> > & finder,
+     TPattern & pattern,
+     TDelegate & delegate,
+     int scoreLimit,
+     Tag<TParallel> const& parallelTag)
+{
+    typedef Finder_<TContainer, TPattern, Jst<TSpec> > TFinder;
+    typedef typename GetJstTraverser<TFinder>::Type TTraverser;
+
+    // Set up the journaled string tree traversal.
+    TTraverser traverser(container(finder), length(needle(pattern)) - scoreLimit);
+
+    if (finder._needReinit)
+    {
+        init(finder._extensionFunctor, pattern, scoreLimit);
+        finder._needReinit = false;
+    }
+    traverse(finder, delegate, traverser, parallelTag);
+}
 
 template <typename TContainer, typename TPattern, typename TSpec, typename TDelegate>
 inline void
 find(Finder_<TContainer, TPattern, Jst<TSpec> > & finder,
      TPattern & pattern,
      TDelegate & delegate,
-     int scoreLimit = 0,
-     unsigned numThreads = 1)
+     int scoreLimit = 0)
 {
-    _find(finder, pattern, delegate, scoreLimit, numThreads);
+    find(finder, pattern, delegate, scoreLimit, Serial());
 }
 
 //template <typename TContainer, typename TPattern, typename TSpec, typename TDelegate>

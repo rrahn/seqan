@@ -168,7 +168,7 @@ struct RegisteredExtensionPoint<Finder_<TContainer, Pattern<TNeedle, ShiftOr>, J
 // ============================================================================
 
 // ----------------------------------------------------------------------------
-// Function getState                                         [ShiftOr]
+// Function getState                                                  [ShiftOr]
 // ----------------------------------------------------------------------------
 
 template <typename TFinder>
@@ -186,7 +186,18 @@ getState(FinderExtensionPoint<TFinder, ShiftOr> const & extensionFunctor)
 }
 
 // ----------------------------------------------------------------------------
-// Function setState()                                       [ShiftOr]
+// Function initState()                                               [ShiftOr]
+// ----------------------------------------------------------------------------
+
+template <typename TFinder>
+inline void
+initState(FinderExtensionPoint<TFinder, ShiftOr> & extensionFunctor)
+{
+    _patternInit(extensionFunctor._state);
+}
+
+// ----------------------------------------------------------------------------
+// Function setState()                                                [ShiftOr]
 // ----------------------------------------------------------------------------
 
 template <typename TFinder>

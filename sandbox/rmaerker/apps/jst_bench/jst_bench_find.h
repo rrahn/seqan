@@ -353,14 +353,14 @@ _checkCorrectAlgorithm(TStringTree & stringTree,
         TPattern pattern;
         setHost(pattern, needle);
 
+        reinit(stringTree);
         TFinder finder(stringTree);
         ParallelHitCollector_ delegateParallel(length(stringSet(stringTree)), findOptions.numThreads);
 
-//        if (findOptions.numThreads > 1)
-////            find(finder, pattern, delegateParallel, findOptions.k, Parallel());
-//        else
-        reinit(stringTree);
-        find(finder, pattern, delegateParallel, findOptions.k, findOptions.numThreads);
+        if (findOptions.numThreads > 1)
+            find(finder, pattern, delegateParallel, findOptions.k, Parallel());
+        else
+            find(finder, pattern, delegateParallel, findOptions.k, Serial());
 
         std::stringstream patternLable;
         patternLable << "Needle Information\t";
@@ -731,9 +731,10 @@ int _findPatternOnline(JournaledStringTree<TDeltaMap, TStringTreeSpec> & stringT
     setHost(pattern, needle);
     TFinder finder(stringTree);
 
-    find(finder, pattern, hitCollector, findOptions.k, findOptions.numThreads);
-//    else
-//        find(finder, pattern, hitCollector, findOptions.k, Parallel());
+    if (findOptions.numThreads > 1)
+        find(finder, pattern, hitCollector, findOptions.k, Parallel());
+    else
+        find(finder, pattern, hitCollector, findOptions.k, Serial());
     std::cout << "Time for find: " << sysTime() - timeBlockAll << " s." << std::endl;
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////

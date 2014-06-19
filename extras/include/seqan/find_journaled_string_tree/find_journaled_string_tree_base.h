@@ -187,6 +187,40 @@ struct GetJstTraverserForFinder_;
 // Functions
 // ============================================================================
 
+// ----------------------------------------------------------------------------
+// Function getGetState()
+// ----------------------------------------------------------------------------
+
+template <typename TFinder, typename TSpec>
+inline typename GetState<FinderExtensionPoint<TFinder, TSpec> >::Type
+getState(FinderExtensionPoint<TFinder, TSpec> const & /*extensionFunctor*/)
+{
+    return typename GetState<FinderExtensionPoint<TFinder, TSpec> >::Type();
+}
+
+// ----------------------------------------------------------------------------
+// Function setState()
+// ----------------------------------------------------------------------------
+
+template <typename TFinder, typename TSpec, typename TState>
+inline void
+setState(FinderExtensionPoint<TFinder, TSpec> const & /*extensionFunctor*/,
+         TState const & /*state*/)
+{
+    // no-op function.
+}
+
+// ----------------------------------------------------------------------------
+// Function initState()
+// ----------------------------------------------------------------------------
+
+template <typename TFinder, typename TSpec>
+inline void
+initState(FinderExtensionPoint<TFinder, TSpec> const & /*extensionFunctor*/)
+{
+    // no-op function.
+}
+
 }  // namespace seqan
 
 #endif  // EXTRAS_INCLUDE_SEQAN_FIND_JOURNALED_STRING_TREE_FIND_JOURNALED_STRING_TREE_BASE_H_

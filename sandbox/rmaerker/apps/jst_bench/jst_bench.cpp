@@ -116,7 +116,7 @@ readFinderOptions(FindOptions & options, ArgumentParser const & parser)
     getOptionValue(options.outputFile, parser, "output");
     getOptionValue(options.numThreads, parser, "threads");
     // Parallelize with OpenMp
-    omp_set_num_threads(options.numThreads);   // TODO(rmaerker): Maybe we use it first later.
+    omp_set_num_threads(options.numThreads);
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Online search program options.

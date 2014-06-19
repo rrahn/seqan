@@ -2243,13 +2243,16 @@ _execTraversal(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPositio
             waitForWriters(queue, 1);  // Barrier for writers until all are registered to the queue.
 
             _execProducerThread(queue, jobs[omp_get_thread_num()], externalAlg, delegate, parallelTag);
+#ifdef PROFILE_JST_INTERN
+            std::cerr << "Queue empty? " << empty(queue) << std::endl;
+#endif
             traverser = jobs[0];
         }
 
-        SEQAN_OMP_PRAGMA(critical(cout))
-        {
-            printf("Thread: %i registered for popping.\n", omp_get_thread_num());
-        }
+//        SEQAN_OMP_PRAGMA(critical(cout))
+//        {
+//            printf("Thread: %i registered for popping.\n", omp_get_thread_num());
+//        }
         ScopedReadLock<TQueue> readLock(queue);
         waitForFirstValue(queue); // Barrier to wait for all writers to set up.
 
@@ -2410,11 +2413,28 @@ traverse(TOperator & traversalCaller,
          JstTraverser<TContainer, TState, TSpec> & traverser,
          Tag<TParallelSpec> const & tag)
 {
+#ifdef PROFILE_JST_INTERN
+    double buildTotal = 0.0;
+    double searchTotal = 0.0;
+    double tBuild = sysTime();
+#endif
     while(journalNextBlock(container(traverser), contextSize(traverser), tag))
     {
         _reinitBlockEnd(traverser);
+#ifdef PROFILE_JST_INTERN
+        buildTotal += sysTime() - tBuild;
+        double tSearch = sysTime();
+#endif
         _execTraversal(traverser, traversalCaller, delegate, tag);
+#ifdef PROFILE_JST_INTERN
+        searchTotal += sysTime() - tSearch;
+        tBuild = sysTime();
+#endif
     }
+#ifdef PROFILE_JST_INTERN
+    std::cout << "Time build:  " << buildTotal << " s." << std::endl;
+    std::cout << "Time search: " << searchTotal << " s." << std::endl;
+#endif
 }
 
 template <typename TOperator, typename TDelegate, typename TContainer, typename TState, typename TSpec>
