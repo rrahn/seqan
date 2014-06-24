@@ -242,16 +242,18 @@ public:
     mutable TBranchNodeIterator _branchNodeInContextIt;  // Points to left node within context or behind the context.
 
     // Auxiliary structures.
-    mutable TMergePointStore _mergePointStack;  // Stores merge points, when deletions are connected to the master branch.
-    mutable TBranchStack     _branchStack;  // Handles the branches of the current tree.
-    TSize _contextSize;
-    bool _needInit;
-    mutable bool _isSynchronized;
-    TState _lastMasterState;
+    mutable TMergePointStore    _mergePointStack;  // Stores merge points, when deletions are connected to the master branch.
+    mutable TBranchStack        _branchStack;  // Handles the branches of the current tree.
+    TSize                       _contextSize;
+    int                         _rightOverlap;
+    bool                        _needInit;
+    mutable bool                _isSynchronized;
+    TState                      _lastMasterState;
 
     JstTraverser() : _traversalState(JST_TRAVERSAL_STATE_NULL),
                   _haystackPtr((TContainer*) 0),
                   _contextSize(1),
+                  _rightOverlap(0),
                   _needInit(true),
                   _isSynchronized(false)
     {}
@@ -260,6 +262,18 @@ public:
         _traversalState(JST_TRAVERSAL_STATE_NULL),
         _mergePointStack(container(haystack)),
         _contextSize(contextSize),
+        _rightOverlap(0),
+        _needInit(false),
+        _isSynchronized(false)
+    {
+        init(*this, haystack);
+    }
+
+    JstTraverser(TContainer & haystack, TSize contextSize, int rightOverlap) :
+        _traversalState(JST_TRAVERSAL_STATE_NULL),
+        _mergePointStack(container(haystack)),
+        _contextSize(contextSize),
+        _rightOverlap(rightOverlap),
         _needInit(false),
         _isSynchronized(false)
     {
@@ -299,6 +313,19 @@ public:
 // ============================================================================
 // Metafunctions
 // ============================================================================
+
+// ----------------------------------------------------------------------------
+// Metafunction IsBranchIteator
+// ----------------------------------------------------------------------------
+
+template <typename THaystackIt>
+struct IsBranchIteator : False{};
+
+template <typename TJournaledString, typename TJournalSpec>
+struct IsBranchIteator<Iter<TJournaledString, JournaledStringIterSpec<TJournalSpec> > > : True{};
+
+template <typename TJournaledString, typename TJournalSpec>
+struct IsBranchIteator<Iter<TJournaledString, JournaledStringIterSpec<TJournalSpec> > const> : True{};
 
 // ----------------------------------------------------------------------------
 // Metafunction Container
@@ -1275,6 +1302,8 @@ _traverseBranch(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPositi
     // Note, we need the position of the iterator, because the journal string iterator never
     // exceeds the end of the journal string. And it might be faster than evaluating the iterator.
     unsigned branchPos = _contextEndPosition(traverser, StateTraverseBranch());
+    // End position of the traversal.
+    unsigned seqEndPos = length(*(top(traverser._branchStack)._proxyIter._journalStringPtr)) + traverser._rightOverlap;
 #ifdef DEBUG_DATA_PARALLEL
     if (check == true)
     {
@@ -1284,8 +1313,7 @@ _traverseBranch(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPositi
 #endif
 
     TBitVector splitVec;
-
-    while(branchPos < top(traverser._branchStack)._proxyEndPos && branchPos < length(*(top(traverser._branchStack)._proxyIter._journalStringPtr)))  // Check end condition.
+    while(branchPos < top(traverser._branchStack)._proxyEndPos && branchPos < seqEndPos)  // Check end condition.
     {
         if (branchPos >= splitPointPos)
         {
@@ -2056,6 +2084,8 @@ _execTraversal(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPositio
 {
     typedef typename Container<TContainer>::Type TDeltaMap;
     typedef typename DeltaCoverage<TDeltaMap>::Type TBitVector;
+    typedef typename JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosition, TRequireFullContext> > TTraverser;
+    typedef typename TTraverser::TMasterBranchIterator TMasterIterator;
 
 #ifdef PROFILE_DATA_PARALLEL_INTERN
     String<double> timeTable;
@@ -2291,11 +2321,14 @@ _reinitBlockEnd(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPositi
 {
     // We do not need to update the end if the full tree is journaled.
     if (fullJournalRequired(container(traverser)))
+    {
+        traverser._masterItEnd += traverser._rightOverlap;
         return;
+    }
 
     traverser._branchNodeBlockEnd = container(traverser)._mapBlockEnd;
     if (traverser._branchNodeBlockEnd == end(container(container(traverser)), Standard()))  // Last block.
-        traverser._masterItEnd = end(host(container(traverser)), Rooted());
+        traverser._masterItEnd = end(host(container(traverser)), Rooted()) + traverser._rightOverlap;
     else
         traverser._masterItEnd = begin(host(container(traverser)), Rooted()) + value(traverser._branchNodeBlockEnd);
 }
@@ -2331,6 +2364,7 @@ _copy(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosition, TRequi
         traverser._mergePointStack = other._mergePointStack;  // Stores merge points, when deletions are connected to the master branch.
         traverser._branchStack = other._branchStack;  // Handles the branches of the current tree.
         traverser._contextSize = other._contextSize;
+        traverser._rightOverlap = other._rightOverlap;  // Right overlap to allow the context to move over the reference.
         traverser._needInit = other._needInit;
         traverser._isSynchronized = other._isSynchronized;
         traverser._lastMasterState = other._lastMasterState;

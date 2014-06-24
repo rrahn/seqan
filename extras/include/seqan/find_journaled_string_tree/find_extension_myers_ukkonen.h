@@ -328,7 +328,7 @@ setState(FinderExtensionPoint<TFinder, MyersBitVector>  & extensionFunctor,
 // ----------------------------------------------------------------------------
 
 template <typename TFinder, typename TScore>
-inline void
+inline Pair<unsigned>
 init(FinderExtensionPoint<TFinder, MyersBitVector> & myersFunctor,
      typename GetPattern<TFinder>::Type & pattern,
      TScore const & scoreLimit)
@@ -343,6 +343,7 @@ init(FinderExtensionPoint<TFinder, MyersBitVector> & myersFunctor,
     _patternInit(myersFunctor._pattern, myersFunctor._state, myersFunctor);  // Initialize the pattern.
     myersFunctor._isSmallPattern = myersFunctor._pattern.largePattern == NULL;
     myersFunctor.lastBit = (TWord)1 << (pattern.needleSize - 1);
+    return Pair<unsigned>(length(host(pattern)) + myersFunctor._state.maxErrors, 0);
 }
 
 

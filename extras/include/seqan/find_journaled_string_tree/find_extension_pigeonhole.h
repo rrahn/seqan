@@ -48,133 +48,94 @@ namespace seqan {
 // Tags, Classes, Enums
 // ============================================================================
 
-// ----------------------------------------------------------------------------
-// Struct FinderInitializationState                                [Pigeonhole]
-// ----------------------------------------------------------------------------
+template <typename TFinder, typename TSpec>
+class FinderExtensionPointState;
 
-template <typename TSpec>
-struct FinderInitializationState<Pigeonhole<TSpec> >
+template <typename TFinder, typename TSpec>
+class FinderExtensionPointState<TFinder, Pigeonhole<TSpec> >
 {
-    typedef Pair<unsigned, unsigned> THit;
+public:
+    typedef typename GetPattern<TFinder>::Type TPattern;
+    typedef typename TPattern::TShape TShape;
 
-    double errorRate;
-    String<THit> _currHits;
+    TShape shape;
 
+    FinderExtensionPointState()
+    {}
 };
 
 // ----------------------------------------------------------------------------
 // Class Pattern
 // ----------------------------------------------------------------------------
 
-// Adaption of the original pigeonhole pattern.
-template <typename TIndex, typename TSpec>
-class Pattern<TIndex, Jst<Pigeonhole<TSpec> > > : public Pattern<TIndex, Pigeonhole<TSpec> >
+template <typename TFinder, typename TSpec>
+class FinderExtensionPoint<TFinder, Pigeonhole<TSpec> >
 {
 public:
 
-    typedef typename Position<TIndex>::Type TPosition;
-    typedef Pair<TPosition, TPosition> THit;
-    typedef String<THit> THitString;
+    typedef FinderState<Pigeonhole<TSpec> >                         TFinderState;
+    typedef typename GetPattern<TFinder>::Type                      TPattern;
+    typedef typename Host<TPattern>::Type                           TIndex;
 
-    THitString _hitBatch;  // All current hits.
+    TPattern *      _patternPtr;
+    TFinderState *  _statePtr;
+    __int64         _qGramPrefix;
+    bool            _firstHash;
 
-    Pattern() : Pattern<TIndex, Pigeonhole<TSpec> >()
-    {
-        clear(_hitBatch);
-    }
+    FinderExtensionPoint()
+    {}
 
-    Pattern(TIndex &_index): Pattern<TIndex, Pigeonhole<TSpec> >(_index)
-    {
-        clear(_hitBatch);
-    }
-
-    Pattern(TIndex const &_index): Pattern<TIndex, Pigeonhole<TSpec> >(_index)
-    {
-        clear(_hitBatch);
-    }
-
-};
-
-// ----------------------------------------------------------------------------
-// Struct DataParallelPigeonholeHit
-// ----------------------------------------------------------------------------
-
-template <typename TPosition>
-struct DataParallelPigeonholeHit
-{
-    TPosition _needleId;
-    TPosition _ndlOffset;
-};
-
-
-template <typename TFinder>
-struct FunctorPigeonholeFilter_;
-
-template <typename THaystack, typename TIndex, typename TSpec>
-struct FunctorPigeonholeFilter_<Finder2<THaystack, Pattern<TIndex, Jst<Pigeonhole<TSpec> > >, Jst<Pigeonhole<TSpec> > > >
-{
-    typedef Pattern<TIndex, Jst<Pigeonhole<TSpec> > > TPattern;
-    typedef Finder2<THaystack, TPattern, Jst<Pigeonhole<TSpec> > > TFinder;
-
-    TPattern & _pattern;
-
-    bool _isFirstQGram;
-
-    FunctorPigeonholeFilter_(TPattern & pattern) :
-                     _pattern(pattern),
-                     _isFirstQGram(true)
-    {
-        _patternInit(pattern, 0);
-    }
-
-    template <typename TSpec>
-    FunctorPigeonholeFilter_(TPattern & pattern,
-                             FinderInitializationState<Pigeonhole<TSpec> > const & state) :
-                     _pattern(pattern),
-                     _isFirstQGram(true)
-    {
-        _patternInit(pattern, state.errorRate);
-    }
-
-    template <typename TResult, typename THystkIt>
+    template <typename TResult, typename THystkIt, typename TLogical>
     inline void
-    operator()(TResult & res, THystkIt const & haystackIt)
+    operator()(TResult & res, THystkIt haystackIt)
     {
         typedef typename Fibre<TIndex, QGramSA>::Type const TSA;
         typedef typename Iterator<TSA, Standard>::Type      TSAIter;
-        typedef typename TFinder::TPigeonholeHit            THit;
-        typedef typename Position<TFinder>::Type TPosition;
+        typedef typename Value<TFinderState>::Type          THit;
+        typedef typename Position<TFinder>::Type            TPosition;
+        typedef typename TPattern::TShape                   TShape;
+        typedef typename Value<TShape>::Type                THash;
 
-        TIndex const &index = host(_pattern);
+        haystackIt += _qGramPrefix;  // Set to actual begin of qGram.
+        TIndex const &index = host(*_patternPtr);
+        THash hashVal;
+        if (_firstHash)
+        {
+            hashVal = hash(_patternPtr->shape, haystackIt);
+            _firstHash = false;
+        }
+        else
+        {
+            hashVal = hashNext(_patternPtr->shape, haystackIt);
+        }
 
         // all previous matches reported -> search new ones
-        clear(_pattern._hitBatch);
+        clear(*_statePtr);
 
         TSAIter saBegin = begin(indexSA(index), Standard());
         Pair<unsigned> ndlPos;
         THit hit;
 
-        register unsigned bktNo = getBucket(index.bucketMap, hash);
-        register TSAIter occ = saBegin + indexDir(index)[bktNo];
-        register TSAIter occEnd = saBegin + indexDir(index)[bktNo + 1];
+        unsigned bktNo = getBucket(index.bucketMap, hashVal);
+        TSAIter occ = saBegin + indexDir(index)[bktNo];
+        TSAIter occEnd = saBegin + indexDir(index)[bktNo + 1];
 
-        // Check all occurrences for a hit.
         for(; occ != occEnd; ++occ)
         {
             posLocalize(ndlPos, *occ, stringSetLimits(index));
-            appendValue(_pattern._hitBatch, Pair<unsigned, unsigned>(getSeqNo(ndlPos), getSeqOffset(ndlPos)));
+            hit.ndlSeqPos = getSeqOffset(ndlPos);     // relative needle position.
+            hit.ndlSeqNo = getSeqNo(ndlPos);                        // needle seq. number
 
-            // TODO(rmaerker): Delegate to the verifier to check if a region needs to be scanned again.
-//            if (Pigeonhole<TSpec>::ONE_PER_DIAGONAL)
-//            {
-//                // TODO(rmaerker): How do we get to this information.
-//                __int64 diag = hit.hstkPos + (__int64)_pattern.finderPosOffset;
-//                if (_pattern.lastSeedDiag[hit.ndlSeqNo] == diag)
-//                    continue;
-//                _pattern.lastSeedDiag[hit.ndlSeqNo] = diag;
-//            }
+            if (Pigeonhole<TSpec>::ONE_PER_DIAGONAL && !IsBranchIteator<THystkIt>::VALUE)
+            {
+                __int64 diag = static_cast<__int64>(position(haystackIt)) - hit.hstkPos + (__int64)_patternPtr->finderPosOffset;
+                if (_patternPtr->lastSeedDiag[hit.ndlSeqNo] == diag)
+                    continue;
+                _patternPtr->lastSeedDiag[hit.ndlSeqNo] = diag;
+            }
+            hit.ndlSeqLength = sequenceLength(hit.ndlSeqNo, host(*_patternPtr));
 //            unsigned ndlLength = sequenceLength(hit.ndlSeqNo, host(_pattern));
-//
+
 //            if (Pigeonhole<TSpec>::HAMMING_ONLY != 0)
 //            {
 //                hit.bucketWidth = ndlLength;
@@ -185,14 +146,13 @@ struct FunctorPigeonholeFilter_<Finder2<THaystack, Pattern<TIndex, Jst<Pigeonhol
 //                hit.bucketWidth = ndlLength + (indels << 1);
 //                hit.hstkPos -= indels;
 //            }
+            appendValue(*_statePtr, hit);
         }
 
-//        finder.curHit = begin(finder.hits, Standard());
-//        finder.endHit = end(finder.hits, Standard());
-//
-//        return !empty(finder.hits);
-        res.i1 = !empty(_pattern._hitBatch);
+        // biggest position encountered.
+        _patternPtr->finderPosNextOffset = _max(_patternPtr->finderPosNextOffset, position(haystackIt) + _patternPtr->maxSeqLen);
 
+        res.i2 = !empty(*_statePtr);
     }
 };
 
@@ -200,66 +160,112 @@ struct FunctorPigeonholeFilter_<Finder2<THaystack, Pattern<TIndex, Jst<Pigeonhol
 // Metafunctions
 // ============================================================================
 
-template <typename THaystack, typename TPattern, typename TSpec>
-struct FinderFunctor<Finder2<THaystack, TPattern, Jst<Pigeonhole<TSpec> > > >
+// ----------------------------------------------------------------------------
+// Metafunction RegisteredExtensionPoint                           [Pigeonhole]
+// ----------------------------------------------------------------------------
+
+template <typename TContainer, typename TIndex, typename TFilterSpec, typename TSpec>
+struct RegisteredExtensionPoint<Finder2<TContainer, Pattern<TIndex, Pigeonhole<TFilterSpec> >, Jst<TSpec> > >
 {
-    typedef FunctorPigeonholeFilter_<Finder2<THaystack, TPattern, Jst<Pigeonhole<TSpec> > > > Type;
+    typedef Finder2<TContainer, Pattern<TIndex, Pigeonhole<TFilterSpec> >, Jst<TSpec> > TFinder_;
+    typedef FinderExtensionPoint<TFinder_, Pigeonhole<TFilterSpec> > Type;
 };
 
 // ----------------------------------------------------------------------------
-// Metafunction InitStateForFinder
+// Metafunction GetState
 // ----------------------------------------------------------------------------
 
-template <typename THaystack, typename TPattern, typename TSpec>
-struct InitStateForFinder<Finder2<THaystack, TPattern, Jst<Pigeonhole<TSpec> > > >
+template <typename TFinder, typename TSpec>
+struct GetState<FinderExtensionPoint<TFinder, Pigeonhole<TSpec> > >
 {
-    typedef FinderInitializationState<Pigeonhole<TSpec> > Type;
+    typedef typename GetPattern<TFinder>::Type TPattern_;
+    typedef typename TPattern_::TShape Type;
 };
 
-template <typename THaystack, typename TPattern, typename TSpec>
-struct InitStateForFinder<Finder2<THaystack, TPattern, Jst<Pigeonhole<TSpec> > > const>  :
-    InitStateForFinder<Finder2<THaystack, TPattern, Jst<Pigeonhole<TSpec> > > >{};
+template <typename TFinder, typename TSpec>
+struct GetState<FinderExtensionPoint<TFinder, Pigeonhole<TSpec> > const>
+{
+    typedef typename GetPattern<TFinder>::Type TPattern_;
+    typedef typename TPattern_::TShape const Type;
+};
+
+// ----------------------------------------------------------------------------
+// Metafunction RequireFullContext                                 [Pigeonhole]
+// ----------------------------------------------------------------------------
+
+template <typename TFinder, typename TSpec>
+struct RequireFullContext<FinderExtensionPoint<TFinder, Pigeonhole<TSpec> > > : False{};
+
+//// ----------------------------------------------------------------------------
+//// Metafunction ContextIteratorPosition                            [Pigeonhole]
+//// ----------------------------------------------------------------------------
+//
+//template <typename TFinder, typename TSpec>
+//struct ContextIteratorPosition<FinderExtensionPoint<TFinder, Pigeonhole<TSpec> > >
+//{
+//    typedef ContextPositionMiddle Type;
+//};
 
 // ============================================================================
 // Functions
 // ============================================================================
 
 // ----------------------------------------------------------------------------
-// Function needInitHash()
+// Function getState                                               [Pigeonhole]
 // ----------------------------------------------------------------------------
 
-template <typename THaystack, typename TIndex, typename TPatternSpec, typename TSpec, typename TIterator>
-inline bool
-needInitHash(Finder2<THaystack, Pattern<TIndex, Pigeonhole<TPatternSpec> >, Jst<Pigeonhole<TSpec> > > const & finder)
+template <typename TFinder, typename TSpec>
+inline typename GetState<FinderExtensionPoint<TFinder, Pigeonhole<TSpec> > >::Type &
+getState(FinderExtensionPoint<TFinder, Pigeonhole<TSpec> > & extensionFunctor)
 {
-    return finder._patternComp._isFirstQGram;
+    return extensionFunctor._patternPtr->shape;
+}
+
+template <typename TFinder, typename TSpec>
+inline typename GetState<FinderExtensionPoint<TFinder, Pigeonhole<TSpec> > const>::Type &
+getState(FinderExtensionPoint<TFinder, Pigeonhole<TSpec> > const & extensionFunctor)
+{
+    return extensionFunctor._patternPtr->shape;
 }
 
 // ----------------------------------------------------------------------------
-// Function compute()
+// Function setState()                                             [Pigeonhole]
 // ----------------------------------------------------------------------------
 
-template <typename THaystack, typename TIndex, typename TPatternSpec, typename TSpec, typename TIterator>
-inline typename ComputeState< typename GetTraverserForFinder_<
-                              Finder2<THaystack, Pattern<TIndex, Pigeonhole<TPatternSpec> >,
-                              Jst<Pigeonhole<TSpec> > > >::Type>::Type
-compute(Finder2<THaystack, Pattern<TIndex, Pigeonhole<TPatternSpec> >, Jst<Pigeonhole<TSpec> > > & finder,
-        TIterator const & iter)
+template <typename TFinder, typename TSpec>
+inline void
+setState(FinderExtensionPoint<TFinder, Pigeonhole<TSpec> >  & extensionFunctor,
+         typename GetState<FinderExtensionPoint<TFinder, Pigeonhole<TSpec> > >::Type const & state)
 {
-    typedef Finder2<THaystack, Pattern<TIndex, Pigeonhole<TPatternSpec> >, Jst<Pigeonhole<TSpec> > > TFinder;
-    typedef typename GetTraverserForFinder_<TFinder>::Type  TTraverser;
-    typedef typename ComputeState<TTraverser>::Type         TComputeState;
-    typedef typename Fibre<TIndex, QGramShape>::Type        TShape;
+    extensionFunctor._patternPtr->shape = state;
+}
 
-    TShape &shape = getPattern(finder).shape;
-    if (needInitHash(finder))
-        hashInit(shape, iter);
-    else
-        hashNext(shape, iter);
+// ----------------------------------------------------------------------------
+// Function init()
+// ----------------------------------------------------------------------------
 
-    TComputeState state(false, 1);
-    finder._finderFuntor(state, iter);
-    return state;
+template <typename TFinder, typename TSpec>
+inline Pair<unsigned>
+init(FinderExtensionPoint<TFinder, Pigeonhole<TSpec> > & pigeonholeFunctor,
+     typename GetPattern<TFinder>::Type & pattern,
+     FinderState<Pigeonhole<TSpec> > & state,
+     double const & errorRate)
+{
+    typedef typename GetPattern<TFinder>::Type TPattern;
+    typedef typename Host<TPattern>::Type      TIndex;
+
+    _patternInit(pattern, errorRate);
+
+    pigeonholeFunctor._pattern = pattern;
+    pigeonholeFunctor._finderState = &state;
+
+    reinit(state);
+
+    unsigned errors = (unsigned) floor(errorRate * pattern.maxSeqLength);
+    unsigned qGram = length(indexShape(host(pattern)));
+    pigeonholeFunctor._qGramPrefix = pattern.maxSeqLength + errors - (qGram - 1);
+    pigeonholeFunctor._firstHash = true;
+    return Pair<unsigned>(((pattern.maxSeqLength + errors) << 1) - qGram, (pattern.maxSeqLength + errors) - qGram);
 }
 
 }  // namespace seqan

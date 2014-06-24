@@ -60,6 +60,14 @@ typedef Tag<ContextPositionLeft_> ContextPositionLeft;
 struct ContextPositionRight_;
 typedef Tag<ContextPositionRight_> ContextPositionRight;
 
+
+// ----------------------------------------------------------------------------
+// Tag ContextPositionMiddle
+// ----------------------------------------------------------------------------
+
+struct ContextPositionMiddle_;
+typedef Tag<ContextPositionMiddle_> ContextPositionMiddle;
+
 // ----------------------------------------------------------------------------
 // Struct JstTraverserSpec
 // ----------------------------------------------------------------------------

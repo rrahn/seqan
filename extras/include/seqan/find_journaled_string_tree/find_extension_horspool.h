@@ -120,7 +120,7 @@ struct RegisteredExtensionPoint<Finder2<TContainer, Pattern<TNeedle, Horspool>, 
 // ----------------------------------------------------------------------------
 
 template <typename TFinder>
-inline void
+inline Pair<unsigned>
 init(FinderExtensionPoint<TFinder, Horspool> & horspoolFunctor,
      typename GetPattern<TFinder>::Type & pattern)
 {
@@ -128,6 +128,7 @@ init(FinderExtensionPoint<TFinder, Horspool> & horspoolFunctor,
     horspoolFunctor._pattern = &pattern;
     horspoolFunctor._itBegin = begin(needle(pattern), Rooted());
     horspoolFunctor._itEnd = end(needle(pattern), Rooted());
+    return Pair<unsigned>(horspoolFunctor._itEnd - horspoolFunctor._itBegin, 0);
 }
 
 }

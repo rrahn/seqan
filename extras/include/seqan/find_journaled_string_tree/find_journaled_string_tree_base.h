@@ -128,6 +128,13 @@ SEQAN_CONCEPT_IMPL((JstFinderExtensionConcept), FinderExtensionPoint<TFinder, TS
 template <typename TFinder, typename TSpec>
 SEQAN_CONCEPT_IMPL((JstFinderExtensionConcept), FinderExtensionPoint<TFinder, TSpec> const);
 
+// ----------------------------------------------------------------------------
+// Class FinderState
+// ----------------------------------------------------------------------------
+
+template <typename TSpec = Nothing>
+class FinderState;
+
 // ============================================================================
 // Metafunctions
 // ============================================================================

@@ -31,13 +31,15 @@
 // ==========================================================================
 // Author: Rene Rahn <rene.rahn@fu-berlin.de>
 // ==========================================================================
-// Implements simple online serarch.
+// Implements the writer model to asynchronously dump matches.
 // ==========================================================================
 
-#ifndef EXTRAS_INCLUDE_SEQAN_FIND_JOURNALED_STRING_TREE_FIND_JOURNALED_STRING_TREE_SIMPLE_H_
-#define EXTRAS_INCLUDE_SEQAN_FIND_JOURNALED_STRING_TREE_FIND_JOURNALED_STRING_TREE_SIMPLE_H_
+#ifndef EXTRAS_APPS_JST_MAPPER_JST_MAPPER_RESULTS_WRITER_H_
+#define EXTRAS_APPS_JST_MAPPER_JST_MAPPER_RESULTS_WRITER_H_
 
-namespace seqan {
+#include <iostream>
+
+using namespace seqan;
 
 // ============================================================================
 // Forwards
@@ -47,37 +49,27 @@ namespace seqan {
 // Tags, Classes, Enums
 // ============================================================================
 
-// ----------------------------------------------------------------------------
-// Class FinderFinderExtensionPoint
-// ----------------------------------------------------------------------------
-
-template <typename TContainer, typename TNeedle, typename TSpec>
-class FinderExtensionPoint<Finder2<TContainer, Pattern<TNeedle, Simple>, TSpec>, Simple>
+class ResultsWriter
 {
 public:
+    std::ofstream fileStream;
+    CharString buffer;
 
-    typedef typename Iterator<TNeedle, Standard>::Type TNeedleIt;
-
-    TNeedleIt _itBegin;
-    TNeedleIt _itEnd;
-
-    FinderExtensionPoint()
-    {}
-
-    FinderExtensionPoint(Pattern<TNeedle, Simple> & pattern)
+    ResultsWriter(char * const & fileName)
     {
-        init(*this, pattern);
+        fileStream.open(fileName, std::ios_base::out);
+        resize(buffer, 4096, Exact());
     }
 
-    template <typename TResult, typename THystkIt>
-    inline void
-    operator()(TResult & res, THystkIt haystackIt)
+    template <typename TFinder>
+    inline void operator(TFinder const & finder)
     {
-        TNeedleIt ndlIt = _itBegin;
-        for (; ndlIt != _itEnd; ++ndlIt, ++haystackIt)
-            if (*ndlIt != getValue(haystackIt))
-                return;
-        res.i1 = true;
+        asyncWrite(*this, getPositions(finder));
+    }
+
+    ~ResultsWriter()
+    {
+        fileStream.close();
     }
 };
 
@@ -85,35 +77,16 @@ public:
 // Metafunctions
 // ============================================================================
 
-// ----------------------------------------------------------------------------
-// Metafunction RegisteredExtensionPoint                               [Simple]
-// ----------------------------------------------------------------------------
-
-template <typename TContainer, typename TNeedle, typename TSpec>
-struct RegisteredExtensionPoint<Finder2<TContainer, Pattern<TNeedle, Simple>, Jst<TSpec> > >
-{
-    typedef Finder2<TContainer, Pattern<TNeedle, Simple>, Jst<TSpec> > TFinder_;
-    typedef FinderExtensionPoint<TFinder_, Simple> Type;
-};
-
 // ============================================================================
 // Functions
 // ============================================================================
 
-// ----------------------------------------------------------------------------
-// Function init()
-// ----------------------------------------------------------------------------
-
-template <typename TFinder>
-inline Pair<unsigned>
-init(FinderExtensionPoint<TFinder, Simple> & simpleFunctor,
-     typename GetPattern<TFinder>::Type & pattern)
+template <typename TPosVector>
+void asyncWrite(ResultsWriter & writer, TPosVector const & posVector);
 {
-    simpleFunctor._itBegin = begin(needle(pattern), Standard());
-    simpleFunctor._itEnd = end(needle(pattern), Standard());
-    return Pair<unsigned>(simpleFunctor._itEnd - simpleFunctor._itBegin, 0);
+    // TODO(rmaerker): ImplementMe!
+    // Now we trigger the asynchronous write.
+    writer.fileStream << "Match ";
 }
 
-}  // namespace seqan
-
-#endif  // EXTRAS_INCLUDE_SEQAN_FIND_JOURNALED_STRING_TREE_FIND_JOURNALED_STRING_TREE_SIMPLE_H_
+#endif // EXTRAS_APPS_JST_MAPPER_JST_MAPPER_RESULTS_WRITER_H_

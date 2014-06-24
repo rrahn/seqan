@@ -218,7 +218,7 @@ execute(TResult & res,
 // ----------------------------------------------------------------------------
 
 template <typename TFinder>
-inline void
+inline Pair<unsigned>
 init(FinderExtensionPoint<TFinder, ShiftOr> & shiftOrFunctor,
      typename GetPattern<TFinder>::Type & pattern)
 {
@@ -238,6 +238,7 @@ init(FinderExtensionPoint<TFinder, ShiftOr> & shiftOrFunctor,
         shiftOrFunctor._isSmallNeedle = true;
         shiftOrFunctor.mask = static_cast<TWord>(1) << (pattern.needleLength - 1);
     }
+    return Pair<unsigned>(length(host(pattern)), 0);
 }
 
 }

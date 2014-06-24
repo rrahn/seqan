@@ -31,13 +31,16 @@
 // ==========================================================================
 // Author: Rene Rahn <rene.rahn@fu-berlin.de>
 // ==========================================================================
-// Implements simple online serarch.
+// Implements strategy to map the reads.
 // ==========================================================================
 
-#ifndef EXTRAS_INCLUDE_SEQAN_FIND_JOURNALED_STRING_TREE_FIND_JOURNALED_STRING_TREE_SIMPLE_H_
-#define EXTRAS_INCLUDE_SEQAN_FIND_JOURNALED_STRING_TREE_FIND_JOURNALED_STRING_TREE_SIMPLE_H_
+#ifndef EXTRAS_APPS_JST_MAPPER_JST_MAPPER_MAP_READS_H_
+#define EXTRAS_APPS_JST_MAPPER_JST_MAPPER_MAP_READS_H_
 
-namespace seqan {
+#include "jst_mapper.h"
+#include "jst_mapper_verifier.h"
+
+using namespace seqan;
 
 // ============================================================================
 // Forwards
@@ -47,73 +50,49 @@ namespace seqan {
 // Tags, Classes, Enums
 // ============================================================================
 
-// ----------------------------------------------------------------------------
-// Class FinderFinderExtensionPoint
-// ----------------------------------------------------------------------------
-
-template <typename TContainer, typename TNeedle, typename TSpec>
-class FinderExtensionPoint<Finder2<TContainer, Pattern<TNeedle, Simple>, TSpec>, Simple>
-{
-public:
-
-    typedef typename Iterator<TNeedle, Standard>::Type TNeedleIt;
-
-    TNeedleIt _itBegin;
-    TNeedleIt _itEnd;
-
-    FinderExtensionPoint()
-    {}
-
-    FinderExtensionPoint(Pattern<TNeedle, Simple> & pattern)
-    {
-        init(*this, pattern);
-    }
-
-    template <typename TResult, typename THystkIt>
-    inline void
-    operator()(TResult & res, THystkIt haystackIt)
-    {
-        TNeedleIt ndlIt = _itBegin;
-        for (; ndlIt != _itEnd; ++ndlIt, ++haystackIt)
-            if (*ndlIt != getValue(haystackIt))
-                return;
-        res.i1 = true;
-    }
-};
-
 // ============================================================================
 // Metafunctions
 // ============================================================================
-
-// ----------------------------------------------------------------------------
-// Metafunction RegisteredExtensionPoint                               [Simple]
-// ----------------------------------------------------------------------------
-
-template <typename TContainer, typename TNeedle, typename TSpec>
-struct RegisteredExtensionPoint<Finder2<TContainer, Pattern<TNeedle, Simple>, Jst<TSpec> > >
-{
-    typedef Finder2<TContainer, Pattern<TNeedle, Simple>, Jst<TSpec> > TFinder_;
-    typedef FinderExtensionPoint<TFinder_, Simple> Type;
-};
 
 // ============================================================================
 // Functions
 // ============================================================================
 
-// ----------------------------------------------------------------------------
-// Function init()
-// ----------------------------------------------------------------------------
-
-template <typename TFinder>
-inline Pair<unsigned>
-init(FinderExtensionPoint<TFinder, Simple> & simpleFunctor,
-     typename GetPattern<TFinder>::Type & pattern)
+template <typename TFragmentStore, typename TContigPos, typename TContigValue, typename TVerifierSpec>
+JstMapperResult
+mapReads(TFragmentStore & fragStore, DeltaMap<TContigPos, TContigValue> & deltaMap, JstMapperOptions const & options)
 {
-    simpleFunctor._itBegin = begin(needle(pattern), Standard());
-    simpleFunctor._itEnd = end(needle(pattern), Standard());
-    return Pair<unsigned>(simpleFunctor._itEnd - simpleFunctor._itBegin, 0);
+    typedef typename TFragmentStore::TReadSeqStore                        TReadStore;
+    typedef typename TFragmentStore::TContigStore                         TContigStore;
+//    typedef typename Value<TContigStore>::Type                      TContigStoreElement;
+//    typedef typename TContigStoreElement::TContigSeq                TContigSeq;
+//    typedef typename Value<TContigSeq>::Type                        TContigSeqAlphabet;
+//    typedef typename Position<TContigSeq>::Type                     TContigSeqPosition;
+    typedef Index<TReadStore, IndexQGram<Simple, OpenAddressing> >        TIndex;
+    typedef Pattern<TIndex, Pigeonhole<> >                                TPattern;
+    typedef DeltaMap<TContigPos, TContigValue>                            TDeltaMap;
+    typedef JournaledStringTree<TDeltaMap>                                TJst;
+
+    typedef FinderState<Pigeonhole<> >                                    TFilterState;
+
+    typedef JstMapperVerifier<TFilterState, ResultsWriter, TVerifierSpec> TVerifier;
+
+    ResultsWriter writer(options.output);
+
+    // Step 1) Build the index.
+    TIndex index(fragStore.readSeqStore);
+    TPattern pattern(index);
+    TJst jst(fragStore.contigStore[0].seq, deltaMap);
+    TFilterState filterState;
+    TVerifier verifier(filterState, writer, 3, options.qGram);
+
+    if (options.jstSize != 0)
+        setBlockSize(jst, options.jstSize);
+
+    // Step 2) Trigger the search.
+    indexRequire(index);
+    find(jst, pattern, filterState, verifier, options.errorRate , Jst<Pigeonhole<> >());
+
 }
 
-}  // namespace seqan
-
-#endif  // EXTRAS_INCLUDE_SEQAN_FIND_JOURNALED_STRING_TREE_FIND_JOURNALED_STRING_TREE_SIMPLE_H_
+#endif // EXTRAS_APPS_JST_MAPPER_JST_MAPPER_MAP_READS_H_

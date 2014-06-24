@@ -31,13 +31,11 @@
 // ==========================================================================
 // Author: Rene Rahn <rene.rahn@fu-berlin.de>
 // ==========================================================================
-// Implements simple online serarch.
+// Implements the generalt configurator for the jst mapper.
 // ==========================================================================
 
-#ifndef EXTRAS_INCLUDE_SEQAN_FIND_JOURNALED_STRING_TREE_FIND_JOURNALED_STRING_TREE_SIMPLE_H_
-#define EXTRAS_INCLUDE_SEQAN_FIND_JOURNALED_STRING_TREE_FIND_JOURNALED_STRING_TREE_SIMPLE_H_
-
-namespace seqan {
+#ifndef EXTRAS_APPS_JST_MAPPER_JST_MAPPER_CONFIGURATOR_H_
+#define EXTRAS_APPS_JST_MAPPER_JST_MAPPER_CONFIGURATOR_H_
 
 // ============================================================================
 // Forwards
@@ -47,73 +45,24 @@ namespace seqan {
 // Tags, Classes, Enums
 // ============================================================================
 
-// ----------------------------------------------------------------------------
-// Class FinderFinderExtensionPoint
-// ----------------------------------------------------------------------------
-
-template <typename TContainer, typename TNeedle, typename TSpec>
-class FinderExtensionPoint<Finder2<TContainer, Pattern<TNeedle, Simple>, TSpec>, Simple>
+template <typename TSpec>
+struct JstMapperConfigurator
 {
-public:
 
-    typedef typename Iterator<TNeedle, Standard>::Type TNeedleIt;
+    // Fragment Store
 
-    TNeedleIt _itBegin;
-    TNeedleIt _itEnd;
+    // Delta Store
 
-    FinderExtensionPoint()
-    {}
 
-    FinderExtensionPoint(Pattern<TNeedle, Simple> & pattern)
-    {
-        init(*this, pattern);
-    }
-
-    template <typename TResult, typename THystkIt>
-    inline void
-    operator()(TResult & res, THystkIt haystackIt)
-    {
-        TNeedleIt ndlIt = _itBegin;
-        for (; ndlIt != _itEnd; ++ndlIt, ++haystackIt)
-            if (*ndlIt != getValue(haystackIt))
-                return;
-        res.i1 = true;
-    }
 };
 
 // ============================================================================
 // Metafunctions
 // ============================================================================
 
-// ----------------------------------------------------------------------------
-// Metafunction RegisteredExtensionPoint                               [Simple]
-// ----------------------------------------------------------------------------
-
-template <typename TContainer, typename TNeedle, typename TSpec>
-struct RegisteredExtensionPoint<Finder2<TContainer, Pattern<TNeedle, Simple>, Jst<TSpec> > >
-{
-    typedef Finder2<TContainer, Pattern<TNeedle, Simple>, Jst<TSpec> > TFinder_;
-    typedef FinderExtensionPoint<TFinder_, Simple> Type;
-};
-
 // ============================================================================
 // Functions
 // ============================================================================
 
-// ----------------------------------------------------------------------------
-// Function init()
-// ----------------------------------------------------------------------------
 
-template <typename TFinder>
-inline Pair<unsigned>
-init(FinderExtensionPoint<TFinder, Simple> & simpleFunctor,
-     typename GetPattern<TFinder>::Type & pattern)
-{
-    simpleFunctor._itBegin = begin(needle(pattern), Standard());
-    simpleFunctor._itEnd = end(needle(pattern), Standard());
-    return Pair<unsigned>(simpleFunctor._itEnd - simpleFunctor._itBegin, 0);
-}
-
-}  // namespace seqan
-
-#endif  // EXTRAS_INCLUDE_SEQAN_FIND_JOURNALED_STRING_TREE_FIND_JOURNALED_STRING_TREE_SIMPLE_H_
+#endif // EXTRAS_APPS_JST_MAPPER_JST_MAPPER_CONFIGURATOR_H_

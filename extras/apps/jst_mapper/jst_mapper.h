@@ -31,13 +31,16 @@
 // ==========================================================================
 // Author: Rene Rahn <rene.rahn@fu-berlin.de>
 // ==========================================================================
-// Implements simple online serarch.
+// Basic jst mapper functionality.
 // ==========================================================================
 
-#ifndef EXTRAS_INCLUDE_SEQAN_FIND_JOURNALED_STRING_TREE_FIND_JOURNALED_STRING_TREE_SIMPLE_H_
-#define EXTRAS_INCLUDE_SEQAN_FIND_JOURNALED_STRING_TREE_FIND_JOURNALED_STRING_TREE_SIMPLE_H_
+#ifndef EXTRAS_APPS_JST_MAPPER_JST_MAPPER_BASE_H_
+#define EXTRAS_APPS_JST_MAPPER_JST_MAPPER_BASE_H_
 
-namespace seqan {
+#include <seqan/basic.h>
+#include <seqan/sequence.h>
+#include <seqan/journaled_string_tree.h>
+#include <seqan/find_journaled_string_tree.h>
 
 // ============================================================================
 // Forwards
@@ -48,72 +51,64 @@ namespace seqan {
 // ============================================================================
 
 // ----------------------------------------------------------------------------
-// Class FinderFinderExtensionPoint
+// Enum JstMapperResults
 // ----------------------------------------------------------------------------
 
-template <typename TContainer, typename TNeedle, typename TSpec>
-class FinderExtensionPoint<Finder2<TContainer, Pattern<TNeedle, Simple>, TSpec>, Simple>
+enum JstMapperResult
 {
-public:
+    LOAD_CONTIGS_FAILED,
+    LOAD_DELTA_FAILED,
+    LOAD_READS_FAILED,
+    WRITE_OUTPUT_FAILED,
+    UNKNOWN_OPTION_VALUE,
+    MAPPING_OK
+};
 
-    typedef typename Iterator<TNeedle, Standard>::Type TNeedleIt;
+// ----------------------------------------------------------------------------
+// Enum VerifierErrorModel
+// ----------------------------------------------------------------------------
 
-    TNeedleIt _itBegin;
-    TNeedleIt _itEnd;
+enum VerifierErrorModel
+{
+    HAMMING_DISTANCE,
+    EDIT_DISTANCE
+};
 
-    FinderExtensionPoint()
+// ----------------------------------------------------------------------------
+// Class JstMapperOptions
+// ----------------------------------------------------------------------------
+
+struct JstMapperOptions
+{
+    // Verbosity level.  0 -- quiet, 1 -- normal, 2 -- verbose, 3 -- very verbose.
+    int verbosity;
+
+    // The first (and only) argument of the program is stored here.
+    seqan::CharString inputGenome;
+    seqan::CharString inputGenomeDelta;
+    seqan::CharString inputReads1;
+    seqan::CharString inputReads2;
+    seqan::CharString output;
+
+    unsigned jstSize;
+
+    // Filter Options.
+    unsigned qGram;
+
+    // Verifier Options.
+    double errorRate;
+    VerifierErrorModel errorModel;
+
+    JstMapperOptions() : verbosity(1)
     {}
-
-    FinderExtensionPoint(Pattern<TNeedle, Simple> & pattern)
-    {
-        init(*this, pattern);
-    }
-
-    template <typename TResult, typename THystkIt>
-    inline void
-    operator()(TResult & res, THystkIt haystackIt)
-    {
-        TNeedleIt ndlIt = _itBegin;
-        for (; ndlIt != _itEnd; ++ndlIt, ++haystackIt)
-            if (*ndlIt != getValue(haystackIt))
-                return;
-        res.i1 = true;
-    }
 };
 
 // ============================================================================
 // Metafunctions
 // ============================================================================
 
-// ----------------------------------------------------------------------------
-// Metafunction RegisteredExtensionPoint                               [Simple]
-// ----------------------------------------------------------------------------
-
-template <typename TContainer, typename TNeedle, typename TSpec>
-struct RegisteredExtensionPoint<Finder2<TContainer, Pattern<TNeedle, Simple>, Jst<TSpec> > >
-{
-    typedef Finder2<TContainer, Pattern<TNeedle, Simple>, Jst<TSpec> > TFinder_;
-    typedef FinderExtensionPoint<TFinder_, Simple> Type;
-};
-
 // ============================================================================
 // Functions
 // ============================================================================
 
-// ----------------------------------------------------------------------------
-// Function init()
-// ----------------------------------------------------------------------------
-
-template <typename TFinder>
-inline Pair<unsigned>
-init(FinderExtensionPoint<TFinder, Simple> & simpleFunctor,
-     typename GetPattern<TFinder>::Type & pattern)
-{
-    simpleFunctor._itBegin = begin(needle(pattern), Standard());
-    simpleFunctor._itEnd = end(needle(pattern), Standard());
-    return Pair<unsigned>(simpleFunctor._itEnd - simpleFunctor._itBegin, 0);
-}
-
-}  // namespace seqan
-
-#endif  // EXTRAS_INCLUDE_SEQAN_FIND_JOURNALED_STRING_TREE_FIND_JOURNALED_STRING_TREE_SIMPLE_H_
+#endif // EXTRAS_APPS_JST_MAPPER_JST_MAPPER_BASE_H_

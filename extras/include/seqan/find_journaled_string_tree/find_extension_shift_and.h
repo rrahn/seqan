@@ -216,7 +216,7 @@ execute(TResult & res,
 // ----------------------------------------------------------------------------
 
 template <typename TFinder>
-inline void
+inline Pair<unsigned>
 init(FinderExtensionPoint<TFinder, ShiftAnd> & shiftAndFunctor,
      typename GetPattern<TFinder>::Type & pattern)
 {
@@ -235,6 +235,7 @@ init(FinderExtensionPoint<TFinder, ShiftAnd> & shiftAndFunctor,
         shiftAndFunctor._isSmallNeedle = true;
         shiftAndFunctor._compare = static_cast<TWord>(1) << (pattern.needleLength - 1);
     }
+    return Pair<unsigned>(length(host(pattern)), 0);
 }
 
 }

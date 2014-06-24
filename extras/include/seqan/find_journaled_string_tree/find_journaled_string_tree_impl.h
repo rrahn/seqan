@@ -102,19 +102,20 @@ struct Finder2<TContainer, TPattern, Jst<TSpec> >
 
     TContainer*             _containerPtr;
     TFinderExtensionPoint   _extensionFunctor;
-    bool                    _needReinit;
+    Pair<unsigned>          _traversalParams;
 
-    Finder2() : _containerPtr(NULL), _needReinit(true)
+    Finder2() : _containerPtr(NULL), _traversalParams(Pair<unsigned>(0, 0))
     {}
 
 
-    Finder2(TContainer & hystk) : _containerPtr(&hystk), _extensionFunctor(), _needReinit(true)
+    Finder2(TContainer & hystk) : _containerPtr(&hystk), _extensionFunctor(), _traversalParams(Pair<unsigned>(0, 0))
     {}
 
     // Copy constructor.
     Finder2(Finder2 const & other) : _containerPtr(other._containerPtr),
                                      _extensionFunctor(other._extensionFunctor),
-                                     _needReinit(other._needReinit)
+                                     _traversalParams(other._traversalParams)
+
     {}
 
     // Assignment Operator
@@ -124,7 +125,7 @@ struct Finder2<TContainer, TPattern, Jst<TSpec> >
         {
             _containerPtr = other._containerPtr;
             _extensionFunctor = other._extensionFunctor;
-            _needReinit = other._needReinit;
+            _traversalParams = other._traversalParams;
         }
         return *this;
     }
@@ -334,12 +335,36 @@ container(Finder2<TContainer, TPattern, Jst<TSpec> > const & finder)
 // ----------------------------------------------------------------------------
 
 template <typename TFinder, typename TExtensionSpec, typename TPattern, typename TScoreLimit>
-inline void
+inline Pair<unsigned>
 init(FinderExtensionPoint<TFinder, TExtensionSpec> & extensionFunctor,
      TPattern & pattern,
      TScoreLimit const & /*scoreLimit*/)
 {
-    init(extensionFunctor, pattern);
+    return init(extensionFunctor, pattern);
+}
+
+// ----------------------------------------------------------------------------
+// Function init()
+// ----------------------------------------------------------------------------
+
+template <typename TContainer, typename TPattern, typename TSpec, typename TState, typename TErrors>
+inline void
+init(Finder2<TContainer, TPattern, Jst<TSpec> > & finder,
+     TPattern & pattern,
+     FinderState<TState> & state,
+     TErrors const & errors)
+{
+    finder._traversalParams = init(finder.extensionFunctor, pattern, state, errors);
+}
+
+template <typename TContainer, typename TPattern, typename TSpec, typename TErrors>
+inline void
+init(Finder2<TContainer, TPattern, Jst<TSpec> > & finder,
+     TPattern & pattern,
+     FinderState<Nothing> & /*state*/,
+     TErrors const & errors)
+{
+    finder._traversalParams = init(finder.extensionFunctor, pattern, errors);
 }
 
 // ----------------------------------------------------------------------------
@@ -359,38 +384,88 @@ init(FinderExtensionPoint<TFinder, TExtensionSpec> & extensionFunctor,
  * @param[in]       limit       An optional parameter setting the score limit (<tt><= 0</tt>).
  */
 
-template <typename TContainer, typename TPattern, typename TSpec, typename TDelegate>
-inline void
-find(Finder2<TContainer, TPattern, Jst<TSpec> > & finder,
-     TPattern & pattern,
-     TDelegate & delegate,
-     int scoreLimit = 0)
+//template <typename TContainer, typename TPattern, typename TSpec, typename TDelegate>
+//inline void
+//find(Finder2<TContainer, TPattern, Jst<TSpec> > & finder,
+//     TPattern & pattern,
+//     TDelegate & delegate,
+//     int scoreLimit = 0)
+//{
+//    typedef Finder2<TContainer, TPattern, Jst<TSpec> > TFinder;
+//    typedef typename GetJstTraverser<TFinder>::Type TTraverser;
+//
+//    // Set up the journaled string tree traversal.
+//    TTraverser traverser(container(finder), length(needle(pattern)) - scoreLimit);
+//#ifdef PROFILE_JST_INTERN
+//    double timeBuild = sysTime();
+//#endif
+//    while (journalNextBlock(container(finder), contextSize(traverser)))  // Generating the journal index for the next block.
+//    {
+//        if (finder._needReinit)
+//        {
+//            init(finder._extensionFunctor, pattern, scoreLimit);
+//            finder._needReinit = false;
+//        }
+//#ifdef PROFILE_JST_INTERN
+//        std::cerr << "Time-C: " << sysTime() - timeBuild << " s" << std::endl;
+//        double timeSearch = sysTime();
+//#endif
+//        traverse(finder, delegate, traverser);
+//#ifdef PROFILE_JST_INTERN
+//        std::cerr << "Time-S: " << sysTime() - timeSearch << " s" << std::endl;
+//        timeBuild = sysTime();
+//#endif
+//    }
+//}
+
+template <typename THystk, typename TPattern, typename TDelegate, typename TState, typename TErrors, typename TSpec>
+void find(THystk & jst,
+          TPattern & pattern,
+          TDelegate & delegate,
+          FinderState<TState> & state,
+          TErrors const & errors,
+          Jst<TSpec> const & /*tag*/)
 {
-    typedef Finder2<TContainer, TPattern, Jst<TSpec> > TFinder;
+    typedef Finder2<THystk, TPattern, Jst<TSpec> > TFinder;
     typedef typename GetJstTraverser<TFinder>::Type TTraverser;
 
-    // Set up the journaled string tree traversal.
-    TTraverser traverser(container(finder), length(needle(pattern)) - scoreLimit);
-#ifdef PROFILE_JST_INTERN
-    double timeBuild = sysTime();
-#endif
-    while (journalNextBlock(container(finder), contextSize(traverser)))  // Generating the journal index for the next block.
-    {
-        if (finder._needReinit)
-        {
-            init(finder._extensionFunctor, pattern, scoreLimit);
-            finder._needReinit = false;
-        }
-#ifdef PROFILE_JST_INTERN
-        std::cerr << "Time-C: " << sysTime() - timeBuild << " s" << std::endl;
-        double timeSearch = sysTime();
-#endif
-        traverse(finder, delegate, traverser);
-#ifdef PROFILE_JST_INTERN
-        std::cerr << "Time-S: " << sysTime() - timeSearch << " s" << std::endl;
-        timeBuild = sysTime();
-#endif
-    }
+    TFinder finder(jst);
+    init(finder, pattern, state, errors);
+    TTraverser traverser(container(finder), finder._traversalParams.i1, finder._traversalParams.i2);
+    traverse(finder, delegate, traverser);
+}
+
+// Without errors
+template <typename THystk, typename TPattern, typename TDelegate, typename TState, typename TSpec>
+void find(THystk & jst,
+          TPattern & pattern,
+          TDelegate & delegate,
+          FinderState<TState> & state,
+          Jst<TSpec> const & tag)
+{
+    find(jst, pattern, delegate, state, 0, tag);
+}
+
+// Without state.
+template <typename THystk, typename TPattern, typename TDelegate, typename TErrors, typename TSpec>
+void find(THystk & jst,
+          TPattern & pattern,
+          TDelegate & delegate,
+          TErrors const & errors,
+          Jst<TSpec> const & tag)
+{
+    FinderState<> defaultState;
+    find(jst, pattern, delegate, defaultState, errors, tag);
+}
+
+// Without state and errors.
+template <typename THystk, typename TPattern, typename TDelegate, typename TSpec>
+void find(THystk & jst,
+          TPattern & pattern,
+          TDelegate & delegate,
+          Jst<TSpec> const & tag)
+{
+    find(jst, pattern, delegate, 0, tag);
 }
 
 }

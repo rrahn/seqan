@@ -31,13 +31,15 @@
 // ==========================================================================
 // Author: Rene Rahn <rene.rahn@fu-berlin.de>
 // ==========================================================================
-// Implements simple online serarch.
+// Implements filter state used for filter algorithms such as pigeonhole
+// or swift filter.
 // ==========================================================================
 
-#ifndef EXTRAS_INCLUDE_SEQAN_FIND_JOURNALED_STRING_TREE_FIND_JOURNALED_STRING_TREE_SIMPLE_H_
-#define EXTRAS_INCLUDE_SEQAN_FIND_JOURNALED_STRING_TREE_FIND_JOURNALED_STRING_TREE_SIMPLE_H_
+#ifndef EXTRAS_INCLUDE_SEQAN_FIND_JOURNALED_STRING_TREE_FIND_FILTER_STATE_H_
+#define EXTRAS_INCLUDE_SEQAN_FIND_JOURNALED_STRING_TREE_FIND_FILTER_STATE_H_
 
-namespace seqan {
+namespace seqan
+{
 
 // ============================================================================
 // Forwards
@@ -47,73 +49,105 @@ namespace seqan {
 // Tags, Classes, Enums
 // ============================================================================
 
-// ----------------------------------------------------------------------------
-// Class FinderFinderExtensionPoint
-// ----------------------------------------------------------------------------
-
-template <typename TContainer, typename TNeedle, typename TSpec>
-class FinderExtensionPoint<Finder2<TContainer, Pattern<TNeedle, Simple>, TSpec>, Simple>
+template <typename TFilterSpec = void>
+class FinderState<Pigeonhole<TFilterSpec> >
 {
 public:
+    typedef typename Value<FinderState>::Type TValue;
 
-    typedef typename Iterator<TNeedle, Standard>::Type TNeedleIt;
+    String<TValue>  _data;
+    unsigned        currPos;
+    unsigned        endPos;
 
-    TNeedleIt _itBegin;
-    TNeedleIt _itEnd;
-
-    FinderExtensionPoint()
+    FinderState() : currPos(0), endPos(0)
     {}
+};
 
-    FinderExtensionPoint(Pattern<TNeedle, Simple> & pattern)
-    {
-        init(*this, pattern);
-    }
+// ----------------------------------------------------------------------------
+// Class PigeonholeHit
+// ----------------------------------------------------------------------------
 
-    template <typename TResult, typename THystkIt>
-    inline void
-    operator()(TResult & res, THystkIt haystackIt)
-    {
-        TNeedleIt ndlIt = _itBegin;
-        for (; ndlIt != _itEnd; ++ndlIt, ++haystackIt)
-            if (*ndlIt != getValue(haystackIt))
-                return;
-        res.i1 = true;
-    }
+template <typename TSize, typename TSpec>
+class PigeonholeHit2
+{
+    TSize ndlSeqPos;
+    TSize ndlSeqNo;
+    TSize ndlSeqLength;
 };
 
 // ============================================================================
 // Metafunctions
 // ============================================================================
 
-// ----------------------------------------------------------------------------
-// Metafunction RegisteredExtensionPoint                               [Simple]
-// ----------------------------------------------------------------------------
-
-template <typename TContainer, typename TNeedle, typename TSpec>
-struct RegisteredExtensionPoint<Finder2<TContainer, Pattern<TNeedle, Simple>, Jst<TSpec> > >
+template <typename TSpec>
+struct Value<FinderState<Pigeonhole<TSpec> > >
 {
-    typedef Finder2<TContainer, Pattern<TNeedle, Simple>, Jst<TSpec> > TFinder_;
-    typedef FinderExtensionPoint<TFinder_, Simple> Type;
+    typedef PigeonholeHit2<__int64, TSpec> Type;
+};
+
+template <typename TSpec>
+struct Value<FinderState<Pigeonhole<TSpec> > const>
+{
+    typedef PigeonholeHit2<__int64, TSpec> Type;
 };
 
 // ============================================================================
 // Functions
 // ============================================================================
 
-// ----------------------------------------------------------------------------
-// Function init()
-// ----------------------------------------------------------------------------
-
-template <typename TFinder>
-inline Pair<unsigned>
-init(FinderExtensionPoint<TFinder, Simple> & simpleFunctor,
-     typename GetPattern<TFinder>::Type & pattern)
+template <typename TSpec,  typename TExpand>
+void appendValue(FinderState<Pigeonhole<TSpec> > & matchState,
+                 typename Value<FinderState<Pigeonhole<TSpec> > >::Type val,
+                 Tag<TExpand> const & expand)
 {
-    simpleFunctor._itBegin = begin(needle(pattern), Standard());
-    simpleFunctor._itEnd = end(needle(pattern), Standard());
-    return Pair<unsigned>(simpleFunctor._itEnd - simpleFunctor._itBegin, 0);
+    if (length(matchState._data) == matchState.endPos)
+        appendValue(matchState._data, val, expand);
+    else
+        value(matchState._data, matchState.endPos) = val;
+    ++matchState.endPos;
 }
 
-}  // namespace seqan
+template <typename TSpec>
+bool hasNext(FinderState<Pigeonhole<TSpec> > const & matchState)
+{
+    return matchState.currPos < matchState.endPos;
+}
 
-#endif  // EXTRAS_INCLUDE_SEQAN_FIND_JOURNALED_STRING_TREE_FIND_JOURNALED_STRING_TREE_SIMPLE_H_
+template <typename TSpec>
+typename Value<FinderState<Pigeonhole<TSpec> > >::Type &
+getNext(FinderState<Pigeonhole<TSpec> > & matchState)
+{
+    return matchState._data[matchState.currPos++];
+}
+
+template <typename TSize, typename TSpec>
+typename Value<FinderState<Pigeonhole<TSpec> > const >::Type &
+getNext(FinderState<Pigeonhole<TSpec> > const & matchState)
+{
+    return matchState._data[matchState.currPos++];
+}
+
+template <typename TSpec>
+void clear(FinderState<Pigeonhole<TSpec> > & matchState)
+{
+    matchState.currPos = 0;
+    matchState.endPos = 0;
+}
+
+template <typename TSpec>
+void reinit(FinderState<Pigeonhole<TSpec> > & matchState)
+{
+    clear(matchState._data);
+    matchState.currPos = 0;
+    matchState.endPos = 0;
+}
+
+template <typename TSpec>
+bool empty(FinderState<Pigeonhole<TSpec> > const & matchState)
+{
+    return !hasNext(matchState);
+}
+
+}
+
+#endif // EXTRAS_INCLUDE_SEQAN_FIND_JOURNALED_STRING_TREE_FIND_FILTER_STATE_H_
