@@ -31,15 +31,13 @@
 // ==========================================================================
 // Author: Rene Rahn <rene.rahn@fu-berlin.de>
 // ==========================================================================
-// Implements filter state used for filter algorithms such as pigeonhole
-// or swift filter.
+// Implements the generalt configurator for the jst mapper.
 // ==========================================================================
 
-#ifndef EXTRAS_INCLUDE_SEQAN_FIND_JOURNALED_STRING_TREE_FIND_FILTER_STATE_H_
-#define EXTRAS_INCLUDE_SEQAN_FIND_JOURNALED_STRING_TREE_FIND_FILTER_STATE_H_
+#ifndef EXTRAS_APPS_JST_MAPPER_JST_MAPPER_CONFIGURATOR_H_
+#define EXTRAS_APPS_JST_MAPPER_JST_MAPPER_CONFIGURATOR_H_
 
-namespace seqan
-{
+namespace seqan {
 
 // ============================================================================
 // Forwards
@@ -49,104 +47,24 @@ namespace seqan
 // Tags, Classes, Enums
 // ============================================================================
 
-template <typename TFilterSpec = void>
-class FinderState<Pigeonhole<TFilterSpec> >
+template <typename TSpec>
+struct JstMapperConfigurator
 {
-public:
-    typedef typename Value<FinderState>::Type TValue;
 
-    String<TValue>  _data;
-    unsigned        currPos;
-    unsigned        endPos;
+    // Fragment Store
 
-    FinderState() : currPos(0), endPos(0)
-    {}
-};
+    // Delta Store
 
-// ----------------------------------------------------------------------------
-// Class PigeonholeHit
-// ----------------------------------------------------------------------------
 
-template <typename TSize, typename TSpec>
-class PigeonholeHit2
-{
-    TSize ndlSeqPos;
-    TSize ndlSeqId;
 };
 
 // ============================================================================
 // Metafunctions
 // ============================================================================
 
-template <typename TSpec>
-struct Value<FinderState<Pigeonhole<TSpec> > >
-{
-    typedef PigeonholeHit2<__int64, TSpec> Type;
-};
-
-template <typename TSpec>
-struct Value<FinderState<Pigeonhole<TSpec> > const>
-{
-    typedef PigeonholeHit2<__int64, TSpec> Type;
-};
-
 // ============================================================================
 // Functions
 // ============================================================================
 
-template <typename TSpec,  typename TExpand>
-void appendValue(FinderState<Pigeonhole<TSpec> > & matchState,
-                 typename Value<FinderState<Pigeonhole<TSpec> > >::Type val,
-                 Tag<TExpand> const & expand)
-{
-    if (length(matchState._data) == matchState.endPos)
-        appendValue(matchState._data, val, expand);
-    else
-        value(matchState._data, matchState.endPos) = val;
-    ++matchState.endPos;
 }
-
-template <typename TSpec>
-bool hasNext(FinderState<Pigeonhole<TSpec> > const & matchState)
-{
-    return matchState.currPos < matchState.endPos;
-}
-
-template <typename TSpec>
-typename Value<FinderState<Pigeonhole<TSpec> > >::Type &
-getNext(FinderState<Pigeonhole<TSpec> > & matchState)
-{
-    return matchState._data[matchState.currPos++];
-}
-
-template <typename TSize, typename TSpec>
-typename Value<FinderState<Pigeonhole<TSpec> > const >::Type &
-getNext(FinderState<Pigeonhole<TSpec> > const & matchState)
-{
-    return matchState._data[matchState.currPos++];
-}
-
-template <typename TSpec>
-void clear(FinderState<Pigeonhole<TSpec> > & matchState)
-{
-    matchState.currPos = 0;
-    matchState.endPos = 0;
-}
-
-template <typename TSpec>
-void reinit(FinderState<Pigeonhole<TSpec> > & matchState)
-{
-    clear(matchState._data);
-    matchState.currPos = 0;
-    matchState.endPos = 0;
-}
-
-template <typename TSpec>
-bool empty(FinderState<Pigeonhole<TSpec> > const & matchState)
-{
-    return !hasNext(matchState);
-}
-
-}
-
-#endif // EXTRAS_INCLUDE_SEQAN_FIND_JOURNALED_STRING_TREE_FIND_FILTER_STATE_H_
+#endif // EXTRAS_APPS_JST_MAPPER_JST_MAPPER_CONFIGURATOR_H_

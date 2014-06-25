@@ -522,6 +522,44 @@ struct BranchNode<JstTraverser<TContainer, TState, TSpec> const>
     typedef typename Iterator<TDeltaMap_ const, Rooted>::Type Type;
 };
 
+// ----------------------------------------------------------------------------
+// Metafunction ContextView
+// ----------------------------------------------------------------------------
+
+template <typename TJstTraverser, typename TStateTag>
+struct ContextView;
+
+// StateTraverseMaster.
+template <typename TJstTraverser>
+struct ContextView<TJstTraverser, StateTraverseMaster>
+{
+    typedef typename Container<TJstTraverser>::Type TJst_;
+    typedef typename Host<TJst_>::Type              THost_;
+    typedef ContainerView<THost_>                   Type;
+};
+
+template <typename TJstTraverser>
+struct ContextView<TJstTraverser const, StateTraverseMaster>
+{
+    typedef typename ContextView<TJstTraverser, StateTraverseMaster>::Type const Type;
+};
+
+// StateTraverseBranch.
+template <typename TJstTraverser>
+struct ContextView<TJstTraverser, StateTraverseBranch>
+{
+    typedef typename Container<TJstTraverser>::Type TJst_;
+    typedef typename GetStringSet<TJst_>::Type      TJournaledSet_;
+    typedef typename Value<TJournaledSet_>::Type    TJournaledString_;
+    typedef ContainerView<TJournaledString_>        Type;
+};
+
+template <typename TJstTraverser>
+struct ContextView<TJstTraverser const, StateTraverseBranch>
+{
+    typedef typename ContextView<TJstTraverser, StateTraverseBranch>::Type const Type;
+};
+
 // ============================================================================
 // Functions
 // ============================================================================
@@ -973,6 +1011,67 @@ contextIterator(JstTraverser<TContainer, TState, TSpec> const & traverser,
                 StateTraverseBranch const & /*tag*/)
 {
     return traverser._branchIt;
+}
+
+/*!
+ * @fn JstTraverser#contextView
+ * @headerfile <seqan/journaled_string_tree.h>
+ * @brief Returns view to the current context.
+ *
+ * @signature TView contextView(traverser, tag);
+ * @param[in] traverser The traverser to query current context view for.
+ * @param[in] tag       Tag indicating the source of the iterator. Must be one of @link JstTraversalStates @endlink.
+ *
+ * @return TView A view of type @link JstTraverser#ContextView @endlink over the current context.
+ *
+ * @see JstTraverser#contextBegin
+ * @see JstTraverser#contextEnd
+ * @see JstTraverser#contextIterator
+ */
+// StateTraverseMaster.
+template <typename TContainer, typename TState, typename TSpec>
+inline typename ContextView<JstTraverser<TContainer, TState, TSpec>, StateTraverseMaster>::Type
+contextView(JstTraverser<TContainer, TState, TSpec> & traverser,
+            StateTraverseMaster const & tag)
+{
+    typedef JstTraverser<TContainer, TState, TSpec> TTraverser;
+    typedef typename ContextView<TTraverser, StateTraverseMaster>::Type TContextView;
+
+    return TContextView(contextBegin(traverser, tag), contextEnd(traverser, tag));
+}
+
+template <typename TContainer, typename TState, typename TSpec>
+inline typename ContextView<JstTraverser<TContainer, TState, TSpec> const, StateTraverseMaster>::Type
+contextView(JstTraverser<TContainer, TState, TSpec> const & traverser,
+            StateTraverseMaster const & tag)
+{
+    typedef JstTraverser<TContainer, TState, TSpec> const TTraverser;
+    typedef typename ContextView<TTraverser, StateTraverseMaster>::Type TContextView;
+
+    return TContextView(contextBegin(traverser, tag), contextEnd(traverser, tag));
+}
+
+// StateTraverseBranch.
+template <typename TContainer, typename TState, typename TSpec>
+inline typename ContextView<JstTraverser<TContainer, TState, TSpec>, StateTraverseBranch>::Type
+contextView(JstTraverser<TContainer, TState, TSpec> & traverser,
+            StateTraverseBranch const & tag)
+{
+    typedef JstTraverser<TContainer, TState, TSpec> TTraverser;
+    typedef typename ContextView<TTraverser, StateTraverseBranch>::Type TContextView;
+
+    return TContextView(contextBegin(traverser, tag), contextEnd(traverser, tag));
+}
+
+template <typename TContainer, typename TState, typename TSpec>
+inline typename ContextView<JstTraverser<TContainer, TState, TSpec> const, StateTraverseBranch>::Type
+contextView(JstTraverser<TContainer, TState, TSpec> const & traverser,
+            StateTraverseBranch const & tag)
+{
+    typedef JstTraverser<TContainer, TState, TSpec> const TTraverser;
+    typedef typename ContextView<TTraverser, StateTraverseBranch>::Type TContextView;
+
+    return TContextView(contextBegin(traverser, tag), contextEnd(traverser, tag));
 }
 
 // ----------------------------------------------------------------------------

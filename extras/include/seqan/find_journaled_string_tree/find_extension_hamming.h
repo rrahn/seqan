@@ -31,11 +31,14 @@
 // ==========================================================================
 // Author: Rene Rahn <rene.rahn@fu-berlin.de>
 // ==========================================================================
-// Implements the generalt configurator for the jst mapper.
+// Implements hamming distance based comparison of two strings.
 // ==========================================================================
 
-#ifndef EXTRAS_APPS_JST_MAPPER_JST_MAPPER_CONFIGURATOR_H_
-#define EXTRAS_APPS_JST_MAPPER_JST_MAPPER_CONFIGURATOR_H_
+#ifndef EXTRAS_INCLUDE_SEQAN_FIND_JOURNALED_STRING_TREE_FIND_EXTENSION_HAMMING_H_
+#define EXTRAS_INCLUDE_SEQAN_FIND_JOURNALED_STRING_TREE_FIND_EXTENSION_HAMMING_H_
+
+namespace seqan
+{
 
 // ============================================================================
 // Forwards
@@ -45,14 +48,23 @@
 // Tags, Classes, Enums
 // ============================================================================
 
-template <typename TSpec>
-struct JstMapperConfigurator
+template <typename TSize>
+struct StateHammingSimple_
 {
+    TSize errorCount;
+    TSize maxErrors;
+};
 
-    // Fragment Store
+template <typename TPattern>
+class FinderExtensionPoint<TPattern,  HammingSimple>
+{
+public:
+    typedef typename GetState<FinderExtensionPoint>::Type TState;
 
-    // Delta Store
+    TState state;
 
+    FinderExtensionPoint()
+    {}
 
 };
 
@@ -60,9 +72,54 @@ struct JstMapperConfigurator
 // Metafunctions
 // ============================================================================
 
+// ----------------------------------------------------------------------------
+// Metafunction ContextIteratorPosition                               [Hamming]
+// ----------------------------------------------------------------------------
+
+template <typename T>
+struct ContextIteratorPosition<FinderExtensionPoint<T, HammingSimple> >
+{
+    typedef ContextPositionRight Type;
+};
+
+// ----------------------------------------------------------------------------
+// Metafunction RequireFullContext                                    [Hamming]
+// ----------------------------------------------------------------------------
+
+template <typename T>
+struct RequireFullContext<FinderExtensionPoint<T, HammingSimple> > : False{};
+
+// ----------------------------------------------------------------------------
+// Metafunction RegisteredExtensionPoint                              [Hamming]
+// ----------------------------------------------------------------------------
+
+template <typename TNeedle>
+struct RegisteredExtensionPoint<Pattern<TNeedle, HammingSimple> >
+{
+    typedef Pattern<TNeedle, HammingSimple> TPattern_;
+    typedef FinderExtensionPoint<TPattern_, HammingSimple> Type;
+};
+
+// ----------------------------------------------------------------------------
+// Metafunction GetState                                              [Hamming]
+// ----------------------------------------------------------------------------
+
+template <typename T>
+struct GetState<FinderExtensionPoint<T, HammingSimple> >
+{
+    typedef StateHammingSimple_ Type;
+};
+
+template <typename T>
+struct GetState<FinderExtensionPoint<T, HammingSimple> const>
+{
+    typedef StateHammingSimple_ const Type;
+};
+
 // ============================================================================
 // Functions
 // ============================================================================
 
+}
 
-#endif // EXTRAS_APPS_JST_MAPPER_JST_MAPPER_CONFIGURATOR_H_
+#endif // EXTRAS_INCLUDE_SEQAN_FIND_JOURNALED_STRING_TREE_FIND_EXTENSION_HAMMING_H_

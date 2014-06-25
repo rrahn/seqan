@@ -209,10 +209,23 @@ struct GetState<Finder2<TContainer, TPattern, Jst<TSpec> > const> :
 // Metafunction GetJstTraverser
 // ----------------------------------------------------------------------------
 
+// Adopt to not include the finder as a state.
 template <typename TContainer, typename TPattern, typename TSpec>
 struct GetJstTraverser<Finder2<TContainer, TPattern, TSpec> >
 {
     typedef Finder2<TContainer, TPattern, TSpec> TFinder_;
+    typedef typename ContextIteratorPosition<TFinder_>::Type TContextPosition_;
+    typedef typename RequireFullContext<TFinder_>::Type TRequireContext_;
+    typedef typename GetState<TFinder_>::Type TState;
+    typedef JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosition_, TRequireContext_> > Type;
+};
+
+// TODO(rmaerker): Replace method above with current.
+template <typename TContainer, typename TAlgorithm>
+struct GetJstTraverser2
+{
+    // TODO(rmaerker): Completely relies on pattern state and nothing more.
+    typedef Finder2<TContainer, TAlgorithm, Jst<> > TFinder_;
     typedef typename ContextIteratorPosition<TFinder_>::Type TContextPosition_;
     typedef typename RequireFullContext<TFinder_>::Type TRequireContext_;
     typedef typename GetState<TFinder_>::Type TState;

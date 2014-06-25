@@ -31,16 +31,16 @@
 // ==========================================================================
 // Author: Rene Rahn <rene.rahn@fu-berlin.de>
 // ==========================================================================
-// Implements strategy to map the reads.
+// Implements the algorithms to extend a seed to the left.
 // ==========================================================================
 
-#ifndef EXTRAS_APPS_JST_MAPPER_JST_MAPPER_MAP_READS_H_
-#define EXTRAS_APPS_JST_MAPPER_JST_MAPPER_MAP_READS_H_
+#ifndef EXTRAS_APPS_JST_MAPPER_EXTENDER_LEFT_H_
+#define EXTRAS_APPS_JST_MAPPER_EXTENDER_LEFT_H_
 
-#include "jst_mapper.h"
-#include "jst_mapper_verifier.h"
+#include "extender.h"
 
-using namespace seqan;
+namespace seqan
+{
 
 // ============================================================================
 // Forwards
@@ -50,6 +50,21 @@ using namespace seqan;
 // Tags, Classes, Enums
 // ============================================================================
 
+template <typename TState>
+class ExtenderLeft;
+
+template <>
+class ExtenderLeft<ExtenderState<HammingDistance> >
+{
+public:
+    typedef ExtenderState<HammingDistance> TState;
+
+    TState&      extenderState;
+
+    ExtenderLeft(TState & extenderState) : extenderState(extenderState)
+    {}
+};
+
 // ============================================================================
 // Metafunctions
 // ============================================================================
@@ -58,41 +73,55 @@ using namespace seqan;
 // Functions
 // ============================================================================
 
-template <typename TFragmentStore, typename TContigPos, typename TContigValue, typename TVerifierSpec>
-JstMapperResult
-mapReads(TFragmentStore & fragStore, DeltaMap<TContigPos, TContigValue> & deltaMap, JstMapperOptions const & options)
+template <typename TReadSeqPos, typename TRead, typename TContigPos, typename TContigView>
+inline bool
+extend(ExtenderLeft<ExtenderState<HammingDistance> > & extender,
+       TReadSeqPos readBeginPos,
+       TRead & read,
+       TContigPos & contigBeginPos,
+       TContigView & contigView)
 {
-    typedef typename TFragmentStore::TReadSeqStore                        TReadStore;
-    typedef typename TFragmentStore::TContigStore                         TContigStore;
-//    typedef typename Value<TContigStore>::Type                      TContigStoreElement;
-//    typedef typename TContigStoreElement::TContigSeq                TContigSeq;
-//    typedef typename Value<TContigSeq>::Type                        TContigSeqAlphabet;
-//    typedef typename Position<TContigSeq>::Type                     TContigSeqPosition;
-    typedef Index<TReadStore, IndexQGram<Simple, OpenAddressing> >        TIndex;
-    typedef Pattern<TIndex, Pigeonhole<> >                                TPattern;
-    typedef DeltaMap<TContigPos, TContigValue>                            TDeltaMap;
-    typedef JournaledStringTree<TDeltaMap>                                TJst;
+    typedef typename Iterator<TContigView, Standard>::Type  TIterContigView;
+    typedef typename Segment<TRead const, InfixSegment>     TReadInfix;
+    typedef typename Iterator<TReadInfix, Standard>::Type   TIterReadInfix;
 
-    typedef FinderState<Pigeonhole<> >                                    TFilterState;
+    // Seed at the beginning of the read.
+    if (readBeginPos == 0)
+    {
+        contigBeginPos += (end(contigView, Standard()) - extender.extenderState.seedLength) - begin(contigView, Standard());
+        return true;
+    }
 
-    typedef JstMapperVerifier<TFilterState, ResultsWriter, TVerifierSpec> TVerifier;
+    SEQAN_ASSERT_LEQ(begin(contigView), end(contigView) - extender.extenderState.seedLength - readBeginPos);
+    // Clip the end of the contig to the begin of the seed.
+    end(contigView, Standard()) -= extender.extenderState.seedLength;
 
-    ResultsWriter writer(options.output);
+    // Clip the begin of the contig to the left most possible match position of the read.
+    if (end(contigView, Standard()) - readBeginPos > begin(contigView, Standard()))
+    {
+        contigBeginPos += (end(contigView, Standard()) - readBeginPos) - begin(contigView, Standard());
+        begin(contigView, Standard()) = end(contigView, Standard()) - readBeginPos;
+    }
 
-    // Step 1) Build the index.
-    TIndex index(fragStore.readSeqStore);
-    TPattern pattern(index);
-    TJst jst(fragStore.contigStore[0].seq, deltaMap);
-    TFilterState filterState;
-    TVerifier verifier(filterState, writer, 3, options.qGram);
+    TReadInfix readInfix(read, 0, readBeginPos);
 
-    if (options.jstSize != 0)
-        setBlockSize(jst, options.jstSize);
+    // Check if read is valid.
+    if (length(contigView) != length(readInfix))
+        return false;
 
-    // Step 2) Trigger the search.
-    indexRequire(index);
-    find(jst, pattern, filterState, verifier, options.errorRate , Jst<Pigeonhole<> >());
+    TIterContigView contigIt = begin(contigView, Standard());
+    TIterReadInfix readBegin = begin(readInfix, Standard());
+    TIterReadInfix readEnd = end(readInfix, Standard());
+
+    for (TIterReadInfix readIt = readBegin; readIt != readEnd; ++readIt, ++contigIt)
+        if (getValue(readIt) != getValue(contigIt))
+            if (++extender.extenderState.errors > extender.extenderState.maxErrorsPerRead)
+                return false;
+
+    // Prefix matches with at most maxErrorsPerRead!
+    return true;
+}
 
 }
 
-#endif // EXTRAS_APPS_JST_MAPPER_JST_MAPPER_MAP_READS_H_
+#endif // EXTRAS_APPS_JST_MAPPER_EXTENDER_LEFT_H_

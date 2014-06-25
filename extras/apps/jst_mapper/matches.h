@@ -31,15 +31,16 @@
 // ==========================================================================
 // Author: Rene Rahn <rene.rahn@fu-berlin.de>
 // ==========================================================================
-// Implements the writer model to asynchronously dump matches.
+// Implements match class and additional utilities to deal with matches.
 // ==========================================================================
 
-#ifndef EXTRAS_APPS_JST_MAPPER_JST_MAPPER_RESULTS_WRITER_H_
-#define EXTRAS_APPS_JST_MAPPER_JST_MAPPER_RESULTS_WRITER_H_
+#ifndef EXTRAS_APPS_JST_MAPPER_MATCHES_H_
+#define EXTRAS_APPS_JST_MAPPER_MATCHES_H_
 
-#include <iostream>
+#include <extras/apps/masai/matches.h>
 
-using namespace seqan;
+namespace seqan
+{
 
 // ============================================================================
 // Forwards
@@ -49,28 +50,26 @@ using namespace seqan;
 // Tags, Classes, Enums
 // ============================================================================
 
-class ResultsWriter
+struct MultiGenomeMatch_;
+typedef Tag<MultiGenomeMatch_> MultiGenomeMatch;
+
+template <>
+struct Match<MultiGenomeMatch> : public Match<>
 {
-public:
-    std::ofstream fileStream;
-    CharString buffer;
+    typedef Match<> TSuper;
 
-    ResultsWriter(char * const & fileName)
-    {
-        fileStream.open(fileName, std::ios_base::out);
-        resize(buffer, 4096, Exact());
-    }
+    String<bool, Packed<> > coverage;
 
-    template <typename TFinder>
-    inline void operator(TFinder const & finder)
-    {
-        asyncWrite(*this, getPositions(finder));
-    }
+    Match() : TSuper(), coverage()
+    {}
+};
 
-    ~ResultsWriter()
-    {
-        fileStream.close();
-    }
+template <typename TMatch>
+struct MatchBuffer
+{
+    String<TMatch> matches;
+    unsigned beginPos;
+    unsigned endPos;
 };
 
 // ============================================================================
@@ -81,12 +80,26 @@ public:
 // Functions
 // ============================================================================
 
-template <typename TPosVector>
-void asyncWrite(ResultsWriter & writer, TPosVector const & posVector);
+
+
+// ----------------------------------------------------------------------------
+// Function fill()                                                      [Match]
+// ----------------------------------------------------------------------------
+
+template <typename TContigId, typename TContigPos, typename TReadId, typename TErrors, typename TCoverage>
+inline void fill(Match<MultiGenomeMatch> & match,
+                 TContigId contigId,
+                 TContigPos beginPos,
+                 TContigPos endPos,
+                 TReadId readId,
+                 TErrors errors,
+                 TCoverage const & coverage,
+                 bool reverseComplemented)
 {
-    // TODO(rmaerker): ImplementMe!
-    // Now we trigger the asynchronous write.
-    writer.fileStream << "Match ";
+    match.coverage = coverage;
+    fill(match, contigId, beginPos, endPos, readId, errors, reverseComplemented);
 }
 
-#endif // EXTRAS_APPS_JST_MAPPER_JST_MAPPER_RESULTS_WRITER_H_
+}
+
+#endif // EXTRAS_APPS_JST_MAPPER_MATCHES_H_

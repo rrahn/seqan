@@ -31,13 +31,14 @@
 // ==========================================================================
 // Author: Rene Rahn <rene.rahn@fu-berlin.de>
 // ==========================================================================
-// Implements the verifier for filtered matches.
+// Implements the algorithms to extend a seed to the right.
 // ==========================================================================
 
-#ifndef EXTRAS_APPS_JST_MAPPER_JST_MAPPER_VERIFIER_H_
-#define EXTRAS_APPS_JST_MAPPER_JST_MAPPER_VERIFIER_H_
+#ifndef EXTRAS_APPS_JST_MAPPER_EXTENDER_RIGHT_H_
+#define EXTRAS_APPS_JST_MAPPER_EXTENDER_RIGHT_H_
 
-using namespace seqan;
+namespace seqan
+{
 
 // ============================================================================
 // Forwards
@@ -47,46 +48,27 @@ using namespace seqan;
 // Tags, Classes, Enums
 // ============================================================================
 
-template <typename TFilterState, typename TDelegate, typename TSpec>
-class JstMapperVerifier
+template <typename TContainer, typename TState>
+class ExtenderRight;
+
+template <typename TContainer>
+class ExtenderRight<TContainer, ExtenderState<HammingDistance> >
 {
 public:
-    typedef typename Value<TFilterState>::Type TMatchState;
+    typedef ExtenderState<HammingDistance>                          TState;
+    typedef Pattern<TReadSeq, HammingSimple>                        TAlgorithm;
 
-    TMatchState *  statePtr;
-    unsigned       maxErrors;
-    unsigned       qGram;
-    TDelegate      delegate;
+    typedef typename GetState<TAlgorithm>::Type                     TAlgorithmState;
+    typedef typename GetJstTraverser2<TContainer, TAlgorithm>::Type TJstTraverser;
 
-    JstMapperVerifier(TMatchState & state, unsigned errors, unsigned qGram) :
-        statePtr(&state),
-        maxErrors(errors),
-        qGram(qGram),
-        delegate()
+    TState&         extenderState;
+    TAlgorithmState algoState;
+    TJstTraverser   traverser;
+
+    ExtenderRight(TState & extenderState) : extenderState(extenderState)
     {}
 
-    template <typename TFinder>
-    inline void operator(TFinder const & finder)
-    {
-        template typename Positions<TFinder>::Type TPositions;
-
-        while(hasNext(*statePtr))
-        {
-            TMatchState mState = getNext(*statePtr);
-            // Extract the match -> readNo, relReadPos
-
-            // unsigned errorCount = verifyPrefix(contextBegin(finder) + relNedlPos);
-
-            if (errorCount < maxErrors)
-//                errorCount += verifySuffix(finder, contextBegin(finder) + relNdlPos + qram);
-            // Delegate the hits here.
-            if (errorCount < maxErrors)
-//                delegate(Hit);
-        }
-        clear(*statePtr);
-    }
 };
-
 // ============================================================================
 // Metafunctions
 // ============================================================================
@@ -95,29 +77,35 @@ public:
 // Functions
 // ============================================================================
 
+template <typename TContainer, typename TReadSeqPos, typename TRead, typename TContigPos, typename TTraverser>
 inline bool
-verifyPrefix(JstMapperVerifier<HammingDistance> & verifier)
+extend(ExtenderRight<TContainer, ExtenderState<HammingDistance> > & extender,
+       TReadSeqPos readBeginPos,
+       TRead & read,
+       TContigPos & contigBeginPos,
+       TTraverser const & traverser)
 {
-    return true;
+    // From here we need to invoke another traversal.
+
+
+    find(extractState(traverser), )
+
+    //    TContigSeqSize matchEnd = contigBegin + extender.seedLength;
+    //
+    //    if (seedBegin + extender.seedLength < readLength)
+    //    {
+    //        TContigSeqSize contigRightEnd = extender.contigSizes[contigId];
+    //        if (contigRightEnd > contigBegin + readLength - seedBegin)
+    //            contigRightEnd = contigBegin + readLength - seedBegin;
+    //
+    //        TContigInfix contigRight(contig, contigBegin + extender.seedLength, contigRightEnd);
+    //        TReadInfix readRight(read, seedBegin + extender.seedLength, readLength);
+    //
+    //        if (!_extend(extender, contigRight, readRight, errors))
+    //            return false;
+    //
+    //        matchEnd = contigRightEnd;
+    //    }
 }
 
-inline bool
-verifyPrefix(JstMapperVerifier<EditDistance> & verifier)
-{
-    return true;
-}
-
-inline bool
-verifySuffix(JstMapperVerifier<HammingDistance> & verifier)
-{
-    return true;
-}
-
-inline bool
-verifySuffix(JstMapperVerifier<EditDistance> & verifier)
-{
-    return true;
-}
-
-
-#endif // EXTRAS_APPS_JST_MAPPER_JST_MAPPER_VERIFIER_H_
+#endif // EXTRAS_APPS_JST_MAPPER_EXTENDER_RIGHT_H_

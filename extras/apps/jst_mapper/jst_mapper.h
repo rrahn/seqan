@@ -34,13 +34,15 @@
 // Basic jst mapper functionality.
 // ==========================================================================
 
-#ifndef EXTRAS_APPS_JST_MAPPER_JST_MAPPER_BASE_H_
-#define EXTRAS_APPS_JST_MAPPER_JST_MAPPER_BASE_H_
+#ifndef EXTRAS_APPS_JST_MAPPER_JST_MAPPER_H_
+#define EXTRAS_APPS_JST_MAPPER_JST_MAPPER_H_
 
 #include <seqan/basic.h>
 #include <seqan/sequence.h>
 #include <seqan/journaled_string_tree.h>
 #include <seqan/find_journaled_string_tree.h>
+
+namespace seqan {
 
 // ============================================================================
 // Forwards
@@ -111,4 +113,42 @@ struct JstMapperOptions
 // Functions
 // ============================================================================
 
-#endif // EXTRAS_APPS_JST_MAPPER_JST_MAPPER_BASE_H_
+template <typename TFragmentStore, typename TContigPos, typename TContigValue, typename TVerifierSpec>
+JstMapperResult
+mapReads(TFragmentStore & fragStore, DeltaMap<TContigPos, TContigValue> & deltaMap, JstMapperOptions const & options)
+{
+    typedef typename TFragmentStore::TReadSeqStore                        TReadStore;
+    typedef typename TFragmentStore::TContigStore                         TContigStore;
+//    typedef typename Value<TContigStore>::Type                      TContigStoreElement;
+//    typedef typename TContigStoreElement::TContigSeq                TContigSeq;
+//    typedef typename Value<TContigSeq>::Type                        TContigSeqAlphabet;
+//    typedef typename Position<TContigSeq>::Type                     TContigSeqPosition;
+    typedef Index<TReadStore, IndexQGram<Simple, OpenAddressing> >        TIndex;
+    typedef Pattern<TIndex, Pigeonhole<> >                                TPattern;
+    typedef DeltaMap<TContigPos, TContigValue>                            TDeltaMap;
+    typedef JournaledStringTree<TDeltaMap>                                TJst;
+
+    typedef FinderState<Pigeonhole<> >                                    TFilterState;
+
+    typedef JstMapperVerifier<TFilterState, ResultsWriter, TVerifierSpec> TVerifier;
+
+    ResultsWriter writer(options.output);
+
+    // Step 1) Build the index.
+    TIndex index(fragStore.readSeqStore);
+    TPattern pattern(index);
+    TJst jst(fragStore.contigStore[0].seq, deltaMap);
+    TFilterState filterState;
+    TVerifier verifier(filterState, writer, 3, options.qGram);
+
+    if (options.jstSize != 0)
+        setBlockSize(jst, options.jstSize);
+
+    // Step 2) Trigger the search.
+    indexRequire(index);
+    find(jst, pattern, filterState, verifier, options.errorRate , Jst<Pigeonhole<> >());
+
+}
+
+}
+#endif // EXTRAS_APPS_JST_MAPPER_JST_MAPPER_H_
