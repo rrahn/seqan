@@ -48,29 +48,27 @@ namespace seqan
 // Tags, Classes, Enums
 // ============================================================================
 
+// TODO(rmaerker): Write own state that solely stores the prefSufMatch
 // ----------------------------------------------------------------------------
 // Functor Comparator()
 // ----------------------------------------------------------------------------
 
-template <typename TFinder>
-class FinderExtensionPoint<TFinder, ShiftOr>
+template <typename TPattern_>
+class FinderExtensionPoint<TPattern_, ShiftOr> : public FinderExtensionPointBase<TPattern_>
 {
 public:
-
-    typedef typename GetPattern<TFinder>::Type TPattern;
-    typedef typename Needle<TPattern>::Type TNeedle;
+    typedef FinderExtensionPointBase<TPattern_> TSuper;
+    typedef typename Host<TPattern_>::Type TNeedle;
+    typedef typename GetState<FinderExtensionPoint>::Type TState;
     typedef unsigned int TWord;
 
+    TState      _state;
     TWord       mask;
-    TPattern    _state;
     bool        _isSmallNeedle;
 
-    FinderExtensionPoint() : mask(), _state(), _isSmallNeedle(true)
-    {}
-
-    FinderExtensionPoint(TPattern & pattern)
+    FinderExtensionPoint(TPattern_ & pattern) : TSuper(pattern)
     {
-        init(*this, pattern);
+        init(*this);
     }
 
     template <typename TResult, typename THystkIt>
@@ -109,7 +107,6 @@ public:
             return;
         }
     }
-
 };
 
 // ============================================================================
@@ -120,8 +117,8 @@ public:
 // Metafunction ContextIteratorPosition                               [ShiftOr]
 // ----------------------------------------------------------------------------
 
-template <typename TFinder>
-struct ContextIteratorPosition<FinderExtensionPoint<TFinder, ShiftOr> >
+template <typename TPattern_>
+struct ContextIteratorPosition<FinderExtensionPoint<TPattern_, ShiftOr> >
 {
     typedef ContextPositionRight Type;
 };
@@ -130,37 +127,34 @@ struct ContextIteratorPosition<FinderExtensionPoint<TFinder, ShiftOr> >
 // Metafunction RequireFullContext                                    [ShiftOr]
 // ----------------------------------------------------------------------------
 
-template <typename TFinder>
-struct RequireFullContext<FinderExtensionPoint<TFinder, ShiftOr> > :
+template <typename TPattern_>
+struct RequireFullContext<FinderExtensionPoint<TPattern_, ShiftOr> > :
     False{};
 
 // ----------------------------------------------------------------------------
 // Metafunction GetState                                        [ShiftOr]
 // ----------------------------------------------------------------------------
 
-template <typename TFinder>
-struct GetState<FinderExtensionPoint<TFinder, ShiftOr> >
+template <typename TPattern_>
+struct GetState<FinderExtensionPoint<TPattern_, ShiftOr> >
 {
-    typedef FinderExtensionPoint<TFinder, ShiftOr> TExtensionfunctor;
-    typedef typename TExtensionfunctor::TPattern Type;
+    typedef TPattern_ Type;
 };
 
-template <typename TFinder>
-struct GetState<FinderExtensionPoint<TFinder, ShiftOr> const>
+template <typename TPattern_>
+struct GetState<FinderExtensionPoint<TPattern_, ShiftOr> const>
 {
-    typedef FinderExtensionPoint<TFinder, ShiftOr> TExtensionfunctor;
-    typedef typename TExtensionfunctor::TPattern const Type;
+    typedef TPattern_ const Type;
 };
 
 // ----------------------------------------------------------------------------
 // Metafunction RegisteredExtensionPoint                              [ShiftOr]
 // ----------------------------------------------------------------------------
 
-template <typename TContainer, typename TNeedle, typename TSpec>
-struct RegisteredExtensionPoint<Finder2<TContainer, Pattern<TNeedle, ShiftOr>, Jst<TSpec> > >
+template <typename TNeedle>
+struct RegisteredExtensionPoint<Pattern<TNeedle, ShiftOr> >
 {
-    typedef Finder2<TContainer, Pattern<TNeedle, ShiftOr>, Jst<TSpec> > TFinder_;
-    typedef FinderExtensionPoint<TFinder_, ShiftOr> Type;
+    typedef FinderExtensionPoint<Pattern<TNeedle, ShiftOr>, ShiftOr> Type;
 };
 
 // ============================================================================
@@ -171,16 +165,16 @@ struct RegisteredExtensionPoint<Finder2<TContainer, Pattern<TNeedle, ShiftOr>, J
 // Function getState                                         [ShiftOr]
 // ----------------------------------------------------------------------------
 
-template <typename TFinder>
-inline typename GetState<FinderExtensionPoint<TFinder, ShiftOr> >::Type &
-getState(FinderExtensionPoint<TFinder, ShiftOr> & extensionFunctor)
+template <typename TPattern_>
+inline typename GetState<FinderExtensionPoint<TPattern_, ShiftOr> >::Type &
+getState(FinderExtensionPoint<TPattern_, ShiftOr> & extensionFunctor)
 {
     return extensionFunctor._state;
 }
 
-template <typename TFinder>
-inline typename GetState<FinderExtensionPoint<TFinder, ShiftOr> const>::Type &
-getState(FinderExtensionPoint<TFinder, ShiftOr> const & extensionFunctor)
+template <typename TPattern_>
+inline typename GetState<FinderExtensionPoint<TPattern_, ShiftOr> const>::Type &
+getState(FinderExtensionPoint<TPattern_, ShiftOr> const & extensionFunctor)
 {
     return extensionFunctor._state;
 }
@@ -189,22 +183,33 @@ getState(FinderExtensionPoint<TFinder, ShiftOr> const & extensionFunctor)
 // Function setState()                                       [ShiftOr]
 // ----------------------------------------------------------------------------
 
-template <typename TFinder>
+template <typename TPattern_>
 inline void
-setState(FinderExtensionPoint<TFinder, ShiftOr>  & extensionFunctor,
-                  typename GetState<FinderExtensionPoint<TFinder, ShiftOr> >::Type const & state)
+setState(FinderExtensionPoint<TPattern_, ShiftOr>  & extensionFunctor,
+         typename GetState<FinderExtensionPoint<TPattern_, ShiftOr> >::Type const & state)
 {
     extensionFunctor._state = state;
+}
+
+// ----------------------------------------------------------------------------
+// Function initState()                                               [ShiftOr]
+// ----------------------------------------------------------------------------
+
+template <typename TPattern_>
+inline void
+initState(FinderExtensionPoint<TPattern_, ShiftOr> & extension)
+{
+    extension._state = getPattern(extension);
 }
 
 // ----------------------------------------------------------------------------
 // Function execute()
 // ----------------------------------------------------------------------------
 
-template <typename TResult, typename TFinder, typename TContextIter>
+template <typename TResult, typename TPattern_, typename TContextIter>
 inline void
 execute(TResult & res,
-        FinderExtensionPoint<TFinder, ShiftOr> & extensionFunctor,
+        FinderExtensionPoint<TPattern_, ShiftOr> & extensionFunctor,
         TContextIter & contextIter)
 {
     if (extensionFunctor._isSmallNeedle)
@@ -217,28 +222,30 @@ execute(TResult & res,
 // Function init()
 // ----------------------------------------------------------------------------
 
-template <typename TFinder>
-inline Pair<unsigned>
-init(FinderExtensionPoint<TFinder, ShiftOr> & shiftOrFunctor,
-     typename GetPattern<TFinder>::Type & pattern)
+template <typename TPattern_>
+inline void
+init(FinderExtensionPoint<TPattern_, ShiftOr> & extension)
 {
-    typedef FinderExtensionPoint<TFinder, ShiftOr> TShiftOrFunctor;
+    typedef FinderExtensionPoint<TPattern_, ShiftOr> TShiftOrFunctor;
     typedef typename TShiftOrFunctor::TWord TWord;
 
-    _patternInit(pattern);
-    shiftOrFunctor._state = pattern;
+    if (isInit(extension))
+        return;
 
-    if (length(host(pattern)) > BitsPerValue<TWord>::VALUE)
+    _patternInit(getPattern(extension));
+    initState(extension);
+
+    if (contextSize(extension) > BitsPerValue<TWord>::VALUE)
     {
-        shiftOrFunctor._isSmallNeedle = false;
-        shiftOrFunctor.mask = ~(static_cast<TWord>(1) << ((pattern.needleLength - 1) % BitsPerValue<TWord>::VALUE));
+        extension._isSmallNeedle = false;
+        extension.mask = ~(static_cast<TWord>(1) << ((getPattern(extension).needleLength - 1) % BitsPerValue<TWord>::VALUE));
     }
     else
     {
-        shiftOrFunctor._isSmallNeedle = true;
-        shiftOrFunctor.mask = static_cast<TWord>(1) << (pattern.needleLength - 1);
+        extension._isSmallNeedle = true;
+        extension.mask = static_cast<TWord>(1) << (getPattern(extension).needleLength - 1);
     }
-    return Pair<unsigned>(length(host(pattern)), 0);
+    setInit(extension);
 }
 
 }

@@ -51,22 +51,20 @@ namespace seqan {
 // Class FinderFinderExtensionPoint
 // ----------------------------------------------------------------------------
 
-template <typename TContainer, typename TNeedle, typename TSpec>
-class FinderExtensionPoint<Finder2<TContainer, Pattern<TNeedle, Simple>, TSpec>, Simple>
+template <typename TPattern_>
+class FinderExtensionPoint<TPattern_, Simple> : public FinderExtensionPointBase<TPattern_>
 {
 public:
-
-    typedef typename Iterator<TNeedle, Standard>::Type TNeedleIt;
+    typedef FinderExtensionPointBase<TPattern_> TSuper;
+    typedef typename Host<TPattern_>::Type THost;
+    typedef typename Iterator<THost, Standard>::Type TNeedleIt;
 
     TNeedleIt _itBegin;
     TNeedleIt _itEnd;
 
-    FinderExtensionPoint()
-    {}
-
-    FinderExtensionPoint(Pattern<TNeedle, Simple> & pattern)
+    FinderExtensionPoint(TPattern_ & pattern) : TSuper(pattern)
     {
-        init(*this, pattern);
+        init(*this);
     }
 
     template <typename TResult, typename THystkIt>
@@ -89,11 +87,10 @@ public:
 // Metafunction RegisteredExtensionPoint                               [Simple]
 // ----------------------------------------------------------------------------
 
-template <typename TContainer, typename TNeedle, typename TSpec>
-struct RegisteredExtensionPoint<Finder2<TContainer, Pattern<TNeedle, Simple>, Jst<TSpec> > >
+template <typename TNeedle>
+struct RegisteredExtensionPoint<Pattern<TNeedle, Simple> >
 {
-    typedef Finder2<TContainer, Pattern<TNeedle, Simple>, Jst<TSpec> > TFinder_;
-    typedef FinderExtensionPoint<TFinder_, Simple> Type;
+    typedef FinderExtensionPoint<Pattern<TNeedle, Simple>, Simple> Type;
 };
 
 // ============================================================================
@@ -104,14 +101,16 @@ struct RegisteredExtensionPoint<Finder2<TContainer, Pattern<TNeedle, Simple>, Js
 // Function init()
 // ----------------------------------------------------------------------------
 
-template <typename TFinder>
-inline Pair<unsigned>
-init(FinderExtensionPoint<TFinder, Simple> & simpleFunctor,
-     typename GetPattern<TFinder>::Type & pattern)
+template <typename TPattern>
+inline void
+init(FinderExtensionPoint<TPattern, Simple> & simpleFunctor)
 {
-    simpleFunctor._itBegin = begin(needle(pattern), Standard());
-    simpleFunctor._itEnd = end(needle(pattern), Standard());
-    return Pair<unsigned>(simpleFunctor._itEnd - simpleFunctor._itBegin, 0);
+    if (isInit(simpleFunctor))
+        return;
+
+    simpleFunctor._itBegin = begin(needle(simpleFunctor._pattern), Standard());
+    simpleFunctor._itEnd = end(needle(simpleFunctor._pattern), Standard());
+    setInit(simpleFunctor);
 }
 
 }  // namespace seqan

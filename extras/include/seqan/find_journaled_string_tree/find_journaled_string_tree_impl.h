@@ -48,7 +48,7 @@ namespace seqan
 // Tags, Classes, Enums
 // ============================================================================
 
-// TODO(rmaerker): Finder2 class needs to be documented.
+// TODO(rmaerker): Finder_ class needs to be documented.
 /*!
  * @class JstFinder
  * @headerfile <seqan/find_journaled_string_tree.h>
@@ -64,7 +64,7 @@ namespace seqan
  * search multiple sequences simultaneously.
  *
  * @signature template <typename THaystack, typename TPattern>
- *            struct Finder2<THaystack, TPattern, JstFinder>;
+ *            struct Finder_<THaystack, TPattern, JstFinder>;
  *
  * @tparam  THaystack   The type of the haystack to be searched for a pattern match. Of type @link JournaledStringTree @endlink.
  * @tparam  TPattern    The type of the pattern used for searching. Of type @link Pattern @endlink.
@@ -94,48 +94,50 @@ namespace seqan
  * @return TExtensionPoint  The type of the registered extension point. See @link FinderExtensionPoint @endlink.
  */
 
-template <typename TContainer, typename TPattern, typename TSpec>
-struct Finder2<TContainer, TPattern, Jst<TSpec> >
+template <typename TContainer, typename TAlgorithm, typename TSpec>
+struct Finder_<TContainer, TAlgorithm, Jst<TSpec> >
 {
-    typedef Finder2<TContainer, TPattern, Jst<TSpec> > TFinder;
-    typedef typename RegisteredExtensionPoint<TFinder>::Type TFinderExtensionPoint;
+    typedef typename RegisteredExtensionPoint<TAlgorithm>::Type TFinderExtensionPoint;
 
     TContainer*             _containerPtr;
     TFinderExtensionPoint   _extensionFunctor;
-    Pair<unsigned>          _traversalParams;
 
-    Finder2() : _containerPtr(NULL), _traversalParams(Pair<unsigned>(0, 0))
+    Finder_(TContainer & hystk, TAlgorithm & pattern) :
+        _containerPtr(&hystk),
+        _extensionFunctor(pattern)
     {}
 
-
-    Finder2(TContainer & hystk) : _containerPtr(&hystk), _extensionFunctor(), _traversalParams(Pair<unsigned>(0, 0))
+    template <typename TErrors>
+    Finder_(TContainer & hystk, TAlgorithm & pattern, TErrors errors) :
+        _containerPtr(&hystk),
+        _extensionFunctor(pattern, errors)
     {}
 
     // Copy constructor.
-    Finder2(Finder2 const & other) : _containerPtr(other._containerPtr),
-                                     _extensionFunctor(other._extensionFunctor),
-                                     _traversalParams(other._traversalParams)
-
-    {}
-
-    // Assignment Operator
-    Finder2 & operator=(Finder2 const & other)
-    {
-        if (this != &other)
-        {
-            _containerPtr = other._containerPtr;
-            _extensionFunctor = other._extensionFunctor;
-            _traversalParams = other._traversalParams;
-        }
-        return *this;
-    }
+//    Finder_(Finder_ const & other) : _containerPtr(other._containerPtr),
+//                                     _extensionFunctor(other._extensionFunctor),
+//                                     _traversalParams(other._traversalParams)
+//
+//    {}
+//
+//    // Assignment Operator
+//    Finder_& operator=(Finder_ const & other)
+//    {
+//        if (this != &other)
+//        {
+//            _containerPtr = other._containerPtr;
+//            _extensionFunctor = other._extensionFunctor;
+//            _traversalParams = other._traversalParams;
+//        }
+//        return *this;
+//    }
 };
 
 template <typename TContainer, typename TPattern, typename TSpec>
-SEQAN_CONCEPT_IMPL((JstTraversalConcept), Finder2<TContainer, TPattern, Jst<TSpec> >);
+SEQAN_CONCEPT_IMPL((JstTraversalConcept), Finder_<TContainer, TPattern, Jst<TSpec> >);
 
 template <typename TContainer, typename TPattern, typename TSpec>
-SEQAN_CONCEPT_IMPL((JstTraversalConcept), Finder2<TContainer, TPattern, Jst<TSpec> > const);
+SEQAN_CONCEPT_IMPL((JstTraversalConcept), Finder_<TContainer, TPattern, Jst<TSpec> > const);
 
 // ============================================================================
 // Metafunctions
@@ -146,45 +148,43 @@ SEQAN_CONCEPT_IMPL((JstTraversalConcept), Finder2<TContainer, TPattern, Jst<TSpe
 // ----------------------------------------------------------------------------
 
 template <typename TContainer, typename TPattern, typename TSpec>
-struct ContextIteratorPosition<Finder2<TContainer, TPattern, TSpec> >
+struct ContextIteratorPosition<Finder_<TContainer, TPattern, TSpec> >
 {
-    typedef Finder2<TContainer, TPattern, TSpec> TFinder_;
-    typedef typename RegisteredExtensionPoint<TFinder_>::Type TFinderFunctor_;
+    typedef typename RegisteredExtensionPoint<TPattern>::Type TFinderFunctor_;
     typedef typename ContextIteratorPosition<TFinderFunctor_>::Type Type;
 };
 
 template <typename TContainer, typename TPattern, typename TSpec>
-struct ContextIteratorPosition<Finder2<TContainer, TPattern, TSpec> const > :
-    ContextIteratorPosition<Finder2<TContainer, TPattern, TSpec> >{};
+struct ContextIteratorPosition<Finder_<TContainer, TPattern, TSpec> const > :
+    ContextIteratorPosition<Finder_<TContainer, TPattern, TSpec> >{};
 
 // ----------------------------------------------------------------------------
 // Metafunction RequireFullContext
 // ----------------------------------------------------------------------------
 
 template <typename TContainer, typename TPattern, typename TSpec>
-struct RequireFullContext<Finder2<TContainer, TPattern, TSpec> >
+struct RequireFullContext<Finder_<TContainer, TPattern, TSpec> >
 {
-    typedef Finder2<TContainer, TPattern, TSpec> TFinder_;
-    typedef typename RegisteredExtensionPoint<TFinder_>::Type TFinderFunctor_;
+    typedef typename RegisteredExtensionPoint<TPattern>::Type TFinderFunctor_;
     typedef typename RequireFullContext<TFinderFunctor_>::Type Type;
 };
 
 template <typename TContainer, typename TPattern, typename TSpec>
-struct RequireFullContext<Finder2<TContainer, TPattern, TSpec> const > :
-    RequireFullContext<Finder2<TContainer, TPattern, TSpec> >{};
+struct RequireFullContext<Finder_<TContainer, TPattern, TSpec> const > :
+    RequireFullContext<Finder_<TContainer, TPattern, TSpec> >{};
 
 // ----------------------------------------------------------------------------
 // Metafunction Container
 // ----------------------------------------------------------------------------
 
 template <typename TContainer, typename TPattern, typename TSpec>
-struct Container<Finder2<TContainer, TPattern, Jst<TSpec> > >
+struct Container<Finder_<TContainer, TPattern, Jst<TSpec> > >
 {
     typedef TContainer Type;
 };
 
 template <typename TContainer, typename TPattern, typename TSpec>
-struct Container<Finder2<TContainer, TPattern, Jst<TSpec> > const>
+struct Container<Finder_<TContainer, TPattern, Jst<TSpec> > const>
 {
     typedef TContainer const Type;
 };
@@ -194,41 +194,28 @@ struct Container<Finder2<TContainer, TPattern, Jst<TSpec> > const>
 // ----------------------------------------------------------------------------
 
 template <typename TContainer, typename TPattern, typename TSpec>
-struct GetState<Finder2<TContainer, TPattern, Jst<TSpec> > >
+struct GetState<Finder_<TContainer, TPattern, Jst<TSpec> > >
 {
-    typedef Finder2<TContainer, TPattern, Jst<TSpec> > TFinder_;
-    typedef typename RegisteredExtensionPoint<TFinder_>::Type TFinderExtension_;
+    typedef typename RegisteredExtensionPoint<TPattern>::Type TFinderExtension_;
     typedef typename GetState<TFinderExtension_>::Type Type;
 };
 
 template <typename TContainer, typename TPattern, typename TSpec>
-struct GetState<Finder2<TContainer, TPattern, Jst<TSpec> > const> :
-    GetState<Finder2<TContainer, TPattern, Jst<TSpec> > >{};
+struct GetState<Finder_<TContainer, TPattern, Jst<TSpec> > const> :
+    GetState<Finder_<TContainer, TPattern, Jst<TSpec> > >{};
 
 // ----------------------------------------------------------------------------
 // Metafunction GetJstTraverser
 // ----------------------------------------------------------------------------
 
-// Adopt to not include the finder as a state.
-template <typename TContainer, typename TPattern, typename TSpec>
-struct GetJstTraverser<Finder2<TContainer, TPattern, TSpec> >
-{
-    typedef Finder2<TContainer, TPattern, TSpec> TFinder_;
-    typedef typename ContextIteratorPosition<TFinder_>::Type TContextPosition_;
-    typedef typename RequireFullContext<TFinder_>::Type TRequireContext_;
-    typedef typename GetState<TFinder_>::Type TState;
-    typedef JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosition_, TRequireContext_> > Type;
-};
-
 // TODO(rmaerker): Replace method above with current.
-template <typename TContainer, typename TAlgorithm>
-struct GetJstTraverser2
+template <typename TContainer, typename TPattern_>
+struct GetJstTraverser
 {
-    // TODO(rmaerker): Completely relies on pattern state and nothing more.
-    typedef Finder2<TContainer, TAlgorithm, Jst<> > TFinder_;
-    typedef typename ContextIteratorPosition<TFinder_>::Type TContextPosition_;
-    typedef typename RequireFullContext<TFinder_>::Type TRequireContext_;
-    typedef typename GetState<TFinder_>::Type TState;
+    typedef typename RegisteredExtensionPoint<TPattern_>::Type TExtension_;
+    typedef typename ContextIteratorPosition<TExtension_>::Type TContextPosition_;
+    typedef typename RequireFullContext<TExtension_>::Type TRequireContext_;
+    typedef typename GetState<TExtension_>::Type TState;
     typedef JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosition_, TRequireContext_> > Type;
 };
 
@@ -264,8 +251,8 @@ setState(FinderExtensionPoint<TFinder, TSpec> const & /*extensionFunctor*/,
 // ----------------------------------------------------------------------------
 
 template <typename TContainer, typename TPattern, typename TSpec>
-inline typename GetState<Finder2<TContainer, TPattern, Jst<TSpec> > const>::Type
-getState(Finder2<TContainer, TPattern, Jst<TSpec> > const & finder)
+inline typename GetState<Finder_<TContainer, TPattern, Jst<TSpec> > const>::Type
+getState(Finder_<TContainer, TPattern, Jst<TSpec> > const & finder)
 {
     return getState(finder._extensionFunctor);  // Delegates to extension functor.
 }
@@ -276,7 +263,7 @@ getState(Finder2<TContainer, TPattern, Jst<TSpec> > const & finder)
 
 template <typename TContainer, typename TPattern, typename TSpec, typename TState>
 inline void
-setState(Finder2<TContainer, TPattern, Jst<TSpec> > & finder,
+setState(Finder_<TContainer, TPattern, Jst<TSpec> > & finder,
          TState const & state)
 {
     setState(finder._extensionFunctor, state);  // Delegates to extension functor.
@@ -301,7 +288,7 @@ execute(TResult & res,
 
 template <typename TContainer, typename TPattern, typename TSpec, typename TDelegate, typename TTraverser, typename TTag>
 inline typename Size<TTraverser>::Type
-deliverContext(Finder2<TContainer, TPattern, Jst<TSpec> > & finder,
+deliverContext(Finder_<TContainer, TPattern, Jst<TSpec> > & finder,
                TDelegate & delegateFunctor,
                TTraverser & traverser,
                TTag const & /*traverserState*/)
@@ -312,15 +299,11 @@ deliverContext(Finder2<TContainer, TPattern, Jst<TSpec> > & finder,
     execute(res, finder._extensionFunctor, contextIterator(traverser, TTag()));
 
 #ifdef DEBUG_DATA_PARALLEL
-    if (res.i1)  // Interrupt: Call the DelegateFunctor.
-    {
+    if (res.i1)
         _printContext(traverser);
-        delegateFunctor(traverser);
-    }
-#else
-    if (res.i1)  // Interrupt: Call the DelegateFunctor.
-        delegateFunctor(traverser);
 #endif
+    if (res.i1)  // Interrupt: Call the DelegateFunctor.
+        delegateFunctor(traverser, getState(finder._extensionFunctor));
     // Return to the traverser and continue.
     return res.i2;
 }
@@ -330,15 +313,15 @@ deliverContext(Finder2<TContainer, TPattern, Jst<TSpec> > & finder,
 // ----------------------------------------------------------------------------
 
 template <typename TContainer, typename TPattern, typename TSpec>
-inline typename Container<Finder2<TContainer, TPattern, Jst<TSpec> > >::Type &
-container(Finder2<TContainer, TPattern, Jst<TSpec> > & finder)
+inline typename Container<Finder_<TContainer, TPattern, Jst<TSpec> > >::Type &
+container(Finder_<TContainer, TPattern, Jst<TSpec> > & finder)
 {
     return *finder._containerPtr;
 }
 
 template <typename TContainer, typename TPattern, typename TSpec>
-inline typename Container<Finder2<TContainer, TPattern, Jst<TSpec> > const>::Type &
-container(Finder2<TContainer, TPattern, Jst<TSpec> > const & finder)
+inline typename Container<Finder_<TContainer, TPattern, Jst<TSpec> > const>::Type &
+container(Finder_<TContainer, TPattern, Jst<TSpec> > const & finder)
 {
     return *finder._containerPtr;
 }
@@ -362,7 +345,7 @@ init(FinderExtensionPoint<TFinder, TExtensionSpec> & extensionFunctor,
 
 template <typename TContainer, typename TPattern, typename TSpec, typename TState, typename TErrors>
 inline void
-init(Finder2<TContainer, TPattern, Jst<TSpec> > & finder,
+init(Finder_<TContainer, TPattern, Jst<TSpec> > & finder,
      TPattern & pattern,
      FinderState<TState> & state,
      TErrors const & errors)
@@ -372,7 +355,7 @@ init(Finder2<TContainer, TPattern, Jst<TSpec> > & finder,
 
 template <typename TContainer, typename TPattern, typename TSpec, typename TErrors>
 inline void
-init(Finder2<TContainer, TPattern, Jst<TSpec> > & finder,
+init(Finder_<TContainer, TPattern, Jst<TSpec> > & finder,
      TPattern & pattern,
      FinderState<Nothing> & /*state*/,
      TErrors const & errors)
@@ -399,12 +382,12 @@ init(Finder2<TContainer, TPattern, Jst<TSpec> > & finder,
 
 //template <typename TContainer, typename TPattern, typename TSpec, typename TDelegate>
 //inline void
-//find(Finder2<TContainer, TPattern, Jst<TSpec> > & finder,
+//find(Finder_<TContainer, TPattern, Jst<TSpec> > & finder,
 //     TPattern & pattern,
 //     TDelegate & delegate,
 //     int scoreLimit = 0)
 //{
-//    typedef Finder2<TContainer, TPattern, Jst<TSpec> > TFinder;
+//    typedef Finder_<TContainer, TPattern, Jst<TSpec> > TFinder;
 //    typedef typename GetJstTraverser<TFinder>::Type TTraverser;
 //
 //    // Set up the journaled string tree traversal.
@@ -431,45 +414,106 @@ init(Finder2<TContainer, TPattern, Jst<TSpec> > & finder,
 //    }
 //}
 
-template <typename THystk, typename TPattern, typename TDelegate, typename TState, typename TErrors, typename TSpec>
-void find(THystk & jst,
-          TPattern & pattern,
-          TDelegate & delegate,
-          FinderState<TState> & state,
-          TErrors const & errors,
-          Jst<TSpec> const & /*tag*/)
+template <typename THystk, typename TState, typename TContextIteratorPos, typename TRequireFullContext,
+          typename TPattern, typename TDelegate, typename TErrors, typename TSpec, typename TStateFlag,
+          typename TErrorFlag>
+inline void find(JstTraverser<THystk, TState, JstTraverserSpec<TContextIteratorPos, TRequireFullContext> > & traverser,
+                 TPattern & pattern,
+                 TDelegate & delegate,
+                 TState &state,
+                 TErrors const & /*errors*/,
+                 Jst<TSpec> const & /*tag*/,
+                 TStateFlag const & /*stateFlag*/,
+                 False const & /*errorFlag*/)
 {
-    typedef Finder2<THystk, TPattern, Jst<TSpec> > TFinder;
-    typedef typename GetJstTraverser<TFinder>::Type TTraverser;
+    typedef Finder_<THystk, TPattern, Jst<TSpec> > TFinder;
 
-    TFinder finder(jst);
-    init(finder, pattern, state, errors);
-    TTraverser traverser(container(finder), finder._traversalParams.i1, finder._traversalParams.i2);
+    TFinder finder(container(traverser), pattern);
+
+    if (!IsSameType<TStateFlag, True>::VALUE)
+        setState(finder, state);
+    else
+        ignoreUnusedVariableWarning(state);
+
+    setContextSize(traverser, contextSize(finder._extensionFunctor));
     traverse(finder, delegate, traverser);
 }
 
-// Without errors
-template <typename THystk, typename TPattern, typename TDelegate, typename TState, typename TSpec>
-void find(THystk & jst,
-          TPattern & pattern,
-          TDelegate & delegate,
-          FinderState<TState> & state,
-          Jst<TSpec> const & tag)
+template <typename THystk, typename TState, typename TContextIteratorPos, typename TRequireFullContext,
+          typename TPattern, typename TDelegate, typename TErrors, typename TSpec, typename TStateFlag,
+          typename TErrorFlag>
+inline void _find(JstTraverser<THystk, TState, JstTraverserSpec<TContextIteratorPos, TRequireFullContext> > & traverser,
+                  TPattern & pattern,
+                  TDelegate & delegate,
+                  TState &state,
+                  TErrors const & errors,
+                  Jst<TSpec> const & /*tag*/,
+                  TStateFlag const & /*stateFlag*/,
+                  True const & /*errorFlag*/)
 {
-    find(jst, pattern, delegate, state, 0, tag);
+    typedef Finder_<THystk, TPattern, Jst<TSpec> > TFinder;
+
+    TFinder finder(container(traverser), pattern, errors);
+
+    if (!IsSameType<TStateFlag, True>::VALUE)
+        setState(finder, state);
+    else
+        ignoreUnusedVariableWarning(state);
+
+    setContextSize(traverser, contextSize(finder._extensionFunctor));
+    traverse(finder, delegate, traverser);
+}
+
+template <typename THystk, typename TPattern, typename TDelegate, typename TState, typename TErrors, typename TSpec,
+          typename TStateFlag, typename TErrorFlag>
+inline void _find(THystk & jst,
+              TPattern & pattern,
+              TDelegate & delegate,
+              TState & state,
+              TErrors const & errors,
+              Jst<TSpec> const & tag,
+              TStateFlag const & stateFlag,
+              TErrorFlag const & errorFlag)
+{
+    typedef typename GetJstTraverser<THystk, TPattern>::Type TTraverser;
+
+    TTraverser traverser(jst);
+    _find(traverser, pattern, delegate, state, errors, tag, stateFlag, errorFlag);
+}
+
+template <typename THystk, typename TPattern, typename TDelegate, typename TState, typename TErrors, typename TSpec>
+inline void find(THystk & jst,
+                 TPattern & pattern,
+                 TDelegate & delegate,
+                 TState & state,
+                 TErrors const & errors,
+                 Jst<TSpec> const & tag)
+{
+    _find(jst, pattern, delegate, state, errors, tag, True(), True());
 }
 
 // Without state.
 template <typename THystk, typename TPattern, typename TDelegate, typename TErrors, typename TSpec>
-void find(THystk & jst,
-          TPattern & pattern,
-          TDelegate & delegate,
-          TErrors const & errors,
-          Jst<TSpec> const & tag)
+inline void find(THystk & jst,
+                 TPattern & pattern,
+                 TDelegate & delegate,
+                 TErrors const & errors,
+                 Jst<TSpec> const & tag)
 {
-    FinderState<> defaultState;
-    find(jst, pattern, delegate, defaultState, errors, tag);
+    _find(jst, pattern, delegate, Nothing(), errors, tag, False(), True());
 }
+
+// Without errors
+template <typename THystk, typename TPattern, typename TDelegate, typename TSpec>
+inline void find(THystk & jst,
+                 TPattern & pattern,
+                 TDelegate & delegate,
+                 typename GetState<typename RegisteredExtensionPoint<TPattern>::Type>::Type & state,
+                 Jst<TSpec> const & tag)
+{
+    _find(jst, pattern, delegate, state, 0, tag, True(), False());
+}
+
 
 // Without state and errors.
 template <typename THystk, typename TPattern, typename TDelegate, typename TSpec>
@@ -478,7 +522,7 @@ void find(THystk & jst,
           TDelegate & delegate,
           Jst<TSpec> const & tag)
 {
-    find(jst, pattern, delegate, 0, tag);
+    _find(jst, pattern, delegate, Nothing(), 0, tag, False(), False());
 }
 
 }

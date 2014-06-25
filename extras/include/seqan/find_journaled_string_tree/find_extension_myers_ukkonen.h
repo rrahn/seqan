@@ -59,20 +59,19 @@ struct Spec<Pattern<TNeedle, Myers<TSpec, THasState, TFindBeginPatternSpec> > co
 // Tags, Classes, Enums
 // ============================================================================
 
-template <typename TFinder>
-class FinderExtensionPoint<TFinder, MyersBitVector>
+template <typename TPattern_>
+class FinderExtensionPoint<TPattern_, MyersBitVector> : public FinderExtensionPointBase<TPattern_>
 {
 public:
+    typedef FinderExtensionPointBase<TPattern_> TSuper;
 
-    typedef typename GetPattern<TFinder>::Type TPattern;
-    typedef typename PatternState<TPattern>::Type TPatternState;
-    typedef typename Needle<TPattern>::Type TNeedle;
-    typedef typename TPattern::TLargePattern TLargePattern;
+    typedef typename GetState<FinderExtensionPoint>::Type TPatternState;
+    typedef typename Needle<TPattern_>::Type TNeedle;
+    typedef typename TPattern_::TLargePattern TLargePattern;
     typedef typename TPatternState::TLargeState TLargeState;
-    typedef typename TPattern::TWord TWord;
+    typedef typename TPattern_::TWord TWord;
     typedef typename Spec<TPattern>::Type TSpec;
 
-    TPattern        _pattern;
     TPatternState   _state;
 
     TWord X, D0, HN, HP, temp;
@@ -82,13 +81,10 @@ public:
 
     bool _isSmallPattern;
 
-    FinderExtensionPoint()
-    {}
-
     template <typename TMinScore>
-    FinderExtensionPoint(TPattern & pattern, TMinScore const & minScore)
+    FinderExtensionPoint(TPattern & pattern, TMinScore const & minScore) : TSuper(pattern)
     {
-        init(*this, pattern, minScore);
+        init(*this, minScore);
     }
 
     template <typename TResult, typename TIterator>
@@ -96,7 +92,7 @@ public:
     operator()(TResult & result, TIterator const & iter, BitAlgorithmSmallNeedle const & /*tag*/)
     {
         // computing the block
-        X = _pattern.bitMasks[ordValue((typename Value<TNeedle>::Type) getValue(iter))] | _state.VN0;
+        X = this->_pattern.bitMasks[ordValue((typename Value<TNeedle>::Type) getValue(iter))] | _state.VN0;
 
         D0 = ((_state.VP0 + (X & _state.VP0)) ^ _state.VP0) | X;
         HN = _state.VP0 & D0;
@@ -119,7 +115,7 @@ public:
     {
         // computing the block
 
-        TLargePattern &largePattern = *_pattern.largePattern;
+        TLargePattern &largePattern = *(this->_pattern.largePattern);
         TLargeState &largeState = *_state.largeState;
 
 //        while (position(finder) < haystack_length)
@@ -128,7 +124,7 @@ public:
         carryHP = (int)MyersUkkonenHP0_<TSpec>::VALUE; // FIXME: replace Noting with TSpec
 
         // if the active cell is the last of it's block, one additional block has to be calculated
-        limit = largeState.lastBlock + (unsigned)(largeState.scoreMask >> (_pattern.MACHINE_WORD_SIZE - 1));
+        limit = largeState.lastBlock + (unsigned)(largeState.scoreMask >> (*this->_pattern.MACHINE_WORD_SIZE - 1));
 
         if (limit == largePattern.blockCount)
             limit--;
@@ -138,7 +134,7 @@ public:
         // computing the necessary blocks, carries between blocks following one another are stored
         for (currentBlock = 0; currentBlock <= limit; currentBlock++)
         {
-            X = _pattern.bitMasks[shift + currentBlock] | largeState.VN[currentBlock];
+            X = *this->_pattern.bitMasks[shift + currentBlock] | largeState.VN[currentBlock];
 
             temp = largeState.VP[currentBlock] + (X & largeState.VP[currentBlock]) + carryD0;
             if (carryD0 != (TWord)0)
@@ -151,12 +147,12 @@ public:
             HP = largeState.VN[currentBlock] | ~(largeState.VP[currentBlock] | D0);
 
             X = (HP << 1) | carryHP;
-            carryHP = HP >> (_pattern.MACHINE_WORD_SIZE - 1);
+            carryHP = HP >> (this->_pattern.MACHINE_WORD_SIZE - 1);
 
             largeState.VN[currentBlock] = X & D0;
 
             temp = (HN << 1) | carryHN;
-            carryHN = HN >> (_pattern.MACHINE_WORD_SIZE - 1);
+            carryHN = HN >> (this->_pattern.MACHINE_WORD_SIZE - 1);
 
             largeState.VP[currentBlock] = temp | ~(X | D0);
 
@@ -183,7 +179,7 @@ public:
                 largeState.lastBlock--;
                 if (IsSameType<TSpec, FindPrefix>::VALUE && largeState.lastBlock == (unsigned)-1)
                     break;
-                largeState.scoreMask = (TWord)1 << (_pattern.MACHINE_WORD_SIZE - 1);
+                largeState.scoreMask = (TWord)1 << (this->_pattern.MACHINE_WORD_SIZE - 1);
             }
         }
 
@@ -229,8 +225,8 @@ public:
 // Metafunction ContextIteratorPosition                                 [Myers]
 // ----------------------------------------------------------------------------
 
-template <typename TFinder>
-struct ContextIteratorPosition<FinderExtensionPoint<TFinder, MyersBitVector> >
+template <typename TPattern_>
+struct ContextIteratorPosition<FinderExtensionPoint<TPattern_, MyersBitVector> >
 {
     typedef ContextPositionRight Type;
 };
@@ -239,38 +235,34 @@ struct ContextIteratorPosition<FinderExtensionPoint<TFinder, MyersBitVector> >
 // Metafunction RequireFullContext                                      [Myers]
 // ----------------------------------------------------------------------------
 
-template <typename TFinder>
-struct RequireFullContext<FinderExtensionPoint<TFinder, MyersBitVector> > : False{};
+template <typename TPattern_>
+struct RequireFullContext<FinderExtensionPoint<TPattern_, MyersBitVector> > : False{};
 
 // ----------------------------------------------------------------------------
 // Metafunction RegisteredExtensionPoint                                [Myers]
 // ----------------------------------------------------------------------------
 
-template <typename TContainer, typename TNeedle, typename TSpec, typename THasState, typename TFindBeginPatternSpec,
-          typename TFinderSpec>
-struct RegisteredExtensionPoint<Finder2<TContainer, Pattern<TNeedle, Myers<TSpec, THasState, TFindBeginPatternSpec> >, Jst<TFinderSpec> > >
+template <typename TNeedle, typename TSpec, typename THasState, typename TFindBeginPatternSpec>
+struct RegisteredExtensionPoint<Pattern<TNeedle, Myers<TSpec, THasState, TFindBeginPatternSpec> > >
 {
     typedef Pattern<TNeedle, Myers<TSpec, THasState, TFindBeginPatternSpec> > TPattern_;
-    typedef Finder2<TContainer, TPattern_, Jst<TSpec> > TFinder_;
-    typedef FinderExtensionPoint<TFinder_, MyersBitVector> Type;
+    typedef FinderExtensionPoint<TPattern_, MyersBitVector> Type;
 };
 
 // ----------------------------------------------------------------------------
 // Metafunction GetState
 // ----------------------------------------------------------------------------
 
-template <typename TFinder>
-struct GetState<FinderExtensionPoint<TFinder, MyersBitVector> >
+template <typename TPattern_>
+struct GetState<FinderExtensionPoint<TPattern_, MyersBitVector> >
 {
-    typedef FinderExtensionPoint<TFinder, MyersBitVector> TFinderExtensionPoint;
-    typedef typename TFinderExtensionPoint::TPatternState Type;
+    typedef typename PatternState<TPattern_>::Type Type;
 };
 
-template <typename TFinder>
-struct GetState<FinderExtensionPoint<TFinder, MyersBitVector> const>
+template <typename TPattern_>
+struct GetState<FinderExtensionPoint<TPattern_, MyersBitVector> const>
 {
-    typedef FinderExtensionPoint<TFinder, MyersBitVector> TFinderExtensionPoint;
-    typedef typename TFinderExtensionPoint::TPatternState const Type;
+    typedef typename PatternState<TPattern_>::Type Type;
 };
 
 // ============================================================================
@@ -281,10 +273,10 @@ struct GetState<FinderExtensionPoint<TFinder, MyersBitVector> const>
 // Function execute()
 // ----------------------------------------------------------------------------
 
-template <typename TResult, typename TFinder, typename TContextIter>
+template <typename TResult, typename TPattern_, typename TContextIter>
 inline void
 execute(TResult & res,
-        FinderExtensionPoint<TFinder, MyersBitVector> & extensionFunctor,
+        FinderExtensionPoint<TPattern_, MyersBitVector> & extensionFunctor,
         TContextIter & contextIter)
 {
     if (extensionFunctor._isSmallPattern)
@@ -297,16 +289,16 @@ execute(TResult & res,
 // Function getState                                           [Myers]
 // ----------------------------------------------------------------------------
 
-template <typename TFinder>
-inline typename GetState<FinderExtensionPoint<TFinder, MyersBitVector> >::Type &
-getState(FinderExtensionPoint<TFinder, MyersBitVector> & extensionFunctor)
+template <typename TPattern_>
+inline typename GetState<FinderExtensionPoint<TPattern_, MyersBitVector> >::Type &
+getState(FinderExtensionPoint<TPattern_, MyersBitVector> & extensionFunctor)
 {
     return extensionFunctor._state;
 }
 
-template <typename TFinder>
-inline typename GetState<FinderExtensionPoint<TFinder, MyersBitVector> const>::Type &
-getState(FinderExtensionPoint<TFinder, MyersBitVector> const & extensionFunctor)
+template <typename TPattern_>
+inline typename GetState<FinderExtensionPoint<TPattern_, MyersBitVector> const>::Type &
+getState(FinderExtensionPoint<TPattern_, MyersBitVector> const & extensionFunctor)
 {
     return extensionFunctor._state;
 }
@@ -315,37 +307,47 @@ getState(FinderExtensionPoint<TFinder, MyersBitVector> const & extensionFunctor)
 // Function setState()
 // ----------------------------------------------------------------------------
 
-template <typename TFinder>
+template <typename TPattern_>
 inline void
-setState(FinderExtensionPoint<TFinder, MyersBitVector>  & extensionFunctor,
-                  typename GetState<FinderExtensionPoint<TFinder, MyersBitVector> >::Type const & state)
+setState(FinderExtensionPoint<TPattern_, MyersBitVector>  & extensionFunctor,
+         typename GetState<FinderExtensionPoint<TPattern_, MyersBitVector> >::Type const & state)
 {
     extensionFunctor._state = state;
 }
 
 // ----------------------------------------------------------------------------
-// Function _reinit()
+// Function init()
 // ----------------------------------------------------------------------------
 
-template <typename TFinder, typename TScore>
-inline Pair<unsigned>
-init(FinderExtensionPoint<TFinder, MyersBitVector> & myersFunctor,
-     typename GetPattern<TFinder>::Type & pattern,
+template <typename TPattern_>
+inline void
+initState(FinderExtensionPoint<TPattern_, MyersBitVector> & extensionFunctor)
+{
+    extensionFunctor._state = getPattern(extensionFunctor);
+}
+
+// ----------------------------------------------------------------------------
+// Function init()
+// ----------------------------------------------------------------------------
+
+template <typename TPattern_, typename TScore>
+inline void
+init(FinderExtensionPoint<TPattern_, MyersBitVector> & myersFunctor,
      TScore const & scoreLimit)
 {
-    typedef typename GetPattern<TFinder>::Type TPattern;
-    typedef typename TPattern::TWord TWord;
+    typedef typename TPattern_::TWord TWord;
 
-    myersFunctor._pattern = pattern;
-    myersFunctor._state = pattern;
+    if (isInit(myersFunctor))
+        return;
 
+    initState(myersFunctor);
     setScoreLimit(myersFunctor._state, scoreLimit);
     _patternInit(myersFunctor._pattern, myersFunctor._state, myersFunctor);  // Initialize the pattern.
     myersFunctor._isSmallPattern = myersFunctor._pattern.largePattern == NULL;
-    myersFunctor.lastBit = (TWord)1 << (pattern.needleSize - 1);
-    return Pair<unsigned>(length(host(pattern)) + myersFunctor._state.maxErrors, 0);
+    myersFunctor.lastBit = (TWord)1 << (myersFunctor._pattern.needleSize - 1);
+    setContextSize(myersFunctor, length(host(myersFunctor._pattern)) + myersFunctor._state.maxErrors);
+    setInit(myersFunctor);
 }
-
 
 }  // namespace seqan
 

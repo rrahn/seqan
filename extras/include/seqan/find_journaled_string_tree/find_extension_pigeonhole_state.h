@@ -49,17 +49,18 @@ namespace seqan
 // Tags, Classes, Enums
 // ============================================================================
 
-template <typename TFilterSpec = void>
-class FinderState<Pigeonhole<TFilterSpec> >
+class PigeonholeHits
 {
 public:
-    typedef typename Value<FinderState>::Type TValue;
+    typedef typename Value<PigeonholeHits>::Type        TValue;
+    typedef String<TValue>                              TData;
+    typedef typename Iterator<TData, Standard>::Type    TIterator;
 
     String<TValue>  _data;
-    unsigned        currPos;
-    unsigned        endPos;
+    TIterator       currIter;
+    TIterator       endIter;
 
-    FinderState() : currPos(0), endPos(0)
+    FinderState() : currIter(), endIter()
     {}
 };
 
@@ -78,73 +79,72 @@ class PigeonholeHit2
 // Metafunctions
 // ============================================================================
 
-template <typename TSpec>
-struct Value<FinderState<Pigeonhole<TSpec> > >
+template <>
+struct Value<PigeonholeHits>
 {
-    typedef PigeonholeHit2<__int64, TSpec> Type;
+    typedef PigeonholeHit2<__int64, void> Type;
 };
 
-template <typename TSpec>
-struct Value<FinderState<Pigeonhole<TSpec> > const>
+template <>
+struct Value<PigeonholeHits const>
 {
-    typedef PigeonholeHit2<__int64, TSpec> Type;
+    typedef PigeonholeHit2<__int64, void> Type;
 };
 
 // ============================================================================
 // Functions
 // ============================================================================
 
-template <typename TSpec,  typename TExpand>
-void appendValue(FinderState<Pigeonhole<TSpec> > & matchState,
-                 typename Value<FinderState<Pigeonhole<TSpec> > >::Type val,
+template <typename TExpand>
+void appendValue(PigeonholeHits & hits,
+                 typename Value<PigeonholeHits >::Type val,
                  Tag<TExpand> const & expand)
 {
-    if (length(matchState._data) == matchState.endPos)
-        appendValue(matchState._data, val, expand);
+    if (end(hits._data, Standard()) == hits.endIter)
+        appendValue(hits._data, val, expand);
     else
-        value(matchState._data, matchState.endPos) = val;
-    ++matchState.endPos;
+        *hits.endIter = val;
+    ++hits.endIter;
 }
 
-template <typename TSpec>
-bool hasNext(FinderState<Pigeonhole<TSpec> > const & matchState)
+inline bool
+hasNext(PigeonholeHits const & hits)
 {
-    return matchState.currPos < matchState.endPos;
+    if (empty(hits._data))
+        return false;
+    return hits.currIter != hits.endIter;
 }
 
-template <typename TSpec>
-typename Value<FinderState<Pigeonhole<TSpec> > >::Type &
-getNext(FinderState<Pigeonhole<TSpec> > & matchState)
+inline typename Value<PigeonholeHits>::Type &
+getNext(PigeonholeHits & hits)
 {
-    return matchState._data[matchState.currPos++];
+    return *(hits.currIter++);
 }
 
-template <typename TSize, typename TSpec>
-typename Value<FinderState<Pigeonhole<TSpec> > const >::Type &
-getNext(FinderState<Pigeonhole<TSpec> > const & matchState)
+inline typename Value<PigeonholeHits const>::Type &
+getNext(PigeonholeHits const & hits)
 {
-    return matchState._data[matchState.currPos++];
+    return *(hits.currIter++);
 }
 
-template <typename TSpec>
-void clear(FinderState<Pigeonhole<TSpec> > & matchState)
+void clear(PigeonholeHits & hits)
 {
-    matchState.currPos = 0;
-    matchState.endPos = 0;
+    if (empty(hits._data))
+        return;
+    hits.currIter = begin(hits._data, Standard());
+    hits.endIter = hits.currIter;
 }
 
-template <typename TSpec>
-void reinit(FinderState<Pigeonhole<TSpec> > & matchState)
+void reinit(PigeonholeHits & hits)
 {
-    clear(matchState._data);
-    matchState.currPos = 0;
-    matchState.endPos = 0;
+    clear(hits._data);
+    clear(hits.currIter);
+    clear(hits.endIter);
 }
 
-template <typename TSpec>
-bool empty(FinderState<Pigeonhole<TSpec> > const & matchState)
+bool empty(PigeonholeHits const & hits)
 {
-    return !hasNext(matchState);
+    return !hasNext(hits);
 }
 
 }

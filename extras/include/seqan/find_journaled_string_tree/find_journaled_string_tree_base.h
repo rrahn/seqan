@@ -135,6 +135,23 @@ SEQAN_CONCEPT_IMPL((JstFinderExtensionConcept), FinderExtensionPoint<TFinder, TS
 template <typename TSpec = Nothing>
 class FinderState;
 
+template <typename TPattern_>
+class FinderExtensionPointBase
+{
+public:
+    typedef typename Host<TPattern>::Type   THost;
+    typedef typename Size<THost>::Type      TSize;
+
+    TPattern_& _pattern;
+    TSize      _contextSize;
+    bool       _isInit;
+
+    FinderExtensionPointBase(TPattern_ & pattern) : _pattern(pattern), _contextSize(0), _isInit(true)
+    {
+        _contextSize = length(host(pattern));  // Default case for most simple pattern.
+    }
+};
+
 // ============================================================================
 // Metafunctions
 // ============================================================================
@@ -148,7 +165,7 @@ template <typename T>
 struct GetPattern;
 
 template <typename TContainer, typename TPattern, typename TSpec>
-struct GetPattern<Finder2<TContainer, TPattern, TSpec> >
+struct GetPattern<Finder_<TContainer, TPattern, TSpec> >
 {
     typedef TPattern Type;
 };
@@ -157,12 +174,12 @@ struct GetPattern<Finder2<TContainer, TPattern, TSpec> >
 // Metafunction RegisteredExtensionPoint
 // ----------------------------------------------------------------------------
 
-template <typename TFinder>
+template <typename TAlgorithm>
 struct RegisteredExtensionPoint{};
 
-template <typename TContainer, typename TPattern, typename TSpec>
-struct RegisteredExtensionPoint<Finder2<TContainer, TPattern, TSpec> const > :
-    RegisteredExtensionPoint<Finder2<TContainer, TPattern, TSpec> >{};
+template <typename TAlgorithm>
+struct RegisteredExtensionPoint<TAlgorithm const> :
+    RegisteredExtensionPoint<TAlgorithm>{};
 
 // ----------------------------------------------------------------------------
 // Metafunction ExtensionRegistry_
@@ -193,6 +210,79 @@ struct GetJstTraverserForFinder_;
 // ============================================================================
 // Functions
 // ============================================================================
+
+// ----------------------------------------------------------------------------
+// Function isInit()
+// ----------------------------------------------------------------------------
+
+template <typename TPattern_>
+inline bool
+isInit(FinderExtensionPointBase<TPattern_> const & extensionBase)
+{
+    return extensionBase._isInit;
+}
+
+// ----------------------------------------------------------------------------
+// Function setInit()
+// ----------------------------------------------------------------------------
+
+template <typename TPattern_>
+inline void
+setInit(FinderExtensionPointBase<TPattern_> & extensionBase)
+{
+    extensionBase._isInit = true;
+}
+
+// ----------------------------------------------------------------------------
+// Function requireInit()
+// ----------------------------------------------------------------------------
+
+template <typename TPattern_>
+inline void
+requireInit(FinderExtensionPointBase<TPattern_> & extensionBase)
+{
+    extensionBase._isInit = false;
+}
+
+// ----------------------------------------------------------------------------
+// Function setInit()
+// ----------------------------------------------------------------------------
+
+template <typename TPattern_>
+inline TPattern_ &
+getPattern(FinderExtensionPointBase<TPattern_> & extensionBase)
+{
+    return extensionBase._pattern;
+}
+
+template <typename TPattern_>
+inline TPattern_ const &
+getPattern(FinderExtensionPointBase<TPattern_> const & extensionBase)
+{
+    return extensionBase._pattern;
+}
+
+// ----------------------------------------------------------------------------
+// Function contextSize()
+// ----------------------------------------------------------------------------
+
+template <typename TPattern_>
+inline unsigned
+contextSize(FinderExtensionPointBase<TPattern_> const & extensionBase)
+{
+    return extensionBase._contextSize;
+}
+
+// ----------------------------------------------------------------------------
+// Function setContextSize()
+// ----------------------------------------------------------------------------
+
+template <typename TPattern_, typename TSize>
+inline void
+setContextSize(FinderExtensionPointBase<TPattern_> & extensionBase, TSize newSize)
+{
+    extensionBase._contextSize = newSize;
+}
 
 }  // namespace seqan
 

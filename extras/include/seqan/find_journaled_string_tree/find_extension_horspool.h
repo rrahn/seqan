@@ -48,25 +48,20 @@ namespace seqan
 // Tags, Classes, Enums
 // ============================================================================
 
-template <typename TFinder>
-class FinderExtensionPoint<TFinder,  Horspool>
+template <typename TPattern_>
+class FinderExtensionPoint<TPattern_,  Horspool> : public FinderExtensionPointBase<TPattern_>
 {
 public:
-
-    typedef typename GetPattern<TFinder>::Type TPattern;
-    typedef typename Needle<TPattern>::Type TNeedle;
+    typedef FinderExtensionPointBase<TPattern_> TSuper;
+    typedef typename Needle<TPattern_>::Type TNeedle;
     typedef typename Iterator<TNeedle, Rooted>::Type TNeedleIt;
 
-    Pattern<TNeedle, Horspool>* _pattern;  // We keep a pointer to the pattern to access its data map.
     TNeedleIt _itBegin;
     TNeedleIt _itEnd;
 
-    FinderExtensionPoint() : _pattern(NULL), _itBegin(), _itEnd()
-    {}
-
-    FinderExtensionPoint(TPattern & pattern)
+    FinderExtensionPoint(TPattern & pattern) : TSuper(pattern);
     {
-        init(*this, pattern);
+        init(*this);
     }
 
     template <typename TResult, typename THystkIt>
@@ -75,7 +70,7 @@ public:
     {
         THystkIt hystkIt = haystackIt;
         TNeedleIt ndlIt = _itEnd;
-        res.i2 = _pattern->data_map[ordValue(getValue(hystkIt))];
+        res.i2 = this->_pattern.data_map[ordValue(getValue(hystkIt))];
         while(position(ndlIt) > 0)
         {
             if (*(--ndlIt) != getValue(hystkIt))
@@ -94,8 +89,8 @@ public:
 // Metafunction PatternSpecificTraversalSpec                         [Horspool]
 // ----------------------------------------------------------------------------
 
-template <typename TFinder>
-struct ContextIteratorPosition<FinderExtensionPoint<TFinder, Horspool> >
+template <typename TPattern_>
+struct ContextIteratorPosition<FinderExtensionPoint<TPattern_, Horspool> >
 {
     typedef ContextPositionRight Type;
 };
@@ -104,11 +99,10 @@ struct ContextIteratorPosition<FinderExtensionPoint<TFinder, Horspool> >
 // Metafunction RegisteredExtensionPoint                             [Horspool]
 // ----------------------------------------------------------------------------
 
-template <typename TContainer, typename TNeedle, typename TSpec>
-struct RegisteredExtensionPoint<Finder2<TContainer, Pattern<TNeedle, Horspool>, Jst<TSpec> > >
+template <typename TNeedle>
+struct RegisteredExtensionPoint<Pattern<TNeedle, Horspool> >
 {
-    typedef Finder2<TContainer, Pattern<TNeedle, Horspool>, Jst<TSpec> > TFinder_;
-    typedef FinderExtensionPoint<TFinder_, Horspool> Type;
+    typedef FinderExtensionPoint<Pattern<TNeedle, Horspool>, Horspool> Type;
 };
 
 // ============================================================================
@@ -119,16 +113,17 @@ struct RegisteredExtensionPoint<Finder2<TContainer, Pattern<TNeedle, Horspool>, 
 // Function init()
 // ----------------------------------------------------------------------------
 
-template <typename TFinder>
-inline Pair<unsigned>
-init(FinderExtensionPoint<TFinder, Horspool> & horspoolFunctor,
-     typename GetPattern<TFinder>::Type & pattern)
+template <typename TPattern_>
+inline void
+init(FinderExtensionPoint<TPattern_, Horspool> & extension)
 {
-    _patternInit(pattern);  // Initialize the pattern.
-    horspoolFunctor._pattern = &pattern;
-    horspoolFunctor._itBegin = begin(needle(pattern), Rooted());
-    horspoolFunctor._itEnd = end(needle(pattern), Rooted());
-    return Pair<unsigned>(horspoolFunctor._itEnd - horspoolFunctor._itBegin, 0);
+    if (!isInit(extension))
+        return;
+
+    _patternInit(getPattern(extension));  // Initialize the pattern.
+    extension._itBegin = begin(host(getPattern(extension)), Rooted());
+    extension._itEnd = end(host(getPattern(extension)), Rooted());
+    setInit(extension);
 }
 
 }
