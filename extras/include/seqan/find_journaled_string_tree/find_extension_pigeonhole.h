@@ -48,19 +48,17 @@ namespace seqan {
 // Tags, Classes, Enums
 // ============================================================================
 
-template <typename TPattern_, typename TSpec>
-struct FinderExtensionPointState;
 
-template <typename TPattern_, typename TSpec>
-struct FinderExtensionPointState<TPattern_, Pigeonhole<TSpec> >
+template <typename TPattern_, typename THits>
+struct PigeonholeState
 {
 public:
     typedef typename TPattern_::TShape TShape;
 
-    PigeonholeHits* _hitsPtr;
-    TShape          shape;
+    THits* _hitsPtr;
+    TShape shape;
 
-    FinderExtensionPointState() : _hitsPtr(NULL)
+    PigeonholeState() : _hitsPtr(NULL)
     {}
 };
 
@@ -76,11 +74,12 @@ public:
     typedef typename GetState<FinderExtensionPoint>::Type   TState;
     typedef typename Host<TPattern_>::Type                  TIndex;
     typedef typename Size<TIndex>::Type                     TSize;
+    typedef String<PigeonholeHit2<__int64> >                THits;
 
-    PigeonholeHits  _hits;
-    TState          _state;
-    TSize           _nonRepeatBegin;
-    TSize           _seedLength;
+    THits   _hits;
+    TState  _state;
+    TSize   _nonRepeatBegin;
+    TSize   _seedLength;
 
     template <typename TErrorRate>
     FinderExtensionPoint(TPattern_ & pattern, TErrorRate errorRate) : TSuper(pattern)
@@ -94,7 +93,7 @@ public:
     {
         typedef typename Fibre<TIndex, QGramSA>::Type const TSA;
         typedef typename Iterator<TSA, Standard>::Type      TSAIter;
-        typedef typename Value<PigeonholeHits>::Type        THit;
+        typedef typename Value<THits>::Type                 THit;
         typedef typename TPattern_::TShape                  TShape;
         typedef typename Value<TShape>::Type                THash;
 
@@ -175,13 +174,15 @@ struct RegisteredExtensionPoint<Pattern<TIndex, Pigeonhole<TFilterSpec> > >
 template <typename TPattern_, typename TSpec>
 struct GetState<FinderExtensionPoint<TPattern_, Pigeonhole<TSpec> > >
 {
-    typedef FinderExtensionPointState<TPattern_, Pigeonhole<TSpec> > Type;
+    typedef typename FinderExtensionPoint<TPattern_, Pigeonhole<TSpec> >::THits THits_;
+    typedef PigeonholeState<TPattern_, THits_> Type;
 };
 
 template <typename TPattern_, typename TSpec>
 struct GetState<FinderExtensionPoint<TPattern_, Pigeonhole<TSpec> > const>
 {
-    typedef FinderExtensionPointState<TPattern_, Pigeonhole<TSpec> > const Type;
+    typedef typename FinderExtensionPoint<TPattern_, Pigeonhole<TSpec> >::THits THits_;
+    typedef PigeonholeState<TPattern_, THits_> const Type;
 };
 
 // ----------------------------------------------------------------------------
@@ -264,7 +265,7 @@ init(FinderExtensionPoint<TPattern_, Pigeonhole<TSpec> > & extension,
     initState(extension);
 
     unsigned errors = (unsigned) floor(errorRate * getPattern(extension).maxSeqLength);
-    unsigned qGram = length(indexShape(host(getPattern(extension))));
+//    unsigned qGram = length(indexShape(host(getPattern(extension))));
     extension._seedLength = length(getPattern(extension).shape);
     extension._nonRepeatBegin = extension._seedLength;
     setContextSize(extension, getPattern(extension).maxSeqLength + errors);
@@ -278,7 +279,7 @@ init(FinderExtensionPoint<TPattern_, Pigeonhole<TSpec> > & extension,
 template <typename TContainer, typename TIndex, typename TFilterSpec, typename TSpec, typename TDelegate,
           typename TTraverser, typename TTag>
 inline typename Size<TTraverser>::Type
-deliverContext(Finder_<TContainer, Pattern<TIndex, Pigeonhole<TFilterSpec> >, Jst<TSpec> > & finder,
+deliverContext(Finder_<TContainer, Pattern<TIndex, Pigeonhole<TFilterSpec> >, JstFind<TSpec> > & finder,
                TDelegate & delegateFunctor,
                TTraverser & traverser,
                TTag const & /*traverserState*/)

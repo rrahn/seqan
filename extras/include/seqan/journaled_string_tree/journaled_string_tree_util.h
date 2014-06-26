@@ -182,6 +182,21 @@ _copy(MergePointMap_<TVariantMap> & map,
 }
 
 // ----------------------------------------------------------------------------
+// Function setContainer()
+// ----------------------------------------------------------------------------
+
+template <typename TVariantMap>
+inline void
+setContainer(MergePointMap_<TVariantMap> & mergePointStore,
+             TVariantMap & map)
+{
+    clear(mergePointStore._mergePoints);
+    clear(mergePointStore._mergeCoverage);
+    mergePointStore._varMapPtr = &map;
+    resize(mergePointStore._mergeCoverage, coverageSize(map), false, Exact());
+}
+
+// ----------------------------------------------------------------------------
 // Function clear()
 // ----------------------------------------------------------------------------
 

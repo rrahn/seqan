@@ -37,6 +37,8 @@
 #ifndef EXTRAS_APPS_JST_MAPPER_EXTENDER_RIGHT_H_
 #define EXTRAS_APPS_JST_MAPPER_EXTENDER_RIGHT_H_
 
+#include "extender.h"
+
 namespace seqan
 {
 
@@ -48,21 +50,17 @@ namespace seqan
 // Tags, Classes, Enums
 // ============================================================================
 
-template <typename TContainer, typename TState>
-class ExtenderRight;
-
-template <typename TContainer>
-class ExtenderRight<TContainer, ExtenderState<HammingDistance> >
+template <typename TContainer, typename TPattern, typename TState>
+class ExtenderRight
 {
 public:
-    typedef ExtenderState<HammingDistance>                          TState;
-    typedef Pattern<TReadSeq, HammingSimple>                        TAlgorithm;
-
-    typedef typename GetState<TAlgorithm>::Type                     TAlgorithmState;
-    typedef typename GetJstTraverser2<TContainer, TAlgorithm>::Type TJstTraverser;
+//    typedef typename Infix<TReadSeq>::Type                          TReadInfix;
+//    typedef Pattern<TReadInfix, HammingPrefix>                      TPattern;
+    typedef typename GetJstTraverser<TContainer, TPattern>::Type    TJstTraverser;
+//    typedef MatchCollector<TPattern>                                TCollector;
 
     TState&         extenderState;
-    TAlgorithmState algoState;
+    TPattern        pattern;
     TJstTraverser   traverser;
 
     ExtenderRight(TState & extenderState) : extenderState(extenderState)
@@ -77,35 +75,29 @@ public:
 // Functions
 // ============================================================================
 
-template <typename TContainer, typename TReadSeqPos, typename TRead, typename TContigPos, typename TTraverser>
-inline bool
-extend(ExtenderRight<TContainer, ExtenderState<HammingDistance> > & extender,
+template <typename TContainer, typename TPattern, typename TReadSeqPos, typename TRead, typename TDelegate,
+          typename TTraverser>
+inline void
+extend(ExtenderRight<TContainer, TPattern, ExtenderState<HammingDistance> > & extender,
        TReadSeqPos readBeginPos,
        TRead & read,
-       TContigPos & contigBeginPos,
+       TDelegate & delegate,
        TTraverser const & traverser)
 {
+    typedef typename Host<TPattern>::Type TNeedle;
+
     // From here we need to invoke another traversal.
+    // Transfer options? FullState(), ContinueCurrent()
+    transferState(extender.traverser, traverser, TraverseRightExtend());
 
+    // Set pattern host.
+    TNeedle readInfix = infix(read, readBeginPos + extender.extenderState.seedLength, length(read));
+    setHost(extender.pattern, readInfix);
 
-    find(extractState(traverser), )
+    // We need to set the pattern -> and with the pattern the allowed number of errors.
+    find(extender.traverser, extender.pattern, delegate,
+         -(extender.extenderState.maxErrorsPerRead - extender.extenderState.errors), JstFind<FindPrefix>())
 
-    //    TContigSeqSize matchEnd = contigBegin + extender.seedLength;
-    //
-    //    if (seedBegin + extender.seedLength < readLength)
-    //    {
-    //        TContigSeqSize contigRightEnd = extender.contigSizes[contigId];
-    //        if (contigRightEnd > contigBegin + readLength - seedBegin)
-    //            contigRightEnd = contigBegin + readLength - seedBegin;
-    //
-    //        TContigInfix contigRight(contig, contigBegin + extender.seedLength, contigRightEnd);
-    //        TReadInfix readRight(read, seedBegin + extender.seedLength, readLength);
-    //
-    //        if (!_extend(extender, contigRight, readRight, errors))
-    //            return false;
-    //
-    //        matchEnd = contigRightEnd;
-    //    }
 }
 
 #endif // EXTRAS_APPS_JST_MAPPER_EXTENDER_RIGHT_H_

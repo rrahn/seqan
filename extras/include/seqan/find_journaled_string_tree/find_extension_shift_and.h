@@ -53,7 +53,7 @@ namespace seqan
 // ----------------------------------------------------------------------------
 
 template <typename TPattern_>
-class FinderExtensionPoint<TPattern_, ShiftAnd > : public FinderExtensionPointBase<TPattern_>
+class FinderExtensionPoint<TPattern_, ShiftAnd> : public FinderExtensionPointBase<TPattern_>
 {
 public:
     typedef FinderExtensionPointBase<TPattern_> TSuper;
@@ -115,7 +115,7 @@ public:
 // Metafunction ContextIteratorPosition                              [ShiftAnd]
 // ----------------------------------------------------------------------------
 
-template <typename TFinder>
+template <typename TPattern_>
 struct ContextIteratorPosition<FinderExtensionPoint<TPattern_, ShiftAnd> >
 {
     typedef ContextPositionRight Type;
@@ -227,7 +227,7 @@ init(FinderExtensionPoint<TPattern_, ShiftAnd> & extension)
     typedef FinderExtensionPoint<TPattern_, ShiftAnd> TShiftAndFunctor;
     typedef typename TShiftAndFunctor::TWord TWord;
 
-    if (!isInit(extension))
+    if (isInit(extension))
         return;
 
     _patternInit(getPattern(extension));

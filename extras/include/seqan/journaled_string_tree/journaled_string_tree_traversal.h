@@ -48,6 +48,31 @@ namespace seqan {
 // Tags, Classes, Enums
 // ============================================================================
 
+/*!
+ * @defgroup JstTraverserTransferTags JST Traverser Transfer Tags
+ * @brief Tags to specialize how to transfer states between two jst traversal states.
+ *
+ *
+ * @tag JstTraverserTransferTags#FullState
+ * @headerfile <seqan/journaled_string_tree.h>
+ * @brief Complete traversal state is copied allowing the source to continue the traversal of the target one-to-one.
+ *
+ * @signature struct TraverseOneToOne_;
+ * @signature typedef Tag<TraverseOneToOne_> TraverseOneToOne;
+ *
+ * @tag JstTraverserTransferTags#ExtendRight
+ * @headerfile <seqan/journaled_string_tree.h>
+ * @brief Only minimal state information is copied to allow extending the last .... todo(rmaerker): write me!
+ *
+ * @signature struct TraverseRightExtend_;
+ * @signature typedef Tag<TraverseRightExtend_> TraverseRightExtend;
+ */
+
+struct TraverseOneToOne_;
+typedef Tag<TraverseOneToOne_> TraverseOneToOne;
+
+struct TraverseRightExtend_;
+typedef Tag<TraverseRightExtend_> TraverseRightExtend;
 
 /*!
  * @defgroup JstTraverserContextPositionTags JST Context Position Tags
@@ -252,6 +277,7 @@ public:
 
     JstTraverser() : _traversalState(JST_TRAVERSAL_STATE_NULL),
                   _haystackPtr((TContainer*) 0),
+                  _mergePointStack(),
                   _contextSize(1),
                   _rightOverlap(0),
                   _needInit(true),
@@ -263,7 +289,7 @@ public:
         _mergePointStack(container(haystack)),
         _contextSize(contextSize),
         _rightOverlap(0),
-        _needInit(false),
+        _needInit(true),
         _isSynchronized(false)
     {
         init(*this, haystack);
@@ -274,7 +300,7 @@ public:
         _mergePointStack(container(haystack)),
         _contextSize(contextSize),
         _rightOverlap(rightOverlap),
-        _needInit(false),
+        _needInit(true),
         _isSynchronized(false)
     {
         init(*this, haystack);
@@ -1238,6 +1264,101 @@ state(JstTraverser<TContainer, TState, TSpec> const & traverser)
 }
 
 // ----------------------------------------------------------------------------
+// Function transferState()
+// ----------------------------------------------------------------------------
+
+template <typename TContainer, typename TState, typename TPosConfSrc, typename TRangeConfSrc,
+          typename TPosConfTarget, typename TRangeConfTarget>
+inline void
+_transferState(JstTraverser<TContainer, TState, JstTraverserSpec<TPosConfSrc, TRangeConfSrc> > & source,
+               JstTraverser<TContainer, TState, JstTraverserSpec<TPosConfTarget, TRangeConfTarget> > const & target)
+{
+    // Basic stuff.
+    source._traversalState = target._traversalState;
+    source._haystackPtr = target._haystackPtr;  // Pointer to the underlying data parallel facade.
+    source._masterIt = target._masterIt;
+    source._masterItEnd = target._masterItEnd;
+
+    // Master coverage.
+    source._activeMasterCoverage = target._activeMasterCoverage;  // Expensive?
+
+    // Branch Nodes.
+    source._branchNodeIt = target._branchNodeIt;
+    source._branchNodeBlockEnd = target._branchNodeBlockEnd;
+    source._branchNodeInContextIt = target._branchNodeInContextIt;  // Points to left node within context or behind the context.
+
+    // Branch coverage.
+    if (isBranchState(target))
+    {
+        source._activeBranchCoverage = target._activeBranchCoverage;
+        source._proxyBranchNodeIt = target._proxyBranchNodeIt;
+    }
+
+    // Auxiliary structures.
+    source._mergePointStack = target._mergePointStack;  // Stores merge points, when deletions are connected to the master branch.
+    source._contextSize = target._contextSize;
+    source._needInit = target._needInit;
+    source._isSynchronized = target._isSynchronized;
+    source._lastMasterState = target._lastMasterState;
+
+    // Position Left - Left or Right - Right.
+    if (IsSameType<TPosConfSrc, TPosConfTarget>::VALUE)
+    {
+        if (isBranchState(target))
+            source._branchIt = target._branchIt;
+        source._masterIt = target._masterIt;
+        return;
+    }
+
+    // Position Left - Right.
+    if (IsSameType<TPosConfSrc, ContextPositionLeft>::VALUE)
+    {
+        if (isBranchState(target))
+            source._branchIt = contextBegin(target, StateTraverseBranch());
+        source._masterIt = contextBegin(target, StateTraverseMaster());
+    }
+
+    // Position Right - Left.
+    if (isBranchState(target))
+        source._branchIt = contextEnd(target, StateTraverseBranch());
+    source._masterIt = contextEnd(target, StateTraverseMaster());
+}
+
+template <typename TContainer, typename TState, typename TPosConfSrc, typename TRangeConfSrc,
+          typename TPosConfTarget, typename TRangeConfTarget>
+inline void
+transferState(JstTraverser<TContainer, TState, JstTraverserSpec<TPosConfSrc, TRangeConfSrc> > & source,
+              JstTraverser<TContainer, TState, JstTraverserSpec<TPosConfTarget, TRangeConfTarget> > const & target,
+              TraverseRightExtend const & /*transferTag*/)
+{
+    _transferState(source, target);
+
+    // Take care of the current branch.
+    if (isBranchState(target))
+    {
+        clear(source._branchStack);
+        createInitialEntry(source._branchStack);
+        top(source._branchStack) = top(target._branchStack);
+    }
+    return;
+}
+
+template <typename TContainer, typename TState, typename TPosConfSrc, typename TRangeConfSrc,
+          typename TPosConfTarget, typename TRangeConfTarget>
+inline void
+transferState(JstTraverser<TContainer, TState, JstTraverserSpec<TPosConfSrc, TRangeConfSrc> > & source,
+              JstTraverser<TContainer, TState, JstTraverserSpec<TPosConfTarget, TRangeConfTarget> > const & target,
+              TraverseOneToOne const & /*transferTag*/)
+{
+    _transferState(source, target);
+
+    // Take care of the current branch.
+    if (isBranchState(target))
+        source._branchStack = target._branchStack;
+    return;
+}
+
+// ----------------------------------------------------------------------------
 // Function isMasterState()
 // ----------------------------------------------------------------------------
 
@@ -1909,7 +2030,7 @@ void _traverseBranchWithAlt(JstTraverser<TContainer, TState, JstTraverserSpec<Co
             TIndel & indel = deltaIndel(traverser._branchNodeIt);
             top(traverser._branchStack)._proxyEndPosDiff = indel.i1;
             top(traverser._branchStack)._proxyEndPosDiff -= static_cast<int>(length(indel.i2));
-            contextSizeRight += length(indel.i2);
+            contextSizeRight += length(indel.i2) - 1;
             if (indel.i1 > 1)
                 top(traverser._branchStack)._mappedHostPos += indel.i1 - 1;  // Moves right by the size of the deletion.
             break;
@@ -2286,7 +2407,7 @@ _execTraversal(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPositio
 {
     typedef typename Container<TContainer>::Type TDeltaMap;
     typedef typename DeltaCoverage<TDeltaMap>::Type TBitVector;
-    typedef typename JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosition, TRequireFullContext> > TTraverser;
+    typedef JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosition, TRequireFullContext> > TTraverser;
     typedef typename TTraverser::TMasterBranchIterator TMasterIterator;
 
 #ifdef PROFILE_DATA_PARALLEL_INTERN
@@ -2411,7 +2532,7 @@ _execTraversal(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPositio
 #endif
     }
     // Synchronize master coverage in the end.
-    _updateMergePoints(traverser._mergePointStack, position(contextBegin(traverser, StateTraverseMaster())));
+    _updateMergePoints(traverser._mergePointStack, clippedContextBeginPosition(traverser, StateTraverseMaster()));
     transform(traverser._activeMasterCoverage, traverser._activeMasterCoverage,
               traverser._mergePointStack._mergeCoverage,
               FunctorNested<FunctorBitwiseAnd, FunctorIdentity, FunctorBitwiseNot>());
@@ -2606,7 +2727,7 @@ _copy(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosition, TRequi
  * @signature init(traverser);
  * @signature init(traverser, cont);
  * @signature init(traverser, cont, w);
- * @param[in,out]  traverser   The traverser to ne initialized.
+ * @param[in,out]  traverser   The traverser to be initialized.
  * @param[in]       cont        The container to be set.
  * @param[in]       w           The context size to be set.
  *
@@ -2618,17 +2739,11 @@ template <typename TContainer, typename TState, typename TContextPosition, typen
 inline void
 init(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosition, TRequireFullContext> > & traverser)
 {
+    if (!traverser._needInit)
+        return;
     _initSegment(traverser, begin(container(container(traverser)), Rooted()),
                  end(container(container(traverser)), Rooted()), 0, length(host(container(traverser))));
-}
-
-template <typename TContainer, typename TState, typename TContextPosition, typename TRequireFullContext>
-inline void
-init(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosition, TRequireFullContext> > & traverser,
-     TContainer & obj)
-{
-    setContainer(traverser, obj);
-    init(traverser);
+    traverser._needInit = false;
 }
 
 template <typename TContainer, typename TState, typename TContextPosition, typename TRequireFullContext, typename TSize>
@@ -2637,9 +2752,20 @@ init(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosition, TRequir
      TContainer & obj,
      TSize const & contextSize)
 {
+    if (!traverser._needInit)
+        return;
     setContainer(traverser, obj);
     setContextSize(traverser, contextSize);
+    setContainer(traverser._mergePointStack, container(container(traverser)));
     init(traverser);
+}
+
+template <typename TContainer, typename TState, typename TContextPosition, typename TRequireFullContext>
+inline void
+init(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosition, TRequireFullContext> > & traverser,
+     TContainer & obj)
+{
+    init(traverser, obj, 1);
 }
 
 // ----------------------------------------------------------------------------

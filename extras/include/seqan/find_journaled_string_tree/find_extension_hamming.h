@@ -48,28 +48,80 @@ namespace seqan
 // Tags, Classes, Enums
 // ============================================================================
 
-template <typename TPattern_>
-struct StateHammingSimple_
-{
-    typedef typename Host<TPattern_>::Type              THost;
-    typedef typename Iterator<THost, Standard>::Type    TIterator;
-    typedef typename Size<THost>::Type                  TSize;
+// ----------------------------------------------------------------------------
+// Tag HammingPrefix
+// ----------------------------------------------------------------------------
 
-    TSize       errorCount;
-    TIterator   needleIt;
+struct HammingPrefix_;
+typedef Tag<HammingPrefix_> HammingPrefix;
+
+// ----------------------------------------------------------------------------
+// Tag HammingExtension
+// ----------------------------------------------------------------------------
+
+template <typename TTag = HammingSimple>
+struct HammingExtension;
+
+// ----------------------------------------------------------------------------
+// Class Pattern                                                [HammingPrefix]
+// ----------------------------------------------------------------------------
+
+// NOTE(rmaerker): HammingPrefix is the same pattern as HammingSimple.
+// We just need it to define a different iteration process.
+template <typename TNeedle>
+class Pattern<TNeedle, HammingPrefix> : Pattern<TNeedle, HammingSimple>
+{
+    typedef Pattern<TNeedle, HammingSimple> TSuper;
+
+    Pattern() : TSuper()
+    {}
+
+    template <typename TNeedle2>
+    Pattern(const TNeedle2 &ndl, int k = -1) : TSuper(ndl, k)
+    {}
 };
 
+// ----------------------------------------------------------------------------
+// Struct StateHammingSimple_
+// ----------------------------------------------------------------------------
+
+template <typename TSize>
+struct StateHammingSimple_
+{
+    TSize  errorCount;
+};
+
+// ----------------------------------------------------------------------------
+// Struct StateHammingPrefix_
+// ----------------------------------------------------------------------------
+
 template <typename TPattern_>
-class FinderExtensionPoint<TPattern_,  HammingSimple> : FinderExtensionPointBase<TPattern_>
+struct StateHammingPrefix_ : public StateHammingSimple_<int>
+{
+    typedef StateHammingSimple_<int>                    TSuper;
+    typedef typename Host<TPattern>::Type               THost;
+    typedef typename Iterator<THost, Standard>::Type    TNeedleIterator;
+
+    TNeedleIterator currentIt;
+
+    StateHammingPrefix_() : TSuper()
+    {}
+};
+
+// ----------------------------------------------------------------------------
+// Class FinderExtensionPoint                                   [HammingSimple]
+// ----------------------------------------------------------------------------
+
+template <typename TPattern_>
+class FinderExtensionPoint<TPattern_,  HammingExtension<HammingSimple> > : FinderExtensionPointBase<TPattern_>
 {
 public:
-    typedef FinderExtensionPointBase<TPattern_>         TSuper;
-    typedef typename Size<TPattern_>::Type              TSize;
-//    typedef typename GetState<FinderExtensionPoint>::Type   TState;
-    typedef typename Host<TPattern_>::Type              THost;
-    typedef typename Iterator<THost, Standard>::Type    TIterator;
+    typedef FinderExtensionPointBase<TPattern_>             TSuper;
+    typedef typename GetState<FinderExtensionPoint>::Type   TState;
+    typedef typename Host<TPattern_>::Type                  THost;
+    typedef typename Iterator<THost, Standard>::Type        TIterator;
 
-    TIterator _ndlBegin;
+    TState    _state;
     TIterator _ndlEnd;
 
     template <typename TErrors>
@@ -81,14 +133,46 @@ public:
     template <typename TResult, typename THystkIterator>
     inline void operator()(TResult & res, THystkIterator hystkIt)
     {
-        getPattern(*this).distance = 0;
-        TIterator ndlIt = _ndlBegin;
-        while(getPattern(*this).distance <= getPattern(*this).maxDistance && ndlIt != _ndlEnd)=
+        _state.errorCount = 0;
+        TIterator ndlIt = begin(host(getPattern(*this)), Standard());
+        while(_state.errorCount <= getPattern(*this).maxDistance && ndlIt != _ndlEnd)
             if (*ndlIt++ != getValue(hystkIt++))
-                ++getPattern(*this).distance;
-        res.i1 = getPattern(*this).distance <= getPattern(*this).maxDistance;
+                ++_state.errorCount;
+        res.i1 = _state.errorCount <= getPattern(*this).maxDistance;
+    }
+};
+
+// ----------------------------------------------------------------------------
+// Class FinderExtensionPoint                                   [HammingPrefix]
+// ----------------------------------------------------------------------------
+
+template <typename TPattern_>
+class FinderExtensionPoint<TPattern_,  HammingExtension<HammingPrefix> > : FinderExtensionPointBase<TPattern_>
+{
+public:
+    typedef FinderExtensionPointBase<TPattern_>             TSuper;
+    typedef typename GetState<FinderExtensionPoint>::Type   TState;
+    typedef typename Host<TPattern_>::Type                  THost;
+    typedef typename Iterator<THost, Standard>::Type        TIterator;
+
+    TState    _state;
+    TIterator _ndlEnd;
+
+    template <typename TErrors>
+    FinderExtensionPoint(TPattern_ & pattern, TErrors errors) : TSuper(pattern)
+    {
+        init(*this, errors);
     }
 
+    template <typename TResult, typename THystkIterator>
+    inline void operator()(TResult & res, THystkIterator const & hystkIt)
+    {
+        if (*_state.currentIt != getValue(hystkIt))
+            ++_state.errorCount;
+        // Check if end of segment is reached.
+        if (++_state.currentIt == _ndlEnd)
+            res.i1 = _state.errorCount <= getPattern(*this).maxDistance;
+    }
 };
 
 // ============================================================================
@@ -99,18 +183,27 @@ public:
 // Metafunction ContextIteratorPosition                               [Hamming]
 // ----------------------------------------------------------------------------
 
+// HammingSimple.
 template <typename T>
-struct ContextIteratorPosition<FinderExtensionPoint<T, HammingSimple> >
+struct ContextIteratorPosition<FinderExtensionPoint<T, HammingExtension<HammingSimple> > >
 {
     typedef ContextPositionLeft Type;
+};
+
+// HammingPrefix.
+template <typename T>
+struct ContextIteratorPosition<FinderExtensionPoint<T, HammingExtension<HammingPrefix> > >
+{
+    typedef ContextPositionRight Type;
 };
 
 // ----------------------------------------------------------------------------
 // Metafunction RequireFullContext                                    [Hamming]
 // ----------------------------------------------------------------------------
 
-//template <typename T>
-//struct RequireFullContext<FinderExtensionPoint<T, HammingSimple> > : False{};
+// HammingPrefix.
+template <typename T>
+struct RequireFullContext<FinderExtensionPoint<T, HammingExtension<HammingPrefix> > > : False{};
 
 // ----------------------------------------------------------------------------
 // Metafunction RegisteredExtensionPoint                              [Hamming]
@@ -119,87 +212,110 @@ struct ContextIteratorPosition<FinderExtensionPoint<T, HammingSimple> >
 template <typename TNeedle>
 struct RegisteredExtensionPoint<Pattern<TNeedle, HammingSimple> >
 {
-    typedef FinderExtensionPoint<Pattern<TNeedle, HammingSimple>, HammingSimple> Type;
+    typedef FinderExtensionPoint<Pattern<TNeedle, HammingSimple>, HammingExtension<HammingSimple> > Type;
+};
+
+template <typename TNeedle>
+struct RegisteredExtensionPoint<Pattern<TNeedle, HammingPrefix> >
+{
+    typedef FinderExtensionPoint<Pattern<TNeedle, HammingPrefix>, HammingExtension<HammingPrefix> > Type;
 };
 
 // ----------------------------------------------------------------------------
 // Metafunction GetState                                              [Hamming]
 // ----------------------------------------------------------------------------
 
-//template <typename T>
-//struct GetState<FinderExtensionPoint<T, HammingSimple> >
-//{
-//    typedef typename Size<T>::Type TSize_;
-//    typedef StateHammingSimple_<TSize_> Type;
-//};
-//
-//template <typename T>
-//struct GetState<FinderExtensionPoint<T, HammingSimple> const>
-//{
-//    typedef typename Size<T>::Type TSize_;
-//    typedef StateHammingSimple_<TSize_> const Type;
-//};
+template <typename T>
+struct GetState<FinderExtensionPoint<T, HammingExtension<HammingSimple> > >
+{
+    typedef StateHammingSimple_<int> Type;
+};
+
+template <typename T>
+struct GetState<FinderExtensionPoint<T const, HammingExtension<HammingSimple> > >
+{
+    typedef StateHammingSimple_<int> const Type;
+};
+
+template <typename T>
+struct GetState<FinderExtensionPoint<T, HammingExtension<HammingPrefix> > >
+{
+    typedef StateHammingPrefix_<T> Type;
+};
+
+template <typename T>
+struct GetState<FinderExtensionPoint<T const, HammingExtension<HammingPrefix> > >
+{
+    typedef StateHammingPrefix_<T> const Type;
+};
 
 // ============================================================================
 // Functions
 // ============================================================================
 
 // ----------------------------------------------------------------------------
-// Function getState                                               [Pigeonhole]
+// Function getState                                                  [Hamming]
 // ----------------------------------------------------------------------------
 
-//template <typename TPattern_, typename TSpec>
-//inline typename GetState<FinderExtensionPoint<TPattern_, Pigeonhole<TSpec> > >::Type &
-//getState(FinderExtensionPoint<TPattern_, Pigeonhole<TSpec> > & extensionFunctor)
-//{
-//    return extensionFunctor._state;
-//}
-//
-//template <typename TPattern_, typename TSpec>
-//inline typename GetState<FinderExtensionPoint<TPattern_, Pigeonhole<TSpec> > const>::Type &
-//getState(FinderExtensionPoint<TPattern_, Pigeonhole<TSpec> > const & extensionFunctor)
-//{
-//    return extensionFunctor._state;
-//}
-//
-//// ----------------------------------------------------------------------------
-//// Function setState()                                             [Pigeonhole]
-//// ----------------------------------------------------------------------------
-//
-//template <typename TPattern_, typename TSpec>
-//inline void
-//setState(FinderExtensionPoint<TPattern_, Pigeonhole<TSpec> >  & extensionFunctor,
-//         typename GetState<FinderExtensionPoint<TPattern_, Pigeonhole<TSpec> > >::Type const & state)
-//{
-//    extensionFunctor._state = state;
-//}
+template <typename TPattern_, typename TSpec>
+inline typename GetState<FinderExtensionPoint<TPattern_, HammingExtension<TSpec> > >::Type &
+getState(FinderExtensionPoint<TPattern_, HammingExtension<TSpec> > & extensionFunctor)
+{
+    return extensionFunctor._state;
+}
+
+template <typename TPattern_, typename TSpec>
+inline typename GetState<FinderExtensionPoint<TPattern_, HammingExtension<TSpec> > const>::Type &
+getState(FinderExtensionPoint<TPattern_, HammingExtension<TSpec> > const & extensionFunctor)
+{
+    return extensionFunctor._state;
+}
 
 // ----------------------------------------------------------------------------
-// Function initState()
+// Function setState()                                                [Hamming]
 // ----------------------------------------------------------------------------
 
-//template <typename TPattern_>
-//inline void
-//initState(FinderExtensionPoint<TPattern_, HammingSimple> & extensionFunctor)
-//{
-//    extensionFunctor._state.errorCount = 0;
-//    extensionFunctor._state.needleIt = begin(host(getPattern(extensionFunctor)), Standard());
-//}
-
-// ----------------------------------------------------------------------------
-// Function init()
-// ----------------------------------------------------------------------------
-
-template <typename TPattern_, typename TMinScore>
+template <typename TPattern_, typename TSpec>
 inline void
-init(FinderExtensionPoint<TPattern_, HammingSimple> & extension,
+setState(FinderExtensionPoint<TPattern_, HammingExtension<TSpec> >  & extensionFunctor,
+         typename GetState<FinderExtensionPoint<TPattern_, HammingExtension<TSpec> > >::Type const & state)
+{
+    extensionFunctor._state = state;
+}
+
+// ----------------------------------------------------------------------------
+// Function initState()                                               [Hamming]
+// ----------------------------------------------------------------------------
+
+template <typename TPattern_>
+inline void
+initState(FinderExtensionPoint<TPattern_, HammingExtension<HammingSimple> > & extensionFunctor)
+{
+    extensionFunctor._state.errorCount = 0;
+}
+
+template <typename TPattern_>
+inline void
+initState(FinderExtensionPoint<TPattern_, HammingExtension<HammingPrefix> > & extensionFunctor)
+{
+    extensionFunctor._state.errorCount = 0;
+    extensionFunctor._state.currentIt = begin(host(getPattern(extensionFunctor)), Standard());
+}
+
+// ----------------------------------------------------------------------------
+// Function init()                                                    [Hamming]
+// ----------------------------------------------------------------------------
+
+template <typename TPattern_, typename TSpec, typename TMinScore>
+inline void
+init(FinderExtensionPoint<TPattern_, HammingExtension<TSpec> > & extension,
      TMinScore minScore)
 {
     if (isInit(extension))
         return;
 
     setScoreLimit(getPattern(extension), minScore);
-    extension._ndlBegin = begin(host(getPattern(extension)), Standard());
+    initState(extension);
     extension._ndlEnd = end(host(getPattern(extension)), Standard());
     setInit(extension);
 }

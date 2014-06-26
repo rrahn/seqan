@@ -114,7 +114,7 @@ struct GetState
 // Metafunction GetJstTraverser
 // ----------------------------------------------------------------------------
 
-template <typename T>
+template <typename TObj, typename TSpec = void>
 struct GetJstTraverser;
 
 // ----------------------------------------------------------------------------

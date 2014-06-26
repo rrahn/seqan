@@ -81,9 +81,10 @@ typedef Tag<TraverseStateBranch_> StateTraverseBranch;
 /*!
  * @mfn JstTraversalConcept#GetJstTraverser
  * @brief Returns type of the traverser for the caller.
- * @signature GetJstTraverser<TCaller>::Type;
- * @tparam  TCaller The type of the caller that triggers the traversal.
- * @return  TTraverser The type of the traverser (@link JstTraverser @endlink).
+ * @signature GetJstTraverser<TObj [, TSpec]>::Type;
+ * @tparam  TObj        The type of the object that either triggers the traversal or the type of the underlying object the traversal is applied to.
+ * @tparam  TSpec       The specialization type. Note: Optional and usually not required, if <tt>TObj<\tt> is the caller.
+ * @return  TTraverser  The type of the traverser (@link JstTraverser @endlink).
  */
 
 /*!

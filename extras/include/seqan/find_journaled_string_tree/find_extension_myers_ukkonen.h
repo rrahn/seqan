@@ -70,7 +70,7 @@ public:
     typedef typename TPattern_::TLargePattern TLargePattern;
     typedef typename TPatternState::TLargeState TLargeState;
     typedef typename TPattern_::TWord TWord;
-    typedef typename Spec<TPattern>::Type TSpec;
+    typedef typename Spec<TPattern_>::Type TSpec;
 
     TPatternState   _state;
 
@@ -82,7 +82,7 @@ public:
     bool _isSmallPattern;
 
     template <typename TMinScore>
-    FinderExtensionPoint(TPattern & pattern, TMinScore const & minScore) : TSuper(pattern)
+    FinderExtensionPoint(TPattern_ & pattern, TMinScore const & minScore) : TSuper(pattern)
     {
         init(*this, minScore);
     }
@@ -124,7 +124,7 @@ public:
         carryHP = (int)MyersUkkonenHP0_<TSpec>::VALUE; // FIXME: replace Noting with TSpec
 
         // if the active cell is the last of it's block, one additional block has to be calculated
-        limit = largeState.lastBlock + (unsigned)(largeState.scoreMask >> (*this->_pattern.MACHINE_WORD_SIZE - 1));
+        limit = largeState.lastBlock + (unsigned)(largeState.scoreMask >> (this->_pattern.MACHINE_WORD_SIZE - 1));
 
         if (limit == largePattern.blockCount)
             limit--;
@@ -134,7 +134,7 @@ public:
         // computing the necessary blocks, carries between blocks following one another are stored
         for (currentBlock = 0; currentBlock <= limit; currentBlock++)
         {
-            X = *this->_pattern.bitMasks[shift + currentBlock] | largeState.VN[currentBlock];
+            X = this->_pattern.bitMasks[shift + currentBlock] | largeState.VN[currentBlock];
 
             temp = largeState.VP[currentBlock] + (X & largeState.VP[currentBlock]) + carryD0;
             if (carryD0 != (TWord)0)
@@ -262,7 +262,7 @@ struct GetState<FinderExtensionPoint<TPattern_, MyersBitVector> >
 template <typename TPattern_>
 struct GetState<FinderExtensionPoint<TPattern_, MyersBitVector> const>
 {
-    typedef typename PatternState<TPattern_>::Type Type;
+    typedef typename PatternState<TPattern_>::Type const Type;
 };
 
 // ============================================================================
@@ -332,21 +332,21 @@ initState(FinderExtensionPoint<TPattern_, MyersBitVector> & extensionFunctor)
 
 template <typename TPattern_, typename TScore>
 inline void
-init(FinderExtensionPoint<TPattern_, MyersBitVector> & myersFunctor,
+init(FinderExtensionPoint<TPattern_, MyersBitVector> & extension,
      TScore const & scoreLimit)
 {
     typedef typename TPattern_::TWord TWord;
 
-    if (isInit(myersFunctor))
+    if (isInit(extension))
         return;
 
-    initState(myersFunctor);
-    setScoreLimit(myersFunctor._state, scoreLimit);
-    _patternInit(myersFunctor._pattern, myersFunctor._state, myersFunctor);  // Initialize the pattern.
-    myersFunctor._isSmallPattern = myersFunctor._pattern.largePattern == NULL;
-    myersFunctor.lastBit = (TWord)1 << (myersFunctor._pattern.needleSize - 1);
-    setContextSize(myersFunctor, length(host(myersFunctor._pattern)) + myersFunctor._state.maxErrors);
-    setInit(myersFunctor);
+    initState(extension);
+    setScoreLimit(extension._state, scoreLimit);
+    _patternInit(extension._pattern, extension._state, extension);  // Initialize the pattern.
+    extension._isSmallPattern = extension._pattern.largePattern == NULL;
+    extension.lastBit = (TWord)1 << (extension._pattern.needleSize - 1);
+    setContextSize(extension, length(host(extension._pattern)) + extension._state.maxErrors);
+    setInit(extension);
 }
 
 }  // namespace seqan

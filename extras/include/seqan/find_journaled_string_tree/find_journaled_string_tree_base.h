@@ -62,13 +62,36 @@ struct BitAlgorithmSmallNeedle_;
 typedef Tag<BitAlgorithmSmallNeedle_> BitAlgorithmSmallNeedle;
 
 // ----------------------------------------------------------------------------
-// Tag Jst
+// Tag JstFind
 // ----------------------------------------------------------------------------
 
-template <typename TSpec = void>
-struct Jst;
+/*!
+ * @defgroup JstFindSpecializationTags Jst Find Specialization Tags
+ * @brief Tags for specifying the @link JstFind @endlink search type (prefix or infix).
+ *
+ * @tag JstFindSpecializationTags#FindInfix
+ * @headerfile <seqan/find_base.h>
+ * @brief Scans entire data set for infix matches.
+ *
+ * @signature struct FindInfix;
+ *
+ * @tag JstFindSpecializationTags#FindPrefix
+ * @headerfile <seqan/find_base.h>
+ * @brief Scans only current position for a prefix match.
+ *
+ * @signature struct FindPrefix;
+ */
 
-typedef Jst<void> JstFinder;
+/*!
+ * @class JstFind
+ * @brief Tag used to trigger simultaneous find on multiple sequences passed by a @link JournaledStringTree @endlink.
+ * @signature struct JstFind<TTag>;
+ *
+ * @tparam TTag Tag to specialize the find method. One of @link JstFindSpecializationTags @endlink.
+ */
+
+template <typename TSpec = FindInfix>
+struct JstFind{};
 
 // ----------------------------------------------------------------------------
 // Class FinderExtensionPoint
@@ -139,14 +162,14 @@ template <typename TPattern_>
 class FinderExtensionPointBase
 {
 public:
-    typedef typename Host<TPattern>::Type   THost;
+    typedef typename Host<TPattern_>::Type  THost;
     typedef typename Size<THost>::Type      TSize;
 
     TPattern_& _pattern;
     TSize      _contextSize;
     bool       _isInit;
 
-    FinderExtensionPointBase(TPattern_ & pattern) : _pattern(pattern), _contextSize(0), _isInit(true)
+    FinderExtensionPointBase(TPattern_ & pattern) : _pattern(pattern), _contextSize(0), _isInit(false)
     {
         _contextSize = length(host(pattern));  // Default case for most simple pattern.
     }
@@ -180,6 +203,27 @@ struct RegisteredExtensionPoint{};
 template <typename TAlgorithm>
 struct RegisteredExtensionPoint<TAlgorithm const> :
     RegisteredExtensionPoint<TAlgorithm>{};
+
+// ----------------------------------------------------------------------------
+// Metafunction PatternState
+// ----------------------------------------------------------------------------
+
+template <typename T>
+struct PatternState;
+
+template <typename TNeedle, typename TSpec>
+struct PatternState<Pattern<TNeedle, TSpec> >
+{
+    typedef typename RegisteredExtensionPoint<Pattern<TNeedle, TSpec> >::Type TExtension;
+    typedef typename GetState<TExtension>::Type Type;
+};
+
+template <typename TNeedle, typename TSpec>
+struct PatternState<Pattern<TNeedle, TSpec> const>
+{
+    typedef typename RegisteredExtensionPoint<Pattern<TNeedle, TSpec> >::Type TExtension;
+    typedef typename GetState<TExtension>::Type const Type;
+};
 
 // ----------------------------------------------------------------------------
 // Metafunction ExtensionRegistry_

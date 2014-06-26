@@ -71,12 +71,14 @@
 // ===========================================================================
 
 #include <seqan/find_journaled_string_tree/find_extension_myers_ukkonen.h>
+#include <seqan/find_journaled_string_tree/find_extension_hamming.h>
 
 // ===========================================================================
 // Filter.
 // ===========================================================================
 
-#include <seqan/find_journaled_string_tree/find_extension_pigeonhole_state.h>
+#include <seqan/index/find_pigeonhole.h>
+#include <seqan/find_journaled_string_tree/find_extension_pigeonhole_hits.h>
 #include <seqan/find_journaled_string_tree/find_extension_pigeonhole.h>
 
 #endif // EXTRAS_INCLUDE_SEQAN_FIND_JOURNALED_STRING_TREE_

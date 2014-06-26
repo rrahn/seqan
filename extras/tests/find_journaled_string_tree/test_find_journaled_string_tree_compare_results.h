@@ -65,8 +65,8 @@ struct FindResultsTester_
         resize(_hitStringSet, size, seqan::Exact());
     }
 
-    template <typename TTraverser>
-    inline void operator()(TTraverser & traverser)
+    template <typename TTraverser, typename TState>
+    inline void operator()(TTraverser & traverser, TState const & /*state*/)
     {
         typedef typename seqan::Positions<TTraverser>::Type TPositionVec;
 
@@ -119,7 +119,7 @@ bool _runTest(TMockGenerator & mockGen,
     typedef JournaledStringTree<DeltaMap<unsigned, TAlphabet>, StringTreeDefault> TContainer;
 
     typedef Pattern<TNeedle, TAlgorithm> TPattern;
-    typedef Finder2<TContainer, TPattern, Jst<> > TFinder;
+//    typedef Finder_<TContainer, TPattern, JstFind<> > TFinder;
     typedef typename Position<TContainer>::Type TPosition;
 
     typedef typename TMockGenerator::TJournalSet TJournalSet;
@@ -144,8 +144,8 @@ bool _runTest(TMockGenerator & mockGen,
     if (blockSize > 0u)
         setBlockSize(jst, blockSize);
 
-    TFinder finder(jst);
-    find(finder, pattern, delegate);
+//    TFinder finder(jst);
+    find(jst, pattern, delegate, JstFind<>());
 
     // Search over each sequence separately and find the pattern.
     for (unsigned i = 0; i < length(mockGen._seqData); ++i)
@@ -161,11 +161,17 @@ bool _runTest(TMockGenerator & mockGen,
                 appendValue(compareHits, position(stdFinder) + (length(ndl) - 1));
         }
         if (length(compareHits) != length(delegate._hitStringSet[i]))
+        {
+            _printDebugInfo(mockGen, jst, ndl, compareHits, delegate._hitStringSet, i);
             return false;
+        }
 
         for (unsigned j = 0; j < length(compareHits); ++j)
             if (compareHits[j] != delegate._hitStringSet[i][j])
+            {
+                _printDebugInfo(mockGen, jst, ndl, compareHits, delegate._hitStringSet, i);
                 return false;
+            }
     }
     return true;
 }
@@ -188,7 +194,7 @@ bool _runTest(TMockGenerator & mockGen,
     typedef JournaledStringTree<DeltaMap<unsigned, TAlphabet>, StringTreeDefault> TContainer;
 
     typedef Pattern<TNeedle, Myers<TMyersSpec, THasState, TBeginSpec> > TPattern;
-    typedef Finder2<TContainer, TPattern, Jst<> > TFinder;
+//    typedef Finder2<TContainer, TPattern, JstFind<> > TFinder;
     typedef typename Position<TContainer>::Type TPosition;
 
     typedef typename TMockGenerator::TJournalSet TJournalSet;
@@ -232,8 +238,8 @@ bool _runTest(TMockGenerator & mockGen,
     TContainer jst(host(mockGen._seqData), mockGen._varStore);
     if (blockSize > 0u)
         setBlockSize(jst, blockSize);
-    TFinder finder(jst);
-    find(finder, pattern, delegate, numErrors);
+//    TFinder finder(jst);
+    find(jst, pattern, delegate, numErrors, JstFind<>());
 
     // Search over each sequence separately and find the pattern.
     for (unsigned i = 0; i < length(mockGen._seqData); ++i)

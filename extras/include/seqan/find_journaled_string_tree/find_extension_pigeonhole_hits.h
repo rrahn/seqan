@@ -35,8 +35,8 @@
 // or swift filter.
 // ==========================================================================
 
-#ifndef EXTRAS_INCLUDE_SEQAN_FIND_JOURNALED_STRING_TREE_FIND_FILTER_STATE_H_
-#define EXTRAS_INCLUDE_SEQAN_FIND_JOURNALED_STRING_TREE_FIND_FILTER_STATE_H_
+#ifndef EXTRAS_INCLUDE_SEQAN_FIND_JOURNALED_STRING_TREE_FIND_FILTER_HITS_H_
+#define EXTRAS_INCLUDE_SEQAN_FIND_JOURNALED_STRING_TREE_FIND_FILTER_HITS_H_
 
 namespace seqan
 {
@@ -49,18 +49,19 @@ namespace seqan
 // Tags, Classes, Enums
 // ============================================================================
 
+template <typename TSize = __int64>
 class PigeonholeHits
 {
 public:
-    typedef typename Value<PigeonholeHits>::Type        TValue;
-    typedef String<TValue>                              TData;
-    typedef typename Iterator<TData, Standard>::Type    TIterator;
+    typedef typename Value<PigeonholeHits>::Type     TValue;
+    typedef String<TValue>                           TData;
+    typedef typename Iterator<TData, Standard>::Type TIterator;
 
     String<TValue>  _data;
     TIterator       currIter;
     TIterator       endIter;
 
-    FinderState() : currIter(), endIter()
+    PigeonholeHits() : currIter(), endIter()
     {}
 };
 
@@ -68,8 +69,8 @@ public:
 // Class PigeonholeHit
 // ----------------------------------------------------------------------------
 
-template <typename TSize, typename TSpec>
-class PigeonholeHit2
+template <typename TSize, typename TSpec = void>
+struct PigeonholeHit2
 {
     TSize ndlSeqPos;
     TSize ndlSeqId;
@@ -79,26 +80,27 @@ class PigeonholeHit2
 // Metafunctions
 // ============================================================================
 
-template <>
-struct Value<PigeonholeHits>
+template <typename TSize>
+struct Value<PigeonholeHits<TSize> >
 {
-    typedef PigeonholeHit2<__int64, void> Type;
+    typedef PigeonholeHit2<TSize, void> Type;
 };
 
-template <>
-struct Value<PigeonholeHits const>
+template <typename TSize>
+struct Value<PigeonholeHits<TSize> const>
 {
-    typedef PigeonholeHit2<__int64, void> Type;
+    typedef PigeonholeHit2<TSize, void> Type;
 };
 
 // ============================================================================
 // Functions
 // ============================================================================
 
-template <typename TExpand>
-void appendValue(PigeonholeHits & hits,
-                 typename Value<PigeonholeHits >::Type val,
-                 Tag<TExpand> const & expand)
+template <typename TSize, typename TExpand>
+void
+appendValue(PigeonholeHits<TSize> & hits,
+            typename Value<PigeonholeHits<TSize> >::Type val,
+            Tag<TExpand> const & expand)
 {
     if (end(hits._data, Standard()) == hits.endIter)
         appendValue(hits._data, val, expand);
@@ -107,27 +109,32 @@ void appendValue(PigeonholeHits & hits,
     ++hits.endIter;
 }
 
+template <typename TSize>
 inline bool
-hasNext(PigeonholeHits const & hits)
+hasNext(PigeonholeHits<TSize> const & hits)
 {
     if (empty(hits._data))
         return false;
     return hits.currIter != hits.endIter;
 }
 
-inline typename Value<PigeonholeHits>::Type &
-getNext(PigeonholeHits & hits)
+template <typename TSize>
+inline typename Value<PigeonholeHits<TSize> >::Type &
+getNext(PigeonholeHits<TSize> & hits)
 {
     return *(hits.currIter++);
 }
 
-inline typename Value<PigeonholeHits const>::Type &
-getNext(PigeonholeHits const & hits)
+template <typename TSize>
+inline typename Value<PigeonholeHits<TSize> const>::Type &
+getNext(PigeonholeHits<TSize> const & hits)
 {
     return *(hits.currIter++);
 }
 
-void clear(PigeonholeHits & hits)
+template <typename TSize>
+void
+clear(PigeonholeHits<TSize> & hits)
 {
     if (empty(hits._data))
         return;
@@ -135,18 +142,21 @@ void clear(PigeonholeHits & hits)
     hits.endIter = hits.currIter;
 }
 
-void reinit(PigeonholeHits & hits)
+template <typename TSize>
+void
+reinit(PigeonholeHits<TSize> & hits)
 {
     clear(hits._data);
     clear(hits.currIter);
     clear(hits.endIter);
 }
 
-bool empty(PigeonholeHits const & hits)
+template <typename TSize>
+bool empty(PigeonholeHits<TSize> const & hits)
 {
     return !hasNext(hits);
 }
 
 }
 
-#endif // EXTRAS_INCLUDE_SEQAN_FIND_JOURNALED_STRING_TREE_FIND_FILTER_STATE_H_
+#endif // EXTRAS_INCLUDE_SEQAN_FIND_JOURNALED_STRING_TREE_FIND_FILTER_HITS_H_

@@ -47,67 +47,106 @@ namespace seqan {
 // Forwards
 // ============================================================================
 
+template <typename TDistance>
+struct GetVerificationAlgorithm{};
+
 // ============================================================================
 // Tags, Classes, Enums
 // ============================================================================
+
+template <typename TSpec>
+class MatchCollector;
+
+template <typename TNeedle>
+class MatchCollector<Pattern<TNeedle, HammingPrefix> >
+{
+public:
+    typedef Pattern<TNeedle, HammingPrefix> TPattern;
+    typedef typename PatternState<TPattern>::Type TState;
+    typedef Match<MultiGenomeMatch> TMatch;
+    typedef String<TMatch> TBuffer;
+
+    TMatch  match;
+    TBuffer buffer;
+
+    template <typename TTraverser>
+    inline void operator()(TTraverser const & traverser, TState const & state)
+    {
+        match.beginPos = contextBeginPosition(traverser);
+        match.endPosDelta = static_cast<int>(contextEndPosition(traverser)) - match.beginPos;
+        match.errors = state.errorCount;
+        match.coverage = coverage(traverser);
+        appendValue(buffer, match);
+    }
+};
 
 template <typename TDistanceModel>
 class ExtenderState
 {
 public:
     unsigned                 contigId;
-    unsigned                 maxErrorsPerRead;
-    unsigned                 minErrorsPerRead;
     unsigned                 seedLength;
-    unsigned                 errors;
+    int                      maxErrorsPerRead;
+    int                      minErrorsPerRead;
+    int                      errors;
     Match<MultiGenomeMatch>  currMatch;  // The current match.
 
-    ExtenderState(unsigned contigId, unsigned maxErrorsPerRead, unsigned minErrorsPerRead,
-                  unsigned seedLength) :
+    ExtenderState(unsigned contigId, unsigned seedLength, unsigned maxErrorsPerRead, unsigned minErrorsPerRead) :
         contigId(contigId),
+        seedLength(seedLength),
         maxErrorsPerRead(maxErrorsPerRead),
         minErrorsPerRead(minErrorsPerRead),
-        seedLength(seedLength),
         errors(0)
     {}
 };
 
-template <typename TFragmentStore, typename TDelegate, typename TDistanceModel>
+template <typename TFragmentStore, typename TJst, typename TDelegate, typename TDistanceModel>
 class Extender
 {
 public:
     typedef ExtenderState<TDistanceModel> TExtenderState;
+    typedef Infix<TReadSeq>::Type         TReadInfix;
+    typedef typename GetVerificationAlgorithm<TDistanceModel>::Type TAlgoSpec;
+    typedef Pattern<TReadInfix, TAlgoSpec> TVerifier;
+    typedef MatchCollector<TAlgoSpec>      TCollector;
 
     TFragmentStore &               store;
+    TJst &                         jst;
     TDelegate &                    delegate;
     ExtenderState<TDistanceModel>  extenderState;
     ExtenderLeft<TExtenderState>   extenderLeft;
-    ExtenderRight<TExtenderState>  extenderRight;
+
+    ExtenderRight<TJst, TVerifier, TExtenderState>  extenderRight;
+    TCollector                     collector;
     bool                           disabled;
 
 
-    Extender(TFragmentStore & fragStore, TDelegate & delegate, unsigned contigId, unsigned maxErrorsPerRead,
-             unsigned minErrorsPerRead, unsigned seedLength, bool disabled) :
+    Extender(TFragmentStore & fragStore, TJst & jst, TDelegate & delegate, unsigned contigId, unsigned seedLength,
+             unsigned maxErrorsPerRead, unsigned minErrorsPerRead, bool disabled) :
                  store(fragStore),
+                 jst(jst),
                  delegate(delegate),
-                 extenderState(contigId, maxErrorsPerRead, minErrorsPerRead, seedLength),
+                 extenderState(contigId, seedLength, maxErrorsPerRead, minErrorsPerRead),
                  extenderLeft(extenderState),
                  extenderRight(extenderState),
                  disabled(disabled)
     {}
 
+    // I need to know that this is the qGram filter and how i can access the data.
     template <typename TTraversalState, typename TFilterState>
     inline void operator()(TTraversalState const & traversalState, TFilterState const & filterState)
     {
         typedef typename Value<TFilterState>::Type TFilterHit;
+        typedef typename TCollector::TBuffer TMatchBuffer;
+        typedef typename Iterator<TMatchBuffer, Standard>::Type TBufferIterator;
 
 
         while(hasNext(filterState))
         {
             TFilterHit hit = getNext(filterState);
-
+            clear(collector.buffer);  // Clear current buffer to store.
             // Extract the match -> readNo, relReadPos
-            if (isMaster(traversalState))
+            if (isMasterState(traversalState))
             {
                 if (!_extendHit(*this, hit.ndlSeqPos, hit.ndlSeqId,
                                 clippedContextBeginPosition(traversalState, StateTraverseMaster()),
@@ -123,12 +162,12 @@ public:
                                 traversalState), 0)
                     continue;
             }
-            // unsigned errorCount = verifyPrefix(contextBegin(finder) + relNedlPos);
-            while (hasNext(extenderRight.matches))
-            {
 
-                onMatch(extenderState.delegate, )
-            }
+            // Pass matches to delegate.
+            TBufferIterator it = begin(collector.buffer, Standard());
+            TBufferIterator itEnd = end(collector.buffer, Standard());
+            for (; it != itEnd; ++it)
+                onMatch(extenderState.delegate, *it);
         }
     }
 };
@@ -136,6 +175,19 @@ public:
 // ============================================================================
 // Metafunctions
 // ============================================================================
+
+template <>
+struct GetVerificationAlgorithm<HammingDistance>
+{
+    typedef HammingPrefix Type;
+};
+
+template <>
+struct GetVerificationAlgorithm<EditDistance>
+{
+    // TODO(rmaerker): Adapt to Myers.
+    typedef HammingPrefix Type;
+};
 
 // ============================================================================
 // Functions
@@ -149,12 +201,17 @@ inline bool _extendHit(TExtender & extender,
                        TContextPos contigBeginPos,
                        TContextView contigView,
                        TTraversalState const & traverserState,
-                       unsigned seedErrors)
+                       int seedErrors)
 {
     typedef typename TExtender::TFragmentStore          TFragmentStore;
     typedef typename TFragmentStore::TReadSeqStore      TReadStore;
     typedef typename Value<TReadStore>::Type            TReadSeq;
     typedef typename Size<TReadSeq>::Type               TReadSeqSize;
+
+    typedef typename TExtender::TCollector              TCollector;
+    typedef typename TCollector::TBuffer                TBuffer;
+    typedef typename Value<TBuffer>::Type               TMatch;
+    typedef typename Iterator<TBuffer, Standard>::Type  TBufferIterator;
 
     if (extender.disabled)
         return false;
@@ -163,7 +220,7 @@ inline bool _extendHit(TExtender & extender,
     TReadSeqSize readLength = length(read);
 
     // Extend left.
-    if (!extend(extender.extenderLeft, readPos, readId, contigBeginPos, contigView))
+    if (!extend(extender.extenderLeft, readPos, read, contigBeginPos, contigView))
         return false;
 
     // This removes some duplicates. -> How? If there are 0 errors in the prefix step?
@@ -171,45 +228,32 @@ inline bool _extendHit(TExtender & extender,
         return false;
 
     // Extend right.
-    if (!extend(extender.extenderRight, readPos, readId, contigBeginPos, traverserState))
-        return false;
+    // Check if seed is at end of read. -> No extension.
+    if (readPos + extender.extenderState.seedLength < length(read))
+    {
+        extend(extender.extenderRight, readPos, read, extender.collector, traverserState);
+        // No suffix matches found.
+        if (empty(extender.collector.buffer))
+            return false;
 
-    // What happens here ...
-    // call the right extension.
-    // Right extension forces own traversal with own HammingFinder.
-    // Explores all different paths.
-    // What is the general begin position than?
+        TBufferIterator it = begin(extender.collector.buffer, Standard());
+        TBufferIterator itEnd = end(extender.collector.buffer, Standard());
+        TContigSeqSize contigPrefixDelta = contigBeginPos - contextEndPosition(traverserState);
+        for (; it != itEnd; ++it)
+        {
+            // Refine the matches.
+            *it.beginPos -= contigPrefixDelta;
+            *it.coverage &= coverage(traverserState);
+            *it.readId = readId;
+            *it.contigId = extender.extenderState.contigId;
+        }
+    }
 
-    // That is seed begin position - contigBeginPos => prefixOffset
-    // Each match contained in the right extender must store it's relative begin position.
-
-    // relBeginPos - seedLength - prefixOffset => globalBegin Position.
-
-
-//    TContigSeqSize matchEnd = contigBegin + extender.seedLength;
-//
-//    if (seedBegin + extender.seedLength < readLength)
-//    {
-//        TContigSeqSize contigRightEnd = extender.contigSizes[contigId];
-//        if (contigRightEnd > contigBegin + readLength - seedBegin)
-//            contigRightEnd = contigBegin + readLength - seedBegin;
-//
-//        TContigInfix contigRight(contig, contigBegin + extender.seedLength, contigRightEnd);
-//        TReadInfix readRight(read, seedBegin + extender.seedLength, readLength);
-//
-//        if (!_extend(extender, contigRight, readRight, errors))
-//            return false;
-//
-//        matchEnd = contigRightEnd;
-//    }
-//
-//    // This removes some duplicates.
-//    if (errors < extender.minErrorsPerRead)
-//        return false;
-//
-//    bool reverseComplemented = _fixReverseComplemented(extender, readId);
-//    onMatch(extender.matchesDelegate, contigId, matchBegin, matchEnd, readId, errors, reverseComplemented);
-
+    // We can just add the one hit.
+    // TODO(rmaerker): Add single hit.
+    TMatch match;
+    fillMatch(match, extender.extenderState.contigId, contigBeginPos, contextEndPosition(traverserState),
+              readId, coverage(traverserState), false);/
     return true;
 }
 

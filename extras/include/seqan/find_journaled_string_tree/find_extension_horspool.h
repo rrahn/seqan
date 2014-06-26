@@ -49,7 +49,7 @@ namespace seqan
 // ============================================================================
 
 template <typename TPattern_>
-class FinderExtensionPoint<TPattern_,  Horspool> : public FinderExtensionPointBase<TPattern_>
+class FinderExtensionPoint<TPattern_, Horspool> : public FinderExtensionPointBase<TPattern_>
 {
 public:
     typedef FinderExtensionPointBase<TPattern_> TSuper;
@@ -59,7 +59,7 @@ public:
     TNeedleIt _itBegin;
     TNeedleIt _itEnd;
 
-    FinderExtensionPoint(TPattern & pattern) : TSuper(pattern);
+    FinderExtensionPoint(TPattern_ & pattern) : TSuper(pattern)
     {
         init(*this);
     }
@@ -117,7 +117,7 @@ template <typename TPattern_>
 inline void
 init(FinderExtensionPoint<TPattern_, Horspool> & extension)
 {
-    if (!isInit(extension))
+    if (isInit(extension))
         return;
 
     _patternInit(getPattern(extension));  // Initialize the pattern.
