@@ -99,7 +99,7 @@ template <typename TPattern_>
 struct StateHammingPrefix_ : public StateHammingSimple_<int>
 {
     typedef StateHammingSimple_<int>                    TSuper;
-    typedef typename Host<TPattern>::Type               THost;
+    typedef typename Host<TPattern_>::Type              THost;
     typedef typename Iterator<THost, Standard>::Type    TNeedleIterator;
 
     TNeedleIterator currentIt;

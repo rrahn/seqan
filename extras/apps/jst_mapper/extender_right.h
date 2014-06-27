@@ -94,6 +94,8 @@ extend(ExtenderRight<TContainer, TPattern, ExtenderState<HammingDistance> > & ex
     TNeedle readInfix = infix(read, readBeginPos + extender.extenderState.seedLength, length(read));
     setHost(extender.pattern, readInfix);
 
+    setContextSize(extender.traverser, length(readInfix));
+
     // We need to set the pattern -> and with the pattern the allowed number of errors.
     find(extender.traverser, extender.pattern, delegate,
          -(extender.extenderState.maxErrorsPerRead - extender.extenderState.errors), JstFind<FindPrefix>())

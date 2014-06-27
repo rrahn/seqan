@@ -250,10 +250,10 @@ inline bool _extendHit(TExtender & extender,
     }
 
     // We can just add the one hit.
-    // TODO(rmaerker): Add single hit.
     TMatch match;
-    fillMatch(match, extender.extenderState.contigId, contigBeginPos, contextEndPosition(traverserState),
-              readId, coverage(traverserState), false);/
+    fill(match, extender.extenderState.contigId, contigBeginPos, contextEndPosition(traverserState), readId,
+         extender.extenderState.errors, coverage(traverserState), false);
+    appendValue(extender.collector.buffer, match);
     return true;
 }
 
