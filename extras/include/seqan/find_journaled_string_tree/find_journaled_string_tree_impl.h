@@ -440,11 +440,12 @@ _find(JstTraverser<THystk, TState, JstTraverserSpec<TContextIteratorPos, TRequir
     else
         ignoreUnusedVariableWarning(state);
 
-    init(traverser, container(traverser), contextSize(finder._extensionFunctor));
+    setContextSize(traverser, contextSize(finder._extensionFunctor));
+//    init(traverser, container(traverser), contextSize(finder._extensionFunctor));
     if (IsSameType<TSpec, FindInfix>::VALUE)
-        traverse(finder, delegate, traverser);
+        traverse(finder, delegate, traverser, False());
     else
-        traversePrefix(finder, delegate, traverser, contextSize(traverser));
+        traverse(finder, delegate, traverser, True());
 }
 
 template <typename THystk, typename TState, typename TContextIteratorPos, typename TRequireFullContext,
@@ -468,11 +469,12 @@ _find(JstTraverser<THystk, TState, JstTraverserSpec<TContextIteratorPos, TRequir
     else
         ignoreUnusedVariableWarning(state);
 
-    init(traverser, container(traverser), contextSize(finder._extensionFunctor));
+    setContextSize(traverser, contextSize(finder._extensionFunctor));
+//    init(traverser, container(traverser), contextSize(finder._extensionFunctor));
     if (IsSameType<TSpec, FindInfix>::VALUE)
-        traverse(finder, delegate, traverser);
+        traverse(finder, delegate, traverser, False());
     else
-        traversePrefix(finder, delegate, traverser, contextSize(traverser));
+        traverse(finder, delegate, traverser, True());
 }
 
 template <typename THystk, typename TPattern, typename TDelegate, typename TState, typename TErrors, typename TSpec,

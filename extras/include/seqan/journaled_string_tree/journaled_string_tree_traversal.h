@@ -270,40 +270,27 @@ public:
     mutable TMergePointStore    _mergePointStack;  // Stores merge points, when deletions are connected to the master branch.
     mutable TBranchStack        _branchStack;  // Handles the branches of the current tree.
     TSize                       _contextSize;
-    int                         _rightOverlap;
-    bool                        _needInit;
+    bool                        _reinitJST;
     mutable bool                _isSynchronized;
     TState                      _lastMasterState;
 
     JstTraverser() : _traversalState(JST_TRAVERSAL_STATE_NULL),
                   _haystackPtr((TContainer*) 0),
                   _mergePointStack(),
-                  _contextSize(1),
-                  _rightOverlap(0),
-                  _needInit(true),
+                  _contextSize(0),
+                  _reinitJST(false),
                   _isSynchronized(false)
     {}
 
     JstTraverser(TContainer & haystack, TSize contextSize) :
         _traversalState(JST_TRAVERSAL_STATE_NULL),
+        _haystackPtr(&haystack),
         _mergePointStack(container(haystack)),
         _contextSize(contextSize),
-        _rightOverlap(0),
-        _needInit(true),
+        _reinitJST(false),
         _isSynchronized(false)
     {
-        init(*this, haystack);
-    }
-
-    JstTraverser(TContainer & haystack, TSize contextSize, int rightOverlap) :
-        _traversalState(JST_TRAVERSAL_STATE_NULL),
-        _mergePointStack(container(haystack)),
-        _contextSize(contextSize),
-        _rightOverlap(rightOverlap),
-        _needInit(true),
-        _isSynchronized(false)
-    {
-        init(*this, haystack);
+//        init(*this, haystack);
     }
 
     // Copy constructor.
@@ -345,7 +332,6 @@ struct PrefixTraversal : public True
 {
     TPosition prefixBeginPos;
     TPosition prefixSize;
-
 
     PrefixTraversal() : prefixBeginPos(0), prefixSize(0)
     {}
@@ -1474,14 +1460,14 @@ _selectNextSplitPoint(TBranchStackNode const & proxyWindow,
                       TNodeIt const & nodeIt,
                       TNodeIt const & branchNode)
 {
-    int virtualMapping = (*nodeIt - *branchNode);
-    unsigned splitPointPos = position(proxyWindow._proxyIter) + virtualMapping - proxyWindow._proxyEndPosDiff;
+//    int virtualMapping = ;
+    return position(proxyWindow._proxyIter) + (*nodeIt - *branchNode) - proxyWindow._proxyEndPosDiff;
 
-#ifdef DEBUG_DATA_PARALLEL
-    std::cerr << "Virtual Positions: " << position(proxyWindow._proxyIter) << " to " << splitPointPos <<  std::endl;
-    std::cerr << "Physical Positions: " << *branchNode << " to " << *nodeIt << std::endl;
-#endif
-    return splitPointPos;
+//#ifdef DEBUG_DATA_PARALLEL
+//    std::cerr << "Virtual Positions: " << position(proxyWindow._proxyIter) << " to " << splitPointPos <<  std::endl;
+//    std::cerr << "Physical Positions: " << *branchNode << " to " << *nodeIt << std::endl;
+//#endif
+//    return splitPointPos;
 }
 
 // ----------------------------------------------------------------------------
@@ -1515,12 +1501,11 @@ _updateAuxiliaryBranchStructures(TBranchStackEntry & branchEntry,
 // ----------------------------------------------------------------------------
 
 template <typename TContainer, typename TState, typename TContextPosition, typename TRequireFullContext,
-          typename TExternal, typename TDelegate, typename TBranchPos, typename TSplitPos, typename TIter>
+          typename TExternal, typename TDelegate, typename TSplitPos, typename TIter>
 inline void
 _traverseBranch(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosition, TRequireFullContext> > & traverser,
                 TExternal & externalAlg,
                 TDelegate & delegate,
-                TBranchPos branchPos,
                 TSplitPos splitPointPos,
                 TIter & nodeItEnd)
 {
@@ -1532,6 +1517,32 @@ _traverseBranch(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPositi
 
     typedef typename Container<TContainer>::Type TVariantMap;
     typedef typename DeltaCoverage<TVariantMap>::Type TBitVector;
+
+    // Set the correct iterator here.
+    if (IsSameType<TContextPosition, ContextPositionLeft>::VALUE)
+    {
+        if (top(traverser._branchStack)._prefixOffset < 0)
+            traverser._branchIt = top(traverser._branchStack)._proxyIter + -(top(traverser._branchStack)._prefixOffset);  // Needed because of the iterator implementation.
+        else
+            traverser._branchIt = top(traverser._branchStack)._proxyIter - top(traverser._branchStack)._prefixOffset;
+    }
+    else
+    {
+        traverser._branchIt = top(traverser._branchStack)._proxyIter + ((traverser._contextSize -1) - top(traverser._branchStack)._prefixOffset);
+    };
+
+    // Note, we need the position of the iterator, because the journal string iterator never
+    // exceeds the end of the journal string. And it might be faster than evaluating the iterator.
+    unsigned branchPos = _contextEndPosition(traverser, StateTraverseBranch());
+    // End position of the traversal.
+#ifdef DEBUG_DATA_PARALLEL
+    if (check == true)
+    {
+        std::cerr << "The character: " << static_cast<int>(*traverser._branchIt) << " with ordValue: " << ordValue(*traverser._branchIt) << " at position: " << *traverser._branchIt._journalEntriesIterator << std::endl;
+        std::cerr << "The infix: " << top(traverser._branchStack)._proxyIter._journalStringPtr->_insertionBuffer << std::endl;
+    }
+#endif
+
 
     TBitVector splitVec;
     while(branchPos < top(traverser._branchStack)._proxyEndPos && branchPos < length(*(top(traverser._branchStack)._proxyIter._journalStringPtr)))  // Check end condition.
@@ -1596,7 +1607,7 @@ _traverseBranch(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPositi
             }
             if (deltaType(traverser._proxyBranchNodeIt) == DeltaType::DELTA_TYPE_DEL ||
                 deltaType(traverser._proxyBranchNodeIt) == DeltaType::DELTA_TYPE_INDEL)
-                while(nodeItEnd != traverser._proxyBranchNodeIt && *(traverser._proxyBranchNodeIt + 1) < top(traverser._branchStack)._mappedHostPos)
+                while(traverser._proxyBranchNodeIt != nodeItEnd && *(traverser._proxyBranchNodeIt + 1) < top(traverser._branchStack)._mappedHostPos)
                     ++traverser._proxyBranchNodeIt;
 
             if (traverser._proxyBranchNodeIt != nodeItEnd)
@@ -1682,33 +1693,7 @@ _intializeBranch(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosit
     std::cerr << "split point: " << splitPointPos << " ("<< *traverser._proxyBranchNodeIt << ")" << std::endl;
 #endif
 
-    // Set the correct iterator here.
-    if (IsSameType<TContextPosition, ContextPositionLeft>::VALUE)
-    {
-        if (top(traverser._branchStack)._prefixOffset < 0)
-            traverser._branchIt = top(traverser._branchStack)._proxyIter + -(top(traverser._branchStack)._prefixOffset);  // Needed because of the iterator implementation.
-        else
-            traverser._branchIt = top(traverser._branchStack)._proxyIter - top(traverser._branchStack)._prefixOffset;
-    }
-    else
-    {
-        traverser._branchIt = top(traverser._branchStack)._proxyIter + ((traverser._contextSize -1) - top(traverser._branchStack)._prefixOffset);
-    };
-
-    // Note, we need the position of the iterator, because the journal string iterator never
-    // exceeds the end of the journal string. And it might be faster than evaluating the iterator.
-    unsigned branchPos = _contextEndPosition(traverser, StateTraverseBranch());
-    // End position of the traversal.
-//    unsigned seqEndPos = length(*(top(traverser._branchStack)._proxyIter._journalStringPtr)) + traverser._rightOverlap;
-#ifdef DEBUG_DATA_PARALLEL
-    if (check == true)
-    {
-        std::cerr << "The character: " << static_cast<int>(*traverser._branchIt) << " with ordValue: " << ordValue(*traverser._branchIt) << " at position: " << *traverser._branchIt._journalEntriesIterator << std::endl;
-        std::cerr << "The infix: " << top(traverser._branchStack)._proxyIter._journalStringPtr->_insertionBuffer << std::endl;
-    }
-#endif
-
-    _traverseBranch(traverser, externalAlg, delegate, branchPos, splitPointPos, nodeItEnd);
+    _traverseBranch(traverser, externalAlg, delegate, splitPointPos, nodeItEnd);
     // TODO(rmaerker): Compare speed when all vectors are set to the
 }
 
@@ -2113,6 +2098,119 @@ void _traverseBranchWithAlt(JstTraverser<TContainer, TState, JstTraverserSpec<Co
 }
 
 // ----------------------------------------------------------------------------
+// Function _continueTraversal()
+// ----------------------------------------------------------------------------
+
+template <typename TContainer, typename TState, typename TContextPosition, typename TRequireFullContext,
+          typename TExternalAlg, typename TDelegate, typename TParallelSpec, typename TPrefixState>
+void
+_continueTraversal(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosition, TRequireFullContext> > & traverser,
+                   TExternalAlg & externalAlg,
+                   TDelegate & delegate,
+                   Tag<TParallelSpec> const & parallelTag,
+                   TPrefixState const & prefixState)
+{
+    typedef JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosition, TRequireFullContext> > TJstTraverser;
+    typedef typename Size<TJstTraverser>::Type TSize;
+    typedef typename BranchNode<TJstTraverser>::Type TBranchNodeIt;
+
+    if (isMasterState(traverser))  // Continue traversal from master segment.
+    {
+        _traverseMaster(traverser, externalAlg, delegate, _contextEndPosition(traverser, StateTraverseMaster()),
+                        prefixState);
+
+        // Update the coverage.
+        _syncAndUpdateCoverage(traverser, StateTraverseMaster());
+        traverser._lastMasterState = getState(externalAlg);
+
+        // Continue the traversal from the current state.
+        traverser._traversalState = JST_TRAVERSAL_STATE_BRANCH;
+        _execTraversal(traverser, externalAlg, delegate, parallelTag, prefixState);
+    }
+    else  // Continue traversal in the branch segment.
+    {
+        // What can happen. We might need a different end point.
+        // Now we continue the traversal. We might have copied the state or initialized the state.
+
+        // We need a new end-point. We might as well determine the next split point.
+        // Determine the next split point depends on some parameters.
+        // No 1) The relative distance to the begin position of the variant. Computed based on the seen deletions and insertions.
+            // How does it change when assuming we start there? => Does not change. The next split point can be still computed. Is independent of the context size.
+        // No 2) Compute last split point pos.
+
+        // Reset the end position depending on the new context size.
+        TSize contextSizeRight = contextSize(traverser);
+        switch(deltaType(traverser._branchNodeIt))
+        {
+            case DeltaType::DELTA_TYPE_DEL:
+            {
+                if (deltaDel(traverser._branchNodeIt) > 1)
+                    --contextSizeRight;
+                break;
+            }
+            case DeltaType::DELTA_TYPE_INS:
+            {
+                contextSizeRight += length(deltaIns(traverser._branchNodeIt));
+                break;
+            }
+            case DeltaType::DELTA_TYPE_INDEL:
+            {
+                contextSizeRight += length(deltaIndel(traverser._branchNodeIt).i2) - 1;
+                break;
+            }
+        }
+
+        // Select the next node.
+        TBranchNodeIt nodeItEnd = end(container(container(traverser)), Standard()) - 1;
+        unsigned splitPointPos = top(traverser._branchStack)._proxyEndPos;
+
+        // If not at the end, we can simply recompute the next split point.
+        if (traverser._proxyBranchNodeIt != end(container(container(traverser)), Standard()))
+            splitPointPos = _selectNextSplitPoint(top(traverser._branchStack), traverser._proxyBranchNodeIt, traverser._branchNodeIt);
+
+        // Continue the traversal here.
+        _traverseBranch(traverser, externalAlg, delegate, splitPointPos, nodeItEnd);
+
+
+//    #ifdef DEBUG_DATA_PARALLEL
+//        std::cerr << "split point: " << splitPointPos << " ("<< *traverser._proxyBranchNodeIt << ")" << std::endl;
+//    #endif
+//
+//        // Set the correct iterator here.
+//        if (IsSameType<TContextPosition, ContextPositionLeft>::VALUE)
+//        {
+//            if (top(traverser._branchStack)._prefixOffset < 0)
+//                traverser._branchIt = top(traverser._branchStack)._proxyIter + -(top(traverser._branchStack)._prefixOffset);  // Needed because of the iterator implementation.
+//            else
+//                traverser._branchIt = top(traverser._branchStack)._proxyIter - top(traverser._branchStack)._prefixOffset;
+//        }
+//        else
+//        {
+//            traverser._branchIt = top(traverser._branchStack)._proxyIter + ((traverser._contextSize -1) - top(traverser._branchStack)._prefixOffset);
+//        };
+//
+//        // Note, we need the position of the iterator, because the journal string iterator never
+//        // exceeds the end of the journal string. And it might be faster than evaluating the iterator.
+//        unsigned branchPos = _contextEndPosition(traverser, StateTraverseBranch());
+
+        // How to call this process?
+        // - We continue the traversal. But we can't say how we do it. Because it is not clear that we begin a new traversal from the current position or whether we continue our original traversal.
+        // So how to solve this generically? The difference would be the state that is set to the finder.
+        // How to set the end conditions.
+        // Two cases can happen.
+        // 1) The
+
+
+        // Now this is a little bit more complex.
+        // We need to initialize the search here. -> set new end position.
+        // Set the corresponding split point and all of those things.
+
+    }
+    // Now we have to initialize some parameters.
+        // If we continue the master state we can simply call the traverser option can we?
+}
+
+// ----------------------------------------------------------------------------
 // Function _syncAndUpdateCoverage()
 // ----------------------------------------------------------------------------
 
@@ -2432,13 +2530,13 @@ _traverseMaster(TTraverser & traverser,
 // ----------------------------------------------------------------------------
 
 template <typename TContainer, typename TState, typename TContextPosition, typename TRequireFullContext,
-          typename TExternal, typename TDelegate, typename TIsInfix>
+          typename TExternal, typename TDelegate, typename TPrefixState>
 inline void
 _execTraversal(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosition, TRequireFullContext> > & traverser,
                TExternal & externalAlg,
                TDelegate & delegate,
-               TIsInfix const & prefixState,
-               Serial const & /*tag*/)
+               Serial const & /*tag*/,
+               TPrefixState const & prefixState)
 {
     typedef typename Container<TContainer>::Type TDeltaMap;
     typedef typename DeltaCoverage<TDeltaMap>::Type TBitVector;
@@ -2495,7 +2593,7 @@ _execTraversal(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPositio
         double timeBranchAll = sysTime();
 #endif
 
-        if (IsSameType<TIsInfix, True>::VALUE)  // Interrupt if infix end is reached.
+        if (IsSameType<TPrefixState, True>::VALUE)  // Interrupt if infix end is reached.
         {
             if (contextEnd(traverser, StateTraverseMaster()) == traverser._masterItEnd)
                 return;  // Break the search if end is reached.
@@ -2577,13 +2675,13 @@ _execTraversal(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPositio
 // ----------------------------------------------------------------------------
 
 template <typename TContainer, typename TState, typename TContextPosition, typename TRequireFullContext,
-          typename TExternal, typename TDelegate, typename TIsInfix>
+          typename TExternal, typename TDelegate, typename TPrefixState>
 inline void
 _execTraversal(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosition, TRequireFullContext> > & traverser,
                TExternal externalAlg,
                TDelegate & delegate,
-               TIsInfix const & isInfix,
-               Parallel const & parallelTag)
+               Parallel const & parallelTag,
+               TPrefixState const & prefixState)
 {
     typedef JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosition, TRequireFullContext> > TTraverserState;
     typedef typename TTraverserState::TMasterBranchIterator TMasterIt;
@@ -2631,27 +2729,11 @@ _execTraversal(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPositio
         ScopedReadLock<TQueue> readLock(queue);
         waitForFirstValue(queue); // Barrier to wait for all writers to set up.
 
-        _execConsumerThread(queue, jobs[omp_get_thread_num()], externalAlg, delegate, isInfix, parallelTag);
+        _execConsumerThread(queue, jobs[omp_get_thread_num()], externalAlg, delegate, prefixState, parallelTag);
     }
 
     SEQAN_ASSERT(empty(queue));
 }
-
-// ----------------------------------------------------------------------------
-// Function _continueTraversal()
-// ----------------------------------------------------------------------------
-
-//template <typename TContainer, typename TState, typename TContextPosition, typename TRequireFullContext,
-//          typename TExternal, typename TDelegate, typename TIsInfix>
-//inline void
-//_continueTraversal(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosition, TRequireFullContext> > & traverser,
-//                   TExternal & externalAlg,
-//                   TDelegate & delegate,
-//                   TIsInfix const & prefixState,
-//                   Serial const & /*tag*/)
-//{
-//
-//}
 
 // ----------------------------------------------------------------------------
 // Function _initSegment()
@@ -2685,14 +2767,11 @@ _reinitBlockEnd(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPositi
 {
     // We do not need to update the end if the full tree is journaled.
     if (fullJournalRequired(container(traverser)))
-    {
-        traverser._masterItEnd += traverser._rightOverlap;
         return;
-    }
 
     traverser._branchNodeBlockEnd = container(traverser)._mapBlockEnd;
     if (traverser._branchNodeBlockEnd == end(container(container(traverser)), Standard()))  // Last block.
-        traverser._masterItEnd = end(host(container(traverser)), Rooted()) + traverser._rightOverlap;
+        traverser._masterItEnd = end(host(container(traverser)), Rooted());
     else
         traverser._masterItEnd = begin(host(container(traverser)), Rooted()) + value(traverser._branchNodeBlockEnd);
 }
@@ -2702,18 +2781,17 @@ _reinitBlockEnd(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPositi
 // ----------------------------------------------------------------------------
 
 template <typename TPosition, typename TContainer, typename TState, typename TContextPosition,
-          typename TRequireFullContext, typename TSize>
+          typename TRequireFullContext>
 inline PrefixTraversal<TPosition>
-_reinitPrefixEnd(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosition, TRequireFullContext> > & traverser,
-                 TSize prefixSize)
+_reinitPrefixEnd(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosition, TRequireFullContext> > & traverser)
 {
-    traverser._masterItEnd = clippedContextBeginPosition(traverser, StateTraverseMaster()) + prefixSize;
+    traverser._masterItEnd = contextBegin(traverser, StateTraverseMaster()) + contextSize(traverser);
     if (isBranchState(traverser))
     {
         if (top(traverser._branchStack)._prefixOffset <= 0)
-            return PrefixTraversal<TPosition>((*traverser._branchNodeIt - 1), prefixSize);
+            return PrefixTraversal<TPosition>((*traverser._branchNodeIt - 1), contextSize(traverser));
     }
-    return PrefixTraversal<TPosition>(clippedContextBeginPosition(traverser, StateTraverseMaster()), prefixSize);
+    return PrefixTraversal<TPosition>(clippedContextBeginPosition(traverser, StateTraverseMaster()), contextSize(traverser));
 }
 
 // ----------------------------------------------------------------------------
@@ -2747,8 +2825,7 @@ _copy(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosition, TRequi
         traverser._mergePointStack = other._mergePointStack;  // Stores merge points, when deletions are connected to the master branch.
         traverser._branchStack = other._branchStack;  // Handles the branches of the current tree.
         traverser._contextSize = other._contextSize;
-        traverser._rightOverlap = other._rightOverlap;  // Right overlap to allow the context to move over the reference.
-        traverser._needInit = other._needInit;
+        traverser._reinitJST = other._reinitJST;
         traverser._isSynchronized = other._isSynchronized;
         traverser._lastMasterState = other._lastMasterState;
 }
@@ -2777,11 +2854,10 @@ template <typename TContainer, typename TState, typename TContextPosition, typen
 inline void
 init(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosition, TRequireFullContext> > & traverser)
 {
-    if (!traverser._needInit)
+    if (traverser._traversalState != JST_TRAVERSAL_STATE_NULL)
         return;
     _initSegment(traverser, begin(container(container(traverser)), Rooted()),
                  end(container(container(traverser)), Rooted()), 0, length(host(container(traverser))));
-    traverser._needInit = false;
 }
 
 template <typename TContainer, typename TState, typename TContextPosition, typename TRequireFullContext, typename TSize>
@@ -2790,7 +2866,7 @@ init(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosition, TRequir
      TContainer & obj,
      TSize const & contextSize)
 {
-    if (!traverser._needInit)
+    if (!traverser._traversalState == JST_TRAVERSAL_STATE_NULL)
         return;
     setContainer(traverser, obj);
     setContextSize(traverser, contextSize);
@@ -2807,7 +2883,7 @@ init(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosition, TRequir
 }
 
 // ----------------------------------------------------------------------------
-// Function traverse()
+// Function traverse()                                        [Infix Traversal]
 // ----------------------------------------------------------------------------
 
 /*!
@@ -2825,23 +2901,93 @@ init(JstTraverser<TContainer, TState, JstTraverserSpec<TContextPosition, TRequir
 
 template <typename TOperator, typename TDelegate, typename TContainer, typename TState, typename TSpec,
           typename TParallelSpec>
-inline
-SEQAN_FUNC_ENABLE_IF(Is<JstTraversalConcept<TOperator> >, void)
-traverse(TOperator & traversalCaller,
+inline SEQAN_FUNC_ENABLE_IF(Is<JstTraversalConcept<TOperator> >, void)
+traverse(TOperator & externalAlg,
          TDelegate & delegate,
          JstTraverser<TContainer, TState, TSpec> & traverser,
-         Tag<TParallelSpec> const & tag)
+         Tag<TParallelSpec> const & parallelTag,
+         False const & noPrefix)
 {
-    while(journalNextBlock(container(traverser), contextSize(traverser), tag))
+    if (contextSize(traverser) == 0)
+        return;
+
+    if (traverser._traversalState == JST_TRAVERSAL_STATE_NULL)
+    {
+        init(traverser);
+    }
+    else
+    {  // We assume, that there was a break and that the traversal continues from the current state.
+        // TODO(rmaerker): Write me!
+//        if (traverser._reinitJST)
+//            _reinitJST();
+        _continueTraversal(traverser, externalAlg, delegate, parallelTag, noPrefix);
+    }
+
+    while(journalNextBlock(container(traverser), contextSize(traverser), parallelTag))
     {
         _reinitBlockEnd(traverser);
-        _execTraversal(traverser, traversalCaller, delegate, False(), tag);
+        _execTraversal(traverser, externalAlg, delegate, parallelTag, noPrefix);
     }
 }
 
+// ----------------------------------------------------------------------------
+// Function traverser()                                      [Prefix Traversal]
+// ----------------------------------------------------------------------------
+
+template <typename TOperator, typename TDelegate, typename TContainer, typename TState, typename TSpec,
+          typename TParallelSpec>
+inline SEQAN_FUNC_ENABLE_IF(Is<JstTraversalConcept<TOperator> >, void)
+traverse(TOperator & externalAlg,
+         TDelegate & delegate,
+         JstTraverser<TContainer, TState, TSpec> & traverser,
+         Tag<TParallelSpec> const & parallelTag,
+         True const & /*prefixOnly*/)
+{
+    typedef JstTraverser<TContainer, TState, TSpec> TJstTraverser;
+    typedef typename Size<TJstTraverser>::Type TSize;
+
+    if (contextSize(traverser) == 0)
+        return;
+
+    if (traverser._traversalState == JST_TRAVERSAL_STATE_NULL)
+    {
+        init(traverser);
+        journalNextBlock(container(traverser), contextSize(traverser), parallelTag);  // Generate the first block.
+        _execTraversal(traverser, externalAlg, delegate, parallelTag, _reinitPrefixEnd<TSize>(traverser));
+        return;
+    }
+    // TODO(rmaerker): Write me!
+//        if (traverser._reinitJST)
+//            _reinitJST();
+    // Continue the traversal from here.
+    _continueTraversal(traverser, externalAlg, delegate, parallelTag, _reinitPrefixEnd<TSize>(traverser));
+}
+
+// Without parallel tag but with prefixState.
+template <typename TOperator, typename TDelegate, typename TContainer, typename TState, typename TSpec,
+          typename TPrefixState>
+inline void
+traverse(TOperator & traversalCaller,
+         TDelegate & delegate,
+         JstTraverser<TContainer, TState, TSpec> & traverser,
+         TPrefixState const & prefixState)
+{
+    traverse(traversalCaller, delegate, traverser, Serial(), prefixState);
+}
+
+template <typename TOperator, typename TDelegate, typename TContainer, typename TState, typename TSpec,
+          typename TParallel>
+inline void
+traverse(TOperator & traversalCaller,
+         TDelegate & delegate,
+         JstTraverser<TContainer, TState, TSpec> & traverser,
+         Tag<TParallel> const & parallelTag)
+{
+    traverse(traversalCaller, delegate, traverser, parallelTag, False());
+}
+
 template <typename TOperator, typename TDelegate, typename TContainer, typename TState, typename TSpec>
-inline
-SEQAN_FUNC_ENABLE_IF(Is<JstTraversalConcept<TOperator> >, void)
+inline void
 traverse(TOperator & traversalCaller,
          TDelegate & delegate,
          JstTraverser<TContainer, TState, TSpec> & traverser)
@@ -2849,37 +2995,37 @@ traverse(TOperator & traversalCaller,
     traverse(traversalCaller, delegate, traverser, Serial());
 }
 
-// ----------------------------------------------------------------------------
-// Function traversePrefix()
-// ----------------------------------------------------------------------------
-
-template <typename TOperator, typename TDelegate, typename TContainer, typename TState, typename TSpec, typename TSize,
-          typename TParallel>
-inline
-SEQAN_FUNC_ENABLE_IF(Is<JstTraversalConcept<TOperator> >, void)
-traversePrefix(TOperator & externalAlg,
-               TDelegate & delegate,
-               JstTraverser<TContainer, TState, TSpec> & traverser,
-               TSize prefixSize,
-               Tag<TParallel> const & parallelTag)
-{
-    typedef typename Size<TContainer>::Type TCSize;
-    if (prefixSize < contextSize(traverser))
-        return;
-//    _reinitInfixEnd(traverser, prefixSize);
-    _execTraversal(traverser, externalAlg, delegate, _reinitPrefixEnd<TCSize>(traverser, prefixSize), parallelTag);
-}
-
-template <typename TOperator, typename TDelegate, typename TContainer, typename TState, typename TSpec, typename TSize>
-inline
-SEQAN_FUNC_ENABLE_IF(Is<JstTraversalConcept<TOperator> >, void)
-traversePrefix(TOperator & externalAlg,
-               TDelegate & delegate,
-               JstTraverser<TContainer, TState, TSpec> & traverser,
-               TSize prefixSize)
-{
-    traversePrefix(externalAlg, delegate, traverser, prefixSize, Serial());
-}
+//// ----------------------------------------------------------------------------
+//// Function traversePrefix()
+//// ----------------------------------------------------------------------------
+//
+//template <typename TOperator, typename TDelegate, typename TContainer, typename TState, typename TSpec, typename TSize,
+//          typename TParallel>
+//inline
+//SEQAN_FUNC_ENABLE_IF(Is<JstTraversalConcept<TOperator> >, void)
+//traversePrefix(TOperator & externalAlg,
+//               TDelegate & delegate,
+//               JstTraverser<TContainer, TState, TSpec> & traverser,
+//               TSize prefixSize,
+//               Tag<TParallel> const & parallelTag)
+//{
+//    typedef typename Size<TContainer>::Type TCSize;
+//    if (prefixSize < contextSize(traverser))
+//        return;
+////    _reinitInfixEnd(traverser, prefixSize);
+//    _execTraversal(traverser, externalAlg, delegate, _reinitPrefixEnd<TCSize>(traverser, prefixSize), parallelTag);
+//}
+//
+//template <typename TOperator, typename TDelegate, typename TContainer, typename TState, typename TSpec, typename TSize>
+//inline
+//SEQAN_FUNC_ENABLE_IF(Is<JstTraversalConcept<TOperator> >, void)
+//traversePrefix(TOperator & externalAlg,
+//               TDelegate & delegate,
+//               JstTraverser<TContainer, TState, TSpec> & traverser,
+//               TSize prefixSize)
+//{
+//    traversePrefix(externalAlg, delegate, traverser, prefixSize, Serial());
+//}
 
 // ----------------------------------------------------------------------------
 // Function setContextSize()
@@ -2902,6 +3048,11 @@ inline void
 setContextSize(JstTraverser<TContainer, TState, TSpec> & traverser,
              TSize const & newWindowSize)
 {
+    if (traverser._contextSize < newWindowSize)
+    {
+        if (traverser._traversalState != JST_TRAVERSAL_STATE_NULL)
+            traverser._reinitJST = true;
+    }
     traverser._contextSize = newWindowSize;
 }
 
@@ -2948,9 +3099,10 @@ contextSize(JstTraverser<TContainer, TState, TSpec> const & traverser)
 template <typename TContainer, typename TState, typename TSpec>
 inline void
 setContainer(JstTraverser<TContainer, TState, TSpec> & traverser,
-             TContainer & container)
+             TContainer & cont)
 {
-    traverser._haystackPtr = &container;
+    traverser._haystackPtr = &cont;
+    setContainer(traverser._mergePointStack, container(cont));
 }
 
 // ----------------------------------------------------------------------------
