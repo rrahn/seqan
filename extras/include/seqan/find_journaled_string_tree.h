@@ -70,7 +70,7 @@
 // Approximate Search.
 // ===========================================================================
 
-#include <seqan/find_journaled_string_tree/find_Extension_myers_ukkonen.h>
+#include <seqan/find_journaled_string_tree/find_extension_myers_ukkonen.h>
 
 
 #endif // EXTRAS_INCLUDE_SEQAN_FIND_JOURNALED_STRING_TREE_
