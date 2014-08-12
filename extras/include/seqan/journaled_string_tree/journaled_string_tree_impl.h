@@ -75,8 +75,9 @@ struct GetStringSet{};
  * to represent the sequences encoded by the the delta map. The sequence information is built on-demand and can
  * be constructed dynamically in blocks.
  *
- * Use the function @link JournaledStringTree#journalNextBlock @endlink to force the creation of the sequence
- * information for the next block. Per default the entire sequence set is build. To build the sequences in blocks
+ * Use the function @link JournaledStringTree#create @endlink and @link JournaledStringTree#createNext @endlink to force
+ * the creation of the sequence information for the next block.
+ * Per default the entire sequence set is build. To build the sequences in blocks
  * over the mapped variants use the function @link JournaledStringTree#setBlockSize @endlink. The block size
  * is the number of variants that should be integrated in the current sequence content.
  * Note that when generating the sequences block-wise, the actual position of each sequence depends only on the
@@ -586,50 +587,103 @@ fullJournalRequired(JournaledStringTree<TDeltaMap, TSpec> const & stringTree)
 }
 
 // ----------------------------------------------------------------------------
-// Function journalNextBlock()
+// Function create()
 // ----------------------------------------------------------------------------
 
 /*!
- * @fn JournaledStringTree#journalNextBlock
+ * @fn JournaledStringTree#create
+ * @headerfile <seqan/journaled_string_tree.h>
+ * @brief Creates the journaled strings or the first block if block-wise construction is enabled.
+ *
+ * @signature bool create(jst, cs[, parallel);
+ *
+ * @param[in,out] jst       The Journal String Tree to create the journaled strings for.
+ * @param[in] cs            The context size.
+ * @param[in] parallel      Tag to specialize parallel construction. One of @link ParallelismTags @endlink.
+ *                          Defaults to @link ParallelismTags#Serial @endlink.
+ *
+ * This function creates either the complete journaled strings if @link JournaledStringTree#fullJournalRequired @endlink
+ * returns <tt>true<\tt> or the first block if block-wise construction is enabled. To generate the following blocks
+ * use the function @link JournaledStringTree#createNext @endlink.
+ *
+ * @see JournaledStringTree#createNext
+ * @see JournaledStringTree#fullJournalRequired
+ * @see JournaledStringTree#setBlockSize
+ */
+
+template <typename TDeltaMap, typename TSize, typename TParallelTag>
+void create(JournaledStringTree<TDeltaMap, StringTreeDefault> & stringTree,
+            TSize contextSize,
+            Tag<TParallelTag> parallelTag)
+{
+    typedef JournaledStringTree<TDeltaMap, StringTreeDefault> TJst;
+
+    if (stringTree._blockSize != TJst::REQUIRE_FULL_JOURNAL)  // Require full creation.
+    {
+        createNext(stringTree, contextSize, parallelTag);
+        return;
+    }
+
+    if (!stringTree._emptyJournal)  // String tree already created.
+        return;
+    reinit(stringTree);
+    _doJournalBlock(stringTree, contextSize, parallelTag);
+    ++stringTree._activeBlock;
+    stringTree._emptyJournal = false;
+}
+
+template <typename TDeltaMap, typename TSize>
+void create(JournaledStringTree<TDeltaMap, StringTreeDefault> const & stringTree,
+            TSize contextSize)
+{
+    create(stringTree, contextSize, Serial());
+}
+
+// ----------------------------------------------------------------------------
+// Function createNext()
+// ----------------------------------------------------------------------------
+
+/*!
+ * @fn JournaledStringTree#createNext
  * @headerfile <seqan/journaled_string_tree.h>
  * @brief Constructs the sequence content for the next block if available.
  *
- * @signature bool journalNextBlock(jst, w[, tag]);
+ * @signature bool createNext(jst, cs[, tag]);
  *
- * @param[in,out] jst   The Journal String Tree.
- * @param[in] w         The size of the context used to stream the Journal String Tree.
+ * @param[in,out] jst   The Journal String Tree to create the journaled strings for.
+ * @param[in] cs        The context size.
  * @param[in] tag       Tag to enable parallel processing. One of @link ParallelismTags @endlink.
  *                      Defaults to @link ParallelismTags#Serial @endlink.
  *
  *
  * @return bool <tt>true</tt> if a new block was generated, <tt>false</tt> otherwise.
+ *
+ * Before calling this function the function @link JournaledStringTree#create @endlink must be called.
+ *
+ * @see JournaledStringTree#create
  */
 
 template <typename TDeltaMap, typename TSize, typename TParallelTag>
-bool journalNextBlock(JournaledStringTree<TDeltaMap, StringTreeDefault> & stringTree,
-                      TSize contextSize,
-                      Tag<TParallelTag> tag)
+bool createNext(JournaledStringTree<TDeltaMap, StringTreeDefault> const & stringTree,
+                TSize contextSize,
+                Tag<TParallelTag> tag)
 {
     typedef JournaledStringTree<TDeltaMap, StringTreeDefault> TJst;
 
-    bool res = false;
-    if (stringTree._blockSize == TJst::REQUIRE_FULL_JOURNAL && stringTree._emptyJournal)
-    {
-        res = _doJournalBlock(stringTree, contextSize, tag);
-        stringTree._emptyJournal = false;
-    }
-    else if (stringTree._blockSize != TJst::REQUIRE_FULL_JOURNAL)
-        res = _doJournalBlock(stringTree, contextSize, tag);
+    if (stringTree._blockSize == TJst::REQUIRE_FULL_JOURNAL)
+        return false;
 
+    bool res = _doJournalBlock(stringTree, contextSize, tag);
+    stringTree._emptyJournal = false;
     ++stringTree._activeBlock;
     return res;
 }
 
 template <typename TDeltaMap, typename TSpec, typename TSize>
-bool journalNextBlock(JournaledStringTree<TDeltaMap, TSpec> & stringTree,
-                      TSize contextSize)
+bool createNext(JournaledStringTree<TDeltaMap, TSpec> & stringTree,
+                TSize contextSize)
 {
-    return journalNextBlock(stringTree, contextSize, Serial());
+    return createNext(stringTree, contextSize, Serial());
 }
 
 // ----------------------------------------------------------------------------
@@ -680,8 +734,8 @@ reinit(JournaledStringTree<TDeltaMap, TSpec> & jst)
  * @param[in] host       The reference sequence.
  * @param[in] delta      The object containing the delta information.
  *
- * This function does not construct the sequences. Use the function @link JournaledStringTree#journalNextBlock @endlink
- * to dynamically generate the sequences on-demand.
+ * This function does not construct the sequences. Use the function @link JournaledStringTree#create @endlink and
+ * @link JournaledStringTree#createNext @endlink to dynamically generate the sequences on-demand.
  */
 
 template <typename TDeltaMap, typename TSpec, typename THost>
@@ -826,6 +880,227 @@ inline typename GetStringSet<JournaledStringTree<TDeltaMap, TSpec> const>::Type 
 stringSet(JournaledStringTree<TDeltaMap, TSpec> const & stringTree)
 {
     return stringTree._journalSet;
+}
+
+// ----------------------------------------------------------------------------
+// Function open()
+// ----------------------------------------------------------------------------
+
+/*!
+ * @fn JournaledStringTree#open
+ * @headerfile <seqan/journaled_string_tree.h>
+ * @brief Opens the journaled string tree from a gdf file.
+ *
+ * @signature int load(jst, filename[, refId, refFilename][, seqIds]);
+ *
+ * @param[in,out] jst The journaled string tree to be loaded.
+ * @param[in] filename The name of the file used to load the data from.
+ * @param[out] refId Stores the id of the reference.
+ * @param[out] refFilename Stores the file name of the reference.
+ * @param[out] seqIds Stores the ids of the covered sequences.
+ *
+ * @return int <tt>0<\tt> on success, otherwise some value distinct from <tt>0<\tt> indicating the error.
+ *
+ * @see JournaledStringTree#save
+ */
+
+template <typename TDeltaMap, typename TSpec, typename TFilename>
+inline int open(JournaledStringTree<TDeltaMap, TSpec> & jst,
+                TFilename const & filename,
+                CharString & refId,
+                CharString & refFileName,
+                String<CharString> & nameStore)
+{
+    typedef JournaledStringTree<TDeltaMap, TSpec> TJst;
+    typedef typename Host<TJst>::Type THost;
+
+    GdfHeader<> gdfHeader;
+    gdfHeader._nameStorePtr = &nameStore;  // Check if this works.
+
+    std::ifstream inputFile;
+    inputFile.open(toCString(filename), std::ios_base::in | std::ios_base::binary);
+    if (!inputFile.good())
+    {
+        std::cerr << "Cannot open file <" << filename << "> for reading!" << std::endl;
+        return inputFile.rdstate();
+    }
+    int res = read(container(jst), gdfHeader, inputFile, Gdf());
+    if (res != 0)
+    {
+        std::cerr << "An error occurred while reading <" << filename << ">!" << std::endl;
+        return res;
+    }
+    inputFile.close();
+
+    // Read the reference file.
+    refId = gdfHeader._refInfos._refId;
+    refFileName = gdfHeader._refInfos._refFile;
+
+    std::ifstream refFile;
+    refFile.open(toCString(refFileName), std::ios_base::in);
+    if (!refFile.good())
+    {
+        std::cerr << "Cannot open file <" << refFileName << "> for reading!" << std::endl;
+        return refFile.rdstate();
+    }
+    THost tmpHost = "";
+    createHost(stringSet(jst), tmpHost);
+    RecordReader<std::ifstream, SinglePass<> > reader(refFile);
+    res = readRecord(refId, host(jst), reader, Fasta());
+    refFile.close();
+    if (res != 0)
+        std::cerr << "An error occurred while reading <" << refFileName << ">!" << std::endl;
+
+    // Initialize the journaled string tree.
+    resize(stringSet(jst), coverageSize(container(jst)), host(stringSet(jst)), Exact());
+    resize(jst._blockVPOffset, length(stringSet(jst)), 0, Exact());
+    resize(jst._activeBlockVPOffset, length(stringSet(jst)), 0, Exact());
+
+    jst._mapBlockBegin = jst._mapBlockEnd = begin(container(jst), Standard());
+
+    return res;
+}
+
+template <typename TDeltaMap, typename TSpec, typename TFilename>
+inline int open(JournaledStringTree<TDeltaMap, TSpec> & jst,
+                TFilename const & filename,
+                CharString & refId,
+                CharString & refFileName)
+{
+    String<CharString> nameStore;
+    return open(jst, filename, refId, refFileName, nameStore);
+}
+
+template <typename TDeltaMap, typename TSpec, typename TFilename>
+inline int open(JournaledStringTree<TDeltaMap, TSpec> & jst,
+                TFilename const & filename,
+                String<CharString> & nameStore)
+{
+    CharString refId;
+    CharString refFileName;
+    return open(jst, filename, refId, refFileName, nameStore);
+}
+
+
+template <typename TDeltaMap, typename TSpec, typename TFilename>
+inline int open(JournaledStringTree<TDeltaMap, TSpec> & jst,
+                TFilename const & filename)
+{
+    CharString refId;
+    CharString refFileName;
+    return open(jst, filename, refId, refFileName);
+}
+
+// ----------------------------------------------------------------------------
+// Function save()
+// ----------------------------------------------------------------------------
+
+/*!
+ * @fn JournaledStringTree#save
+ * @headerfile <seqan/journaled_string_tree.h>
+ * @brief Saves the journaled string tree at the given location in gdf format.
+ *
+ * @signature int save(jst, filename[, refId, refFilename][, seqIds]);
+ *
+ * @param[in] jst The journaled string tree to be saved.
+ * @param[out] filename The name of the file used to save the journaled string tree.
+ * @param[in] refId Id of the reference sequence.
+ * @param[in] refFilename File name of the reference.
+ * @param[in] seqIds Ids of the sequences covered by the jst.
+ *
+ * Stores the journaled string tree in gdf format at the specified file location. Please note,
+ * that <tt>refId<\tt> and <tt>refFilename<\tt>, as well as <tt>seqIds<\tt> are optional parameters.
+ * If they are empty, some default values are used instead. If the information regarding the reference are empty,
+ * then the reference file is automatically stored in fasta format at <tt><filename.reference.fa><\tt>.
+ *
+ * @return int <tt>0<\tt> on success, otherwise some value distinct from <tt>0<\tt> indicating the error.
+ *
+ * @see JournaledStringTree#save
+ */
+
+template <typename TDeltaMap, typename TSpec, typename TFilename>
+inline int save(JournaledStringTree<TDeltaMap, TSpec> const & jst,
+                TFilename const & filename,
+                CharString const & refId,
+                CharString const & refFileName,
+                String<CharString> const & nameStore)
+{
+    typedef typename DeltaValue<TDeltaMap, DeltaType::DELTA_TYPE_SNP>::Type TSnpType;
+
+    GdfHeader<> gdfHeader;
+    gdfHeader._refInfos._refId = refId;
+    // Write reference if unknown.
+    if (empty(refFileName))
+    {
+        gdfHeader._refInfos._refFile = filename;
+        append(gdfHeader._refInfos._refFile, ".reference.fa");
+        std::ofstream refStream;
+        refStream.open(toCString(gdfHeader._refInfos._refFile), std::ios_base::out);
+        if (!refStream.good())
+        {
+            std::cerr << "Cannot open file <" << gdfHeader._refInfos._refFile << "> for writing!" << std::endl;
+            return refStream.rdstate();
+        }
+        writeRecord(refStream, gdfHeader._refInfos._refId, host(jst), Fasta());
+        refStream.close();
+    }
+    gdfHeader._refInfos._refHash = 0;  // TODO(rmaerker): Compute hash for reference.
+
+    // Enable snp compression if at most 2 bits are needed to store the value.
+    if (BitsPerValue<TSnpType>::VALUE <= 2)
+        gdfHeader._fileInfos._snpCompression = true;
+    else
+        gdfHeader._fileInfos._snpCompression = false;
+
+    // We know that we don't change the names.
+    gdfHeader._nameStorePtr = const_cast<String<CharString>*>(&nameStore);
+
+    std::ofstream fileStream;
+    fileStream.open(toCString(filename), std::ios_base::out | std::ios_base::binary);
+
+    if (!fileStream.good())
+    {
+        std::cerr << "Cannot open file <" << filename << "> for writing!" << std::endl;
+        return fileStream.rdstate();
+    }
+    int res = write(fileStream, container(jst), gdfHeader, Gdf());
+    fileStream.close();
+
+    if (res != 0)
+        std::cerr << "An error occurred while writing!" << std::endl;
+    return res;
+}
+
+template <typename TDeltaMap, typename TSpec, typename TFilename>
+inline int save(JournaledStringTree<TDeltaMap, TSpec> const & jst,
+                TFilename const & filename,
+                String<CharString> & nameStore)
+{
+    return save(jst, filename, "NA", "", nameStore);
+}
+
+template <typename TDeltaMap, typename TSpec, typename TFilename>
+inline int save(JournaledStringTree<TDeltaMap, TSpec> const & jst,
+                TFilename const & filename,
+                CharString const & refId,
+                CharString const & refFileName)
+{
+    String<CharString> emptyIds;
+    // Default naming of sequences.
+    for (unsigned i = 0; i < coverageSize(container(jst)); ++i)
+    {
+        std::stringstream tmp;
+        tmp << "seq" << i;
+        appendValue(emptyIds, tmp.str());
+    }
+    return save(jst, filename, refId, refFileName, emptyIds);
+}
+
+template <typename TDeltaMap, typename TSpec, typename TFilename>
+inline int save(JournaledStringTree<TDeltaMap, TSpec> const & jst,
+                TFilename const & filename)
+{
+    return save(jst, filename, "NA", "");
 }
 
 }

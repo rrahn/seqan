@@ -351,7 +351,7 @@ void _testJournaledStringTreeJournalNextBlock(TJst & jst)
     _createJournalString(set, jst, 0, length(container(jst)));
 
     {  // Journal full block
-        journalNextBlock(jst, 5, Serial());
+        create(jst, 5, Serial());
 
         TString test0 = stringSet(jst)[0];
         TString test1 = stringSet(jst)[1];
@@ -367,9 +367,7 @@ void _testJournaledStringTreeJournalNextBlock(TJst & jst)
     {  // Journal in blocks
         setBlockSize(jst, 3);
         reinit(jst);
-        SEQAN_ASSERT_EQ(journalNextBlock(jst, 5, Serial()), true);
-
-
+        create(jst, 5, Serial());
 
 //                 01234567890123  4567890123
         set[0] = "CACGTGGATCTGTAAAATGACGGACGGACTTGACGGGAGTACGAGCATCGACT";
@@ -385,7 +383,7 @@ void _testJournaledStringTreeJournalNextBlock(TJst & jst)
         SEQAN_ASSERT_EQ(stringSet(jst)[2], set[2]);
         SEQAN_ASSERT_EQ(stringSet(jst)[3], set[3]);
 
-        SEQAN_ASSERT_EQ(journalNextBlock(jst, 5, Serial()), true);
+        SEQAN_ASSERT_EQ(createNext(jst, 5, Serial()), true);
 
 //                  012345678901234567890123
 //        set[X] = "ACGTGGATCTGTACTGACGGACGGACTTGACGGGAGTACGAGCATCGACT";
@@ -403,7 +401,7 @@ void _testJournaledStringTreeJournalNextBlock(TJst & jst)
         SEQAN_ASSERT_EQ(stringSet(jst)[2], set[2]);
         SEQAN_ASSERT_EQ(stringSet(jst)[3], set[3]);
 
-        SEQAN_ASSERT_EQ(journalNextBlock(jst, 5, Serial()), true);
+        SEQAN_ASSERT_EQ(createNext(jst, 5, Serial()), true);
 
 //                012345678901234567890123
         set[0] = "ACGTGGATCTGTACTGACGGACGGACTTGACGGGAGTACGAGCATCGACT";
@@ -419,7 +417,7 @@ void _testJournaledStringTreeJournalNextBlock(TJst & jst)
         SEQAN_ASSERT_EQ(stringSet(jst)[2], set[2]);
         SEQAN_ASSERT_EQ(stringSet(jst)[3], set[3]);
 
-        SEQAN_ASSERT_EQ(journalNextBlock(jst, 5, Serial()), false);
+        SEQAN_ASSERT_EQ(createNext(jst, 5, Serial()), false);
     }
 
 }
@@ -490,7 +488,7 @@ SEQAN_DEFINE_TEST(test_journaled_string_tree_reinit)
     _testDetlaMapfill(deltaMap);
 
     init(jst, hostSeq, deltaMap);
-    journalNextBlock(jst, 5, Serial());
+    create(jst, 5, Serial());
 
     TJournalSet journalSet = stringSet(jst);
 
@@ -562,7 +560,7 @@ SEQAN_DEFINE_TEST(test_journaled_string_tree_virtual_block_position)
     deltaMap._deltaCoverageStore[7][3] = true;
 
     setBlockSize(jst, 3);
-    journalNextBlock(jst, 5, Serial());
+    create(jst, 5, Serial());
 
     SEQAN_ASSERT_EQ(jst._blockSize, 3u);
     SEQAN_ASSERT_EQ(jst._numBlocks, 3u);
@@ -581,7 +579,7 @@ SEQAN_DEFINE_TEST(test_journaled_string_tree_virtual_block_position)
     SEQAN_ASSERT_EQ(jst._activeBlockVPOffset[3], 3);
     SEQAN_ASSERT_EQ(virtualBlockOffset(jst, 3), 0);
 
-    journalNextBlock(jst, 5, Serial());
+    createNext(jst, 5, Serial());
 
     SEQAN_ASSERT_EQ(jst._blockSize, 3u);
     SEQAN_ASSERT_EQ(jst._numBlocks, 3u);
@@ -600,7 +598,7 @@ SEQAN_DEFINE_TEST(test_journaled_string_tree_virtual_block_position)
     SEQAN_ASSERT_EQ(jst._activeBlockVPOffset[3], -2);
     SEQAN_ASSERT_EQ(virtualBlockOffset(jst, 3), 3);
 
-    journalNextBlock(jst, 5, Serial());
+    createNext(jst, 5, Serial());
 
     SEQAN_ASSERT_EQ(jst._blockSize, 3u);
     SEQAN_ASSERT_EQ(jst._numBlocks, 3u);
@@ -618,6 +616,75 @@ SEQAN_DEFINE_TEST(test_journaled_string_tree_virtual_block_position)
     SEQAN_ASSERT_EQ(jst._blockVPOffset[3], 1);
     SEQAN_ASSERT_EQ(jst._activeBlockVPOffset[3], 4);
     SEQAN_ASSERT_EQ(virtualBlockOffset(jst, 3), 1);
+}
+
+SEQAN_DEFINE_TEST(test_journaled_string_tree_save_open)
+{
+    typedef DeltaMap<unsigned, Dna> TDeltaMap;
+    typedef JournaledStringTree<TDeltaMap> TJst;
+
+    String<Dna> hostSeq = "ACGTGGATCTGTACTGACGGACGGACTTGACGGGAGTACGAGCATCGACT";
+    TDeltaMap deltaMap;
+    _testDetlaMapfill(deltaMap);
+    setCoverageSize(deltaMap, 4);
+    deltaMap._deltaCoverageStore[0][0] = true;
+    deltaMap._deltaCoverageStore[0][1] = true;
+    deltaMap._deltaCoverageStore[0][2] = false;
+    deltaMap._deltaCoverageStore[0][3] = true;
+
+    deltaMap._deltaCoverageStore[1][0] = false;
+    deltaMap._deltaCoverageStore[1][1] = false;
+    deltaMap._deltaCoverageStore[1][2] = true;
+    deltaMap._deltaCoverageStore[1][3] = false;
+
+    deltaMap._deltaCoverageStore[2][0] = true;
+    deltaMap._deltaCoverageStore[2][1] = false;
+    deltaMap._deltaCoverageStore[2][2] = false;
+    deltaMap._deltaCoverageStore[2][3] = true;
+
+    deltaMap._deltaCoverageStore[3][0] = false;
+    deltaMap._deltaCoverageStore[3][1] = true;
+    deltaMap._deltaCoverageStore[3][2] = true;
+    deltaMap._deltaCoverageStore[3][3] = true;
+
+    deltaMap._deltaCoverageStore[4][0] = true;
+    deltaMap._deltaCoverageStore[4][1] = false;
+    deltaMap._deltaCoverageStore[4][2] = false;
+    deltaMap._deltaCoverageStore[4][3] = false;
+
+    deltaMap._deltaCoverageStore[5][0] = false;
+    deltaMap._deltaCoverageStore[5][1] = false;
+    deltaMap._deltaCoverageStore[5][2] = true;
+    deltaMap._deltaCoverageStore[5][3] = false;
+
+    deltaMap._deltaCoverageStore[6][0] = false;
+    deltaMap._deltaCoverageStore[6][1] = true;
+    deltaMap._deltaCoverageStore[6][2] = false;
+    deltaMap._deltaCoverageStore[6][3] = true;
+
+    deltaMap._deltaCoverageStore[7][0] = false;
+    deltaMap._deltaCoverageStore[7][1] = true;
+    deltaMap._deltaCoverageStore[7][2] = false;
+    deltaMap._deltaCoverageStore[7][3] = true;
+
+    TJst jst(hostSeq, deltaMap);
+
+    CharString filePath = SEQAN_PATH_TO_ROOT();
+    append(filePath, "/extras/tests/journaled_string_tree/goldGDF.gdf");
+
+    SEQAN_ASSERT_EQ(save(jst, filePath), 0);
+
+    CharString refId;
+    CharString refFilename;
+    String<CharString> seqIds;
+
+    JournaledStringTree<TDeltaMap> jstLoaded;
+    SEQAN_ASSERT_EQ(open(jstLoaded, filePath, refId, refFilename, seqIds), 0);
+
+    CharString testRefFilename = filePath;
+    append(testRefFilename, ".reference.fa");
+    SEQAN_ASSERT_EQ(refFilename, testRefFilename);
+    _testJournaledStringTreeJournalNextBlock(jst);
 }
 
 #endif // EXTRAS_TESTS_JOURNALED_STRING_TREE_TEST_JOURNALED_STRING_TREE_H_
