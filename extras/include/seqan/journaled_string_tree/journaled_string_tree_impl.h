@@ -419,7 +419,7 @@ _doJournalBlock(JournaledStringTree<TDeltaMap, TSpec> & jst,
     SEQAN_OMP_PRAGMA(parallel for)
     for (unsigned jobId = 0; jobId < length(jSetSplitter); ++jobId)
     {
-//        printf("Thread: %i of %i\n", jobId, omp_get_num_threads());
+        // printf("Thread: %i of %i\n", jobId, omp_get_num_threads());
         unsigned jobBegin = jSetSplitter[jobId] - begin(jst._journalSet, Standard());
         unsigned jobEnd = jSetSplitter[jobId + 1] - begin(jst._journalSet, Standard());
 
@@ -433,14 +433,14 @@ _doJournalBlock(JournaledStringTree<TDeltaMap, TSpec> & jst,
                 jst._blockVPOffset[count] += jst._activeBlockVPOffset[count];
             }
         }
-//        printf("Thread %i: jobBegin %i - jobEnd %i\n", jobId, jobBegin, jobEnd);
+        // printf("Thread %i: jobBegin %i - jobEnd %i\n", jobId, jobBegin, jobEnd);
         for (TConstMapIterator itMap = jst._mapBlockBegin; itMap != jst._mapBlockEnd; ++itMap)
         {
-//            std::cerr << "Run " << itMap - itMapBegin << " at position " <<  *itMap << " ################################################" << std::endl;
+            // std::cerr << "Run " << itMap - itMapBegin << " at position " <<  *itMap << " ################################################" << std::endl;
             TBitVecIter itVecBegin = begin(deltaCoverage(itMap), Standard());
             TBitVecIter itVec = itVecBegin + jobBegin;
             TBitVecIter itVecEnd = begin(deltaCoverage(itMap), Standard()) + jobEnd;
-//            std::cerr << "Item "; _printDeltaType(itMap); std::cerr<< ": ";
+            // std::cerr << "Item "; _printDeltaType(itMap); std::cerr<< ": ";
             for (;itVec != itVecEnd; ++itVec)
             {
                 SEQAN_ASSERT_NOT(empty(host(jst._journalSet[itVec - itVecBegin])));
@@ -448,13 +448,13 @@ _doJournalBlock(JournaledStringTree<TDeltaMap, TSpec> & jst,
                 if (!(*itVec))
                     continue;
 
-//                std::cerr << itVec - itVecBegin << "; ";
+                // std::cerr << itVec - itVecBegin << "; ";
                 // Store last visited node for current journaled string.
                 if (!fullJournalRequired(jst))
                     _lastVisitedNodes[itVec - itVecBegin] = itMap - itMapBegin;
                 _journalNextVariant(jst._journalSet[itVec - itVecBegin], itMap);
             }
-//            std::cerr << std::endl;
+            // std::cerr << std::endl;
         }
         // Post-processing: Store VPs for current block.
         if (!fullJournalRequired(jst))
@@ -633,7 +633,7 @@ void create(JournaledStringTree<TDeltaMap, StringTreeDefault> & stringTree,
 }
 
 template <typename TDeltaMap, typename TSize>
-void create(JournaledStringTree<TDeltaMap, StringTreeDefault> const & stringTree,
+void create(JournaledStringTree<TDeltaMap, StringTreeDefault> & stringTree,
             TSize contextSize)
 {
     create(stringTree, contextSize, Serial());
@@ -664,7 +664,7 @@ void create(JournaledStringTree<TDeltaMap, StringTreeDefault> const & stringTree
  */
 
 template <typename TDeltaMap, typename TSize, typename TParallelTag>
-bool createNext(JournaledStringTree<TDeltaMap, StringTreeDefault> const & stringTree,
+bool createNext(JournaledStringTree<TDeltaMap, StringTreeDefault> & stringTree,
                 TSize contextSize,
                 Tag<TParallelTag> tag)
 {
