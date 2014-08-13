@@ -67,9 +67,9 @@ typedef Tag<ReadVariantInformationAndJournalData_> WithLoadingJournalData;
 // Function readJSeqFile()
 // ----------------------------------------------------------------------------
 
-template <typename TValue, typename TAlphabet, typename TSpec, typename TFileLocation>
+template <typename TValue, typename TAlphabet, typename TSpec, typename TConfig, typename TFileLocation>
 inline int readJSeqFile(DeltaMap<TValue, TAlphabet, TSpec> & deltaMap,
-                        JSeqHeader & jseqHeader,
+                        GdfHeader<TConfig> & gdfHeader,
                         CharString const & refId,
                         TFileLocation const & filePath)
 {
@@ -81,13 +81,14 @@ inline int readJSeqFile(DeltaMap<TValue, TAlphabet, TSpec> & deltaMap,
         return JSeqTools::FILE_READ_ERROR;
     }
 
-    RecordReader<std::ifstream, SinglePass<> > reader(inputStream);
+//    RecordReader<std::ifstream, SinglePass<> > reader(inputStream);
 
-    read(deltaMap, jseqHeader, reader, JSeq());
+    read(deltaMap, gdfHeader, inputStream, Gdf());
 
+    inputStream.close();
     // Simple reference checking:
-    if (jseqHeader._refInfos._refId != refId)
-        return JSeqIO::UNSUPPORTED_REFERNCE_INFORMATION_ERROR;  // TODO(rmaerker): Change the name of this error message.
+    if (gdfHeader._refInfos._refId != refId)
+        return GdfIO::UNSUPPORTED_REFERNCE_INFORMATION_ERROR;  // TODO(rmaerker): Change the name of this error message.
 
     return JSeqTools::FILE_READ_OK;
 }

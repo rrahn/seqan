@@ -53,10 +53,10 @@
 #include <seqan/journaled_string_tree.h>
 #include <seqan/find_journaled_string_tree.h>
 
-#include "../gdf_tools/gdf_io_base.h"
-#include "../gdf_tools/gdf_io_header.h"
-#include "../gdf_tools/gdf_io_read.h"
-#include "../gdf_tools/gdf_io_write.h"
+//#include "../gdf_tools/gdf_io_base.h"
+//#include "../gdf_tools/gdf_io_header.h"
+//#include "../gdf_tools/gdf_io_read.h"
+//#include "../gdf_tools/gdf_io_write.h"
 
 #include "jst_bench_options.h"
 #include "jst_bench_base.h"

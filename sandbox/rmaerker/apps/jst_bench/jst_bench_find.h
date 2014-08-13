@@ -1028,10 +1028,10 @@ int _findPattern(FindOptions const & findOptions,
     // Read delta file.
 
     double timeReadDelta = sysTime();
-    JSeqHeader jseqHeader;
+    GdfHeader<> gdfHeader;
 
     TDeltaMap deltaMap;
-    readJSeqFile(deltaMap, jseqHeader, refId, findOptions.jseqFile);
+    readJSeqFile(deltaMap, gdfHeader, refId, findOptions.jseqFile);
 
     TStringTree stringTree(ref, deltaMap);
     if (findOptions.chunkSize != -1)
