@@ -717,6 +717,7 @@ template <typename TDeltaMap, typename TStringTreeSpec, typename TNeedle, typena
 int _findPatternOnline(JournaledStringTree<TDeltaMap, TStringTreeSpec> & stringTree,
                        TNeedle const & needle,
                        FindOptions const & findOptions,
+                       ResultWriter_ & writer,
                        TSearchSpec const & /*searchSpec*/)
 {
     typedef JournaledStringTree<TDeltaMap, TStringTreeSpec> TStringTree;
@@ -726,6 +727,8 @@ int _findPatternOnline(JournaledStringTree<TDeltaMap, TStringTreeSpec> & stringT
     // Now we can process only blocks of variants.
     double timeBlockAll = sysTime();
     HitCollector hitCollector(length(stringSet(stringTree)));
+
+    reinit(stringTree);
 
     TPattern pattern;
     setHost(pattern, needle);
@@ -741,13 +744,11 @@ int _findPatternOnline(JournaledStringTree<TDeltaMap, TStringTreeSpec> & stringT
     // Dump matches.
 
     CharString patternId = "Pattern";
-    ResultWriter_ writer(findOptions.outputFile);
     if (!writer.writeFormatted(patternId, needle, hitCollector.hitPositionSet))
     {
         std::cerr << "Cannot read output file <" << findOptions.outputFile<< ">!" << std::endl;
         return JSeqTools::FILE_READ_ERROR; // TODO(rmaerker): Change to throw Exception.
     }
-
 
     return 0;
 
@@ -1056,8 +1057,12 @@ int _findPattern(FindOptions const & findOptions,
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Select the search method.
-
-    _findPatternOnline(stringTree, readStore[0], findOptions, TMethod());
+    ResultWriter_ writer(findOptions.outputFile);
+    for (unsigned readId = 0; readId < length(readStore); ++readId)
+    {
+        std::cout << "## Search read " << readId << ":" << std::endl;
+        _findPatternOnline(stringTree, readStore[readId], findOptions, writer, TMethod());
+    }
     std::cout << "Total time: " << sysTime() - totalTime << "s." << std::endl;
     return 0;
 
