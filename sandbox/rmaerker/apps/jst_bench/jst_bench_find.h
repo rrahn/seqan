@@ -1028,7 +1028,10 @@ int _findPattern(FindOptions const & findOptions,
     // Read delta file.
 
     double timeReadDelta = sysTime();
+
+    String<CharString> nameStore;
     GdfHeader<> gdfHeader;
+    gdfHeader._nameStorePtr = &nameStore;
 
     TDeltaMap deltaMap;
     readJSeqFile(deltaMap, gdfHeader, refId, findOptions.jseqFile);
