@@ -45,7 +45,7 @@
 #include "test_find_journaled_string_tree_horspool.h"
 #include "test_find_journaled_string_tree_shift_and.h"
 #include "test_find_journaled_string_tree_shift_or.h"
-#include "test_find_journaled_string_tree_myers.h"
+//#include "test_find_journaled_string_tree_myers.h"
 
 SEQAN_BEGIN_TESTSUITE(find_journaled_string_tree)
 {
@@ -97,6 +97,7 @@ SEQAN_BEGIN_TESTSUITE(find_journaled_string_tree)
     SEQAN_CALL_TEST(test_find_journaled_string_tree_del_occ_shift_or_block);
     SEQAN_CALL_TEST(test_find_journaled_string_tree_fuzzy_occ_shift_or_block);
 
+/* Currently disabled.
     SEQAN_CALL_TEST(test_find_journaled_string_tree_ref_occ_myers_ukkonen_infix_0_errors);
     SEQAN_CALL_TEST(test_find_journaled_string_tree_ref_occ_myers_ukkonen_infix_3_errors);
     SEQAN_CALL_TEST(test_find_journaled_string_tree_snp_occ_myers_ukkonen_infix_0_errors);
@@ -118,5 +119,6 @@ SEQAN_BEGIN_TESTSUITE(find_journaled_string_tree)
     SEQAN_CALL_TEST(test_find_journaled_string_tree_del_occ_myers_ukkonen_infix_3_errors_block);
     SEQAN_CALL_TEST(test_find_journaled_string_tree_fuzzy_occ_myers_ukkonen_infix_0_errors_block);
     SEQAN_CALL_TEST(test_find_journaled_string_tree_fuzzy_occ_myers_ukkonen_infix_3_errors_block);
+*/
 }
 SEQAN_END_TESTSUITE
