@@ -84,10 +84,10 @@ readAdaptOptions(ConverterOptions & options, ArgumentParser const & parser)
     else
         options.numIndividuals = -1;
 
-    if (isSet(parser, "genotype"))
-        options.readGenotype = true;
-    else  // Read haplotype information.
-    {
+//    if (isSet(parser, "genotype"))
+//        options.readGenotype = true;
+//    else  // Read haplotype information.
+//    {
         std::stringstream tmpStr;
         String<std::string> tmpOptions = getOptionValues(parser, "haplotype");
         resize(options.haplotypes, length(tmpOptions), Exact());
@@ -100,7 +100,7 @@ readAdaptOptions(ConverterOptions & options, ArgumentParser const & parser)
             tmpStr >> options.haplotypes[i];
         }
         std::sort(begin(options.haplotypes, Standard()), end(options.haplotypes, Standard()));
-    }
+//    }
 
 //    if (isSet(parser, "include-reference"))
 //        options.includeReference = true;
@@ -142,8 +142,8 @@ _setupAndParseArguments(ConverterOptions & options,
     ArgumentParser parser("gdf_converter");
     // Set short description, version, and date.
     setShortDescription(parser, "GDF-Converter for sequence alignments.");
-    setVersion(parser, "0.1");
-    setDate(parser, "April 2014");
+    setVersion(parser, "0.2.0");
+    setDate(parser, "Oct 2015");
 
     // Define usage line and long description.
     addUsageLine(parser," \"[\\fIOPTIONS\\fP] \\fIGDF-FILE\\fP\" ");
@@ -185,14 +185,17 @@ _setupAndParseArguments(ConverterOptions & options,
     addOption(parser, ArgParseOption("n", "firstn", "If specified only the first \"n\" sequences are converted. Takes all individuals per default (-1)", ArgParseArgument::INTEGER));
     setDefaultValue(parser, "n", "-1");
 
-    addOption(parser, ArgParseOption("", "genotype", "Generates genotype by merging the haplotypes into a single sequence. Note, this option will overwrite the option \"haplotype\" if set."));
+//    addOption(parser, ArgParseOption("", "genotype", "Generates genotype by merging the haplotypes into a single sequence. Note, this option will overwrite the option \"haplotype\" if set."));
 
 //    addOption(parser, ArgParseOption("", "suppress-sv", "Suppresses conversion of structural variants."));
 
-    addSection(parser, "Selftest");
+    // Hidden section for selftest.
+//    addSection(parser, "Selftest");
     addOption(parser, ArgParseOption("", "selftest", "Enables selftest mode."));
+    hideOption(parser, "selftest");
     addOption(parser, ArgParseOption("cf", "compare-file", "File containing the fasta sequences constructed from the vcf.", ArgParseArgument::INPUTFILE));
     setValidValues(parser, "cf", "fa fasta");
+    hideOption(parser, "compare-file");
 
     // Add Examples Section.
 //    addTextSection(parser, "Examples");
