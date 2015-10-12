@@ -327,41 +327,41 @@ _decodeBitVector(String<bool, Packed<THostSpec> > & target,
     TSourceIterator srcIt = begin(source, Standard());
     TSourceIterator srcItEnd = end(source, Standard());
 
+    if (srcIt == srcItEnd)
+        return;
+
     TConstPackedHostIterator it = begin(host(target), Standard()) + 1;
-
-    bool beginWithBit = false;
     TPosition blockSize = *srcIt;  // First value corresponds to leading zero count.
-
-    while (srcIt != srcItEnd)
-    {
-        // Skip all completely filled blocks of either '0's or '1's.
-        TPosition skipFullWords = blockSize / BitsPerValue<TBitVector>::VALUE;
-        blockSize -= BitsPerValue<TBitVector>::VALUE * skipFullWords;
-        if (beginWithBit)
-            for (unsigned i = 0; i < skipFullWords; ++i, ++it)
-                it->i = ~static_cast<TBitVector>(0);
-        else
-            it += skipFullWords;
 
         TPosition remainingBits = BitsPerValue<TBitVector>::VALUE;
         while (true)  // Process the current word.
         {
             if (remainingBits <= blockSize)  // Stop processing current word.
             {
+                it->i &= (~static_cast<TBitVector>(0)) << remainingBits;  // Fill remainingBits with 0s
+                ++it;
                 blockSize -= remainingBits;
-                beginWithBit = (blockSize == 0) ? true : false;  // Handle case when remainingBits == blockSize.
-                break;
+                TPosition skipFullWords = blockSize / BitsPerValue<TBitVector>::VALUE;
+                blockSize -= BitsPerValue<TBitVector>::VALUE * skipFullWords;
+                it += skipFullWords;
+                remainingBits = BitsPerValue<TBitVector>::VALUE;
             }
-
+            // Update current word.
             it->i |= (~static_cast<TBitVector>(0)) >> ((BitsPerValue<TBitVector>::VALUE - remainingBits) + blockSize);  // Skip remaining zeros at the beginning of the current word.
             remainingBits -= blockSize;
             blockSize = *(++srcIt);  // Extract number of ones.
 
-            if (remainingBits <= blockSize)
+            if (remainingBits <= blockSize)  // The word is full and we need to continue with next word.
             {
+                it->i |= (~static_cast<TBitVector>(0)) >> (BitsPerValue<TBitVector>::VALUE - remainingBits);  // Fill last raminingBits with ones.
+                ++it;
+                // We have to fill up the remaining bits with ones here.
                 blockSize -= remainingBits;
-                beginWithBit = (blockSize == 0) ? false : true;  // Handle case when remainingBits == blockSize.
-                break;
+                TPosition skipFullWords = blockSize / BitsPerValue<TBitVector>::VALUE;
+                blockSize -= BitsPerValue<TBitVector>::VALUE * skipFullWords;
+                while (skipFullWords-- != 0)  // Fill the words with ones.
+                    (it++)->i = ~static_cast<TBitVector>(0);
+                remainingBits = BitsPerValue<TBitVector>::VALUE;
             }
 
             remainingBits -= blockSize;
@@ -370,11 +370,6 @@ _decodeBitVector(String<bool, Packed<THostSpec> > & target,
                 break;
             blockSize = *srcIt;  // Extract number of zeros.
         }
-        ++it;  // Move to next word in bit vector.
-        if (!remainingBits)
-            if(++srcIt != srcItEnd)  // Check special end condition.
-                blockSize = *srcIt;
-    }
 }
 
 // ----------------------------------------------------------------------------

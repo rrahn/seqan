@@ -916,7 +916,8 @@ inline void open(JournaledStringTree<TDeltaMap, TSpec> & jst,
     typedef typename GetStringSet<TJst>::Type TStringSet;
     typedef typename Value<TStringSet>::Type TJString;
 
-    GdfFileConfiguration<TSnp> config(0u);
+    GdfFileConfiguration<TSnp> config;
+    setCoverageSize(config, 0u);
 
     // Step 1) Read the delta map.
     std::ifstream inputFile;
@@ -1020,7 +1021,8 @@ inline void save(JournaledStringTree<TDeltaMap, TSpec> const & jst,
     }
 
     // Compute hash for reference sequence.
-    GdfFileConfiguration<TSnpType> gdfConfig(getCoverageSize(container(jst)));
+    GdfFileConfiguration<TSnpType> gdfConfig;
+    setCoverageSize(gdfConfig, getCoverageSize(container(jst)));
     gdfConfig.refHash = computeCrc(host(jst));
 
     std::ofstream fileStream;

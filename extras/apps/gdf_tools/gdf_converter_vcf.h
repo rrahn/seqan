@@ -170,9 +170,21 @@ inline void _resolveConflicts(DeltaMap<TValue, TAlphabet, TSpec> & deltaMap)
         }
         if (deltaType(it) == DELTA_TYPE_INS)
         {  // Resolve all insertions that occur immediately before an replacement or deletion.
-            TStoreIter itLocal = it + 1;
+            // Move to the begin of the affected range.
+            TStoreIter itLocal = it;
+            while (itLocal != begin(deltaMap, Standard()) && deltaPosition(--itLocal) == deltaPosition(it))
+            {}
+
+            if (deltaPosition(itLocal) != deltaPosition(it))  // Move one up to begin of range.
+                ++itLocal;
+
             while (deltaPosition(itLocal) == deltaPosition(it))
             {
+                if (itLocal == it)
+                {
+                    ++itLocal;
+                    continue;
+                }
 //                TMappedDelta deltaInfoInner = mappedDelta(deltaMap, itLocal - itBegin);
                 if (deltaType(itLocal) == DELTA_TYPE_DEL || deltaType(itLocal) == DELTA_TYPE_SNP)
                 {
