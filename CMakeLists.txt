@@ -123,10 +123,10 @@ if ("${SEQAN_BUILD_SYSTEM}" STREQUAL "DEVELOP")
     add_subdirectory (tests)
 
     message (STATUS "Configuring demos")
-    add_subdirectory (demos)
+    #add_subdirectory (demos)
 
     message (STATUS "Configuring manual")
-    add_subdirectory (manual)
+    #add_subdirectory (manual)
 endif ()
 
 if ((("${SEQAN_BUILD_SYSTEM}" STREQUAL "DEVELOP") OR
@@ -134,7 +134,7 @@ if ((("${SEQAN_BUILD_SYSTEM}" STREQUAL "DEVELOP") OR
      (NOT SEQAN_NO_DOX))
 
     message (STATUS "Configuring dox")
-    add_subdirectory (dox)
+    #add_subdirectory (dox)
 
     if ("${SEQAN_BUILD_SYSTEM}" STREQUAL "DEVELOP")
         message (STATUS "Configuring util/py_lib")
@@ -144,7 +144,7 @@ endif ()
 
 if (NOT "${SEQAN_BUILD_SYSTEM}" STREQUAL "SEQAN_RELEASE_LIBRARY")
     message (STATUS "Configuring apps")
-    add_subdirectory (apps)
+    #add_subdirectory (apps)
 endif ()
 
 # ===========================================================================
