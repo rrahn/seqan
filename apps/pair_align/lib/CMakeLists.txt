@@ -54,4 +54,4 @@ endforeach(GAPS_T)
 # This part can be used instead for cmake version greater or equal to 2.8.8. 
 # This requires to update the script above as well.
 add_library(pair_align_lib pair_align_lib.cpp pair_align_lib.h ${LIB_TARGETS})
-target_link_libraries(pair_align_lib ${SEQAN_LIBRARIES})
+# target_link_libraries(pair_align_lib ${SEQAN_LIBRARIES})

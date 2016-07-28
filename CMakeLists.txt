@@ -120,7 +120,7 @@ seqan_get_repository_info ()
 # Tests, demos and manual are only built when building in DEVELOP mode.
 if ("${SEQAN_BUILD_SYSTEM}" STREQUAL "DEVELOP")
     message (STATUS "Configuring tests")
-    add_subdirectory (tests)
+    #add_subdirectory (tests)
 
     message (STATUS "Configuring demos")
     #add_subdirectory (demos)
@@ -144,7 +144,7 @@ endif ()
 
 if (NOT "${SEQAN_BUILD_SYSTEM}" STREQUAL "SEQAN_RELEASE_LIBRARY")
     message (STATUS "Configuring apps")
-    #add_subdirectory (apps)
+    add_subdirectory (apps)
 endif ()
 
 # ===========================================================================
