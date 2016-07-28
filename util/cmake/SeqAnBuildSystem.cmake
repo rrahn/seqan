@@ -322,11 +322,11 @@ macro (seqan_add_app_test APP_NAME)
     endif ()
     find_package (PythonInterp)
     if (PYTHONINTERP_FOUND)
-      add_test (NAME app_test_${APP_NAME}${ARGV1}
-                COMMAND ${PYTHON_EXECUTABLE}
-                        ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_tests${ARGV1}.py
-                        ${_VALGRIND_FLAG}
-                        ${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR})
+    #   add_test (NAME app_test_${APP_NAME}${ARGV1}
+    #             COMMAND ${PYTHON_EXECUTABLE}
+    #                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_tests${ARGV1}.py
+    #                     ${_VALGRIND_FLAG}
+    #                     ${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR})
     endif (PYTHONINTERP_FOUND)
 endmacro (seqan_add_app_test APP_NAME)
 
@@ -690,8 +690,8 @@ macro (_seqan_setup_demo_test CPP_FILE EXECUTABLE)
         # Add the test.
         find_package (PythonInterp)
         if (PYTHONINTERP_FOUND)
-          add_test (NAME test_${EXECUTABLE}
-                    COMMAND ${PYTHON_EXECUTABLE} ${CHECKER_PATH} ${ARGS})
+          #add_test (NAME test_${EXECUTABLE}
+          #          COMMAND ${PYTHON_EXECUTABLE} ${CHECKER_PATH} ${ARGS})
           #message(STATUS "add_test (NAME test_${EXECUTABLE} COMMAND ${PYTHON_EXECUTABLE} ${CHECKER_PATH} ${ARGS})")
         endif (PYTHONINTERP_FOUND)
     endif ()
