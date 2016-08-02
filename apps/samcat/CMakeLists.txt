@@ -73,6 +73,9 @@ install (FILES LICENSE
 
 seqan_add_app_test (samcat)
 
+seqan_add_app_test (samcat_fail)
+set_tests_properties (app_test_samcat_fail PROPERTIES WILL_FAIL TRUE)
+
 # ----------------------------------------------------------------------------
 # Setup Common Tool Description for Generic Workflow Nodes
 # ----------------------------------------------------------------------------
