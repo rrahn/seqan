@@ -570,8 +570,9 @@ _computeTraceback(TTarget & target,
     SEQAN_ASSERT_LEQ(coordinate(matrixNavigator, +DPMatrixDimension_::HORIZONTAL), static_cast<TSize>(seqHSize));
     SEQAN_ASSERT_LEQ(coordinate(matrixNavigator, +DPMatrixDimension_::VERTICAL), static_cast<TSize>(seqVSize));
 
-    typename TraceBitMap_::TTraceValue traceValue = scalarValue(matrixNavigator);
-    typename TraceBitMap_::TTraceValue lastTraceValue = _retrieveInitialTraceDirection(traceValue, dpProfile);
+    typename TraceBitMap_<>::Type traceValue = scalarValue(matrixNavigator);
+    typename TraceBitMap_<>::Type lastTraceValue = _retrieveInitialTraceDirection(traceValue, dpProfile);
+
     _computeTraceback(target, traceValue, lastTraceValue, matrixNavigator, seqHSize, seqVSize, band, dpProfile,
                       TraceHead_<TAlgorithm>(), TraceTail_<TAlgorithm>());
 }
