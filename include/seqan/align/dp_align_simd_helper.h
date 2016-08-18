@@ -127,63 +127,46 @@ _precomputeScoreMatrixOffset(TSeqValue const & seqVal,
 // Function _prepareAndRunSimdAlignment()
 // ----------------------------------------------------------------------------
 
-template <typename TResult,
-          typename TTraces,
+template <typename TStringSimdH,
+          typename TStringSimdV,
           typename TSequencesH,
-          typename TSequencesV,
-          typename TScore,
-          typename TAlgo, typename TBand, typename TFreeEndGaps, typename TTraceback,
-          typename TGapModel>
+          typename TSequencesV>
 inline void
-_prepareAndRunSimdAlignment(TResult & results,
-                            TTraces & traces,
-                            TSequencesH const & seqH,
-                            TSequencesV const & seqV,
-                            TScore const & scoringScheme,
-                            AlignConfig2<TAlgo, TBand, TFreeEndGaps, TTraceback> const & alignConfig,
-                            TGapModel const & /*gapModel*/,
-                            SimdAlignEqualLength const & /*tag*/)
+_prepareSimdAlignment(TStringSimdH & stringSimdH,
+                      TStringSimdV & stringSimdV,
+                      TSequencesH const & seqH,
+                      TSequencesV const & seqV,
+                      DPScoutState_<SimdAlignEqualLength> const & /*unused*/)
 {
-    String<TResult, Alloc<OverAligned> > stringSimdH;
-    String<TResult, Alloc<OverAligned> > stringSimdV;
-
     resize(stringSimdH, length(seqH[0]));
     resize(stringSimdV, length(seqV[0]));
     _createSimdRepImpl(stringSimdH, seqH);
     _createSimdRepImpl(stringSimdV, seqV);
-
-    DPScoutState_<SimdAlignEqualLength> state;
-    results = _setUpAndRunAlignment(traces, state, stringSimdH, stringSimdV, scoringScheme, alignConfig, TGapModel());
 }
 
-template <typename TResult,
-          typename TTraces,
+template <typename TStringSimdH,
+          typename TStringSimdV,
           typename TSequencesH,
           typename TSequencesV,
-          typename TScore,
-          typename TAlgo, typename TBand, typename TFreeEndGaps, typename TTraceback,
-          typename TGapModel,
           typename TTraits>
 inline void
-_prepareAndRunSimdAlignment(TResult & results,
-                            TTraces & traces,
-                            TSequencesH const & seqH,
-                            TSequencesV const & seqV,
-                            TScore const & scoringScheme,
-                            AlignConfig2<TAlgo, TBand, TFreeEndGaps, TTraceback> const & alignConfig,
-                            TGapModel const & /*gapModel*/,
-                            SimdAlignVariableLength<TTraits> const /*tag*/)
+_prepareSimdAlignment(TStringSimdH & stringSimdH,
+                      TStringSimdV & stringSimdV,
+                      TSequencesH const & seqH,
+                      TSequencesV const & seqV,
+                      DPScoutState_<SimdAlignVariableLength<TTraits> > & state)
 {
+    using TSimdVecH = typename Value<TStringSimdH>::Type;
     SEQAN_ASSERT_EQ(length(seqH), length(seqV));
-    SEQAN_ASSERT_EQ(static_cast<decltype(length(seqH))>(LENGTH<TResult>::VALUE), length(seqH));
+    SEQAN_ASSERT_EQ(static_cast<decltype(length(seqH))>(LENGTH<TSimdVecH>::VALUE), length(seqH));
 
-    using TSimdValueType = typename Value<TResult>::Type;
+    using TSimdValueType = typename Value<TStringSimdH>::Type;
 
     using TPadStringH = ModifiedString<typename Value<TSequencesH const>::Type, ModPadding>;
     using TPadStringV = ModifiedString<typename Value<TSequencesV const>::Type, ModPadding>;
 
-    String<TResult, Alloc<OverAligned> > stringSimdH;
-    String<TResult, Alloc<OverAligned> > stringSimdV;
+//    String<TResult, Alloc<OverAligned> > stringSimdH;
+//    String<TResult, Alloc<OverAligned> > stringSimdV;
 
     using TDPProfile = typename SetupAlignmentProfile_<TAlgo, TFreeEndGaps, TGapModel, TTraceback>::Type;
     DPScoutState_<SimdAlignVariableLength<SimdAlignVariableLengthTraits<TResult, TSequencesH, TSequencesV, TDPProfile> > > state;
@@ -242,8 +225,6 @@ _prepareAndRunSimdAlignment(TResult & results,
     resize(stringSimdV, maxV);
     _createSimdRepImpl(stringSimdH, paddedH);
     _createSimdRepImpl(stringSimdV, paddedV);
-
-    results = _setUpAndRunAlignment(traces, state, stringSimdH, stringSimdV, scoringScheme, alignConfig, TGapModel());
 }
 
 template <typename TResult,
@@ -269,14 +250,29 @@ _prepareAndRunSimdAlignment(TResult & results,
                                      [seqLengthH, seqLengthV](auto param)
                                      {
                                          return (length(std::get<0>(param)) == seqLengthH) &&
-                                         (length(std::get<1>(param)) == seqLengthV);
+                                                (length(std::get<1>(param)) == seqLengthV);
                                      });
+
+    String<TResult, Alloc<OverAligned> > stringSimdH;
+    String<TResult, Alloc<OverAligned> > stringSimdV;
     if(allSameLength)
-        _prepareAndRunSimdAlignment(results, traces, seqH, seqV, scoringScheme, alignConfig, TGapModel(),
-                                    SimdAlignEqualLength());
+    {
+        DPScoutState_<SimdAlignEqualLength> state;
+        _prepareSimdAlignment(stringSimdH, stringSimdV, seqH, seqV, state);
+        results = _setUpAndRunAlignment(traces, state, stringSimdH, stringSimdV, scoringScheme, alignConfig, TGapModel());
+    }
     else
-        _prepareAndRunSimdAlignment(results, traces, seqH, seqV, scoringScheme, alignConfig, TGapModel(),
-                                    SimdAlignVariableLength<Nothing>());
+    {
+        DPScoutState_<SimdAlignVariableLength<SimdAlignVariableLengthTraits<TResult, TSequencesH, TSequencesV> > > state;
+        _prepareSimdAlignment(stringSimdH, stringSimdV, seqH, seqV, state);
+
+        state.dimV = length(stringSimdV);
+        state.isLocalAlignment = IsLocalAlignment_<TAlgo>::VALUE;
+        state.right = IsFreeEndGap_<TFreeEndGaps, DPLastColumn>::VALUE;
+        state.bottom = IsFreeEndGap_<TFreeEndGaps, DPLastRow>::VALUE;
+
+        results = _setUpAndRunAlignment(traces, state, stringSimdH, stringSimdV, scoringScheme, alignConfig, TGapModel());
+    }
 }
 
 // ----------------------------------------------------------------------------
