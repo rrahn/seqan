@@ -266,7 +266,7 @@ _prepareAndRunSimdAlignment(TResult & results,
         DPScoutState_<SimdAlignVariableLength<SimdAlignVariableLengthTraits<TResult, TSequencesH, TSequencesV> > > state;
         _prepareSimdAlignment(stringSimdH, stringSimdV, seqH, seqV, state);
 
-        state.dimV = length(stringSimdV);
+        state.dimV = length(stringSimdV) + 1;
         state.isLocalAlignment = IsLocalAlignment_<TAlgo>::VALUE;
         state.right = IsFreeEndGap_<TFreeEndGaps, DPLastColumn>::VALUE;
         state.bottom = IsFreeEndGap_<TFreeEndGaps, DPLastRow>::VALUE;
