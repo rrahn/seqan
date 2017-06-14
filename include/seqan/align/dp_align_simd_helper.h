@@ -159,7 +159,7 @@ _prepareSimdAlignment(TStringSimdH & stringSimdH,
     SEQAN_ASSERT_EQ(length(seqH), length(seqV));
     SEQAN_ASSERT_EQ(static_cast<decltype(length(seqH))>(LENGTH<typename Value<TStringSimdH>::Type>::VALUE), length(seqH));
 
-    using TSimdValueType = typename Value<TStringSimdH>::Type;
+    using TSimdMask = typename TTraits::TSimdVector;
 
     using TPadStringH = ModifiedString<typename Value<TSequencesH const>::Type, ModPadding>;
     using TPadStringV = ModifiedString<typename Value<TSequencesV const>::Type, ModPadding>;
@@ -262,7 +262,8 @@ _prepareAndRunSimdAlignment(TResult & results,
     }
     else
     {
-        DPScoutState_<SimdAlignVariableLength<SimdAlignVariableLengthTraits<TResult, TSequencesH, TSequencesV> > > state;
+        using TSimdMask = typename SimdMaskVector<TResult>::Type;
+        DPScoutState_<SimdAlignVariableLength<SimdAlignVariableLengthTraits<TSimdMask, TSequencesH, TSequencesV> > > state;
         _prepareSimdAlignment(stringSimdH, stringSimdV, seqH, seqV, state);
 
         state.dimV = length(stringSimdV) + 1;
