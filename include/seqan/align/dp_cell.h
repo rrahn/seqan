@@ -50,6 +50,12 @@ namespace seqan {
 // Tags, Classes, Enums
 // ============================================================================
 
+struct DynamicGapExtensionHorizontal_;
+typedef Tag<DynamicGapExtensionHorizontal_> DynamicGapExtensionHorizontal;
+
+struct DynamicGapExtensionVertical_;
+typedef Tag<DynamicGapExtensionVertical_> DynamicGapExtensionVertical;
+
 // ----------------------------------------------------------------------------
 // Class DPCell_
 // ----------------------------------------------------------------------------
@@ -293,11 +299,63 @@ setGapExtension(DPCell_<TScoreValue, TGapSpec> & /*dpCell*/, TF1 , TF2, TMask)
     // no-op
 }
 
-template <typename TTarget, typename TScoreValue, typename TGapSpec>
-inline void
-write(TTarget & target, DPCell_<TScoreValue, TGapSpec> const & cell)
+// ----------------------------------------------------------------------------
+// Function isGapExtension()
+// ----------------------------------------------------------------------------
+
+template <typename TScoreValue, typename TGapSpec,
+          typename TSpec>
+inline bool
+isGapExtension(DPCell_<TScoreValue, TGapSpec> const & /*cell*/,
+               TSpec const & /*spec*/)
 {
-    write(target, _scoreOfCell(cell));
+    return false;
+}
+
+// ----------------------------------------------------------------------------
+// Function operator==()
+// ----------------------------------------------------------------------------
+
+template <typename TScoreValue, typename TGapCosts>
+inline bool operator==(DPCell_<TScoreValue, TGapCosts> const & lhs,
+                       DPCell_<TScoreValue, TGapCosts> const & rhs)
+{
+    return _scoreOfCell(lhs) == _scoreOfCell(rhs) &&
+           _horizontalScoreOfCell(lhs) == _horizontalScoreOfCell(rhs) &&
+           _verticalScoreOfCell(lhs) == _verticalScoreOfCell(rhs);
+}
+
+// ----------------------------------------------------------------------------
+// Function operator!=()
+// ----------------------------------------------------------------------------
+
+template <typename TScoreValue, typename TGapCosts>
+inline bool operator!=(DPCell_<TScoreValue, TGapCosts> const & lhs,
+                       DPCell_<TScoreValue, TGapCosts> const & rhs)
+{
+    return !(lhs == rhs);
+}
+
+// ----------------------------------------------------------------------------
+// Function operator<<()
+// ----------------------------------------------------------------------------
+
+template <typename TStream,
+          typename TScoreValue, typename TGapCosts>
+inline TStream& operator<<(TStream & stream,
+                           DPCell_<TScoreValue, TGapCosts> const & cell)
+{
+    stream << "M: " << _scoreOfCell(cell);
+    if (std::is_same<TGapCosts, AffineGaps>::value)
+    {
+        stream << " <H: " << _horizontalScoreOfCell(cell) << " V: " << _verticalScoreOfCell(cell) << ">";
+    }
+    else if (std::is_same<TGapCosts, DynamicGaps>::value)
+    {
+        stream << " <H: " << isGapExtension(cell, DynamicGapExtensionHorizontal{}) <<
+                  " V: " << isGapExtension(cell, DynamicGapExtensionVertical{}) << ">";
+    }
+    return stream;
 }
 
 }  // namespace seqan
