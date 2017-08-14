@@ -533,7 +533,6 @@ _computeAlignmentImpl(TDPScout & scout,
     // ============================================================================
     // POSTPROCESSING
     // ============================================================================
-
     _incHorizontalPos(scout);
     _computeTrack(scout, dpScoreMatrixNavigator, dpTraceMatrixNavigator,
                   sequenceEntryForScore(scoringScheme, seqH, position(seqHIter)),
