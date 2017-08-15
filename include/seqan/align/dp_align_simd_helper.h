@@ -154,6 +154,8 @@ _prepareSimdAlignment(TStringSimdH & stringSimdH,
                       TStringSimdV & stringSimdV,
                       TSequencesH const & seqH,
                       TSequencesV const & seqV,
+                      String<size_t> & lengthsH,
+                      String<size_t> & lengthsV,
                       DPScoutState_<SimdAlignVariableLength<TTraits> > & state)
 {
     SEQAN_ASSERT_EQ(length(seqH), length(seqV));
@@ -165,15 +167,6 @@ _prepareSimdAlignment(TStringSimdH & stringSimdH,
 
     using TPadStringH = ModifiedString<typename Value<TSequencesH const>::Type, ModPadding>;
     using TPadStringV = ModifiedString<typename Value<TSequencesV const>::Type, ModPadding>;
-
-//    String<TResult, Alloc<OverAligned> > stringSimdH;
-//    String<TResult, Alloc<OverAligned> > stringSimdV;
-
-    using TDPProfile = typename SetupAlignmentProfile_<TAlgo, TFreeEndGaps, TGapModel, TTraceback>::Type;
-    DPScoutState_<SimdAlignVariableLength<SimdAlignVariableLengthTraits<TResult, TSequencesH, TSequencesV, TDPProfile> > > state;
-
-    String<size_t> lengthsH;
-    String<size_t> lengthsV;
 
     resize(lengthsH, length(seqH), Exact{});
     resize(lengthsV, length(seqV), Exact{});
@@ -265,8 +258,18 @@ _prepareAndRunSimdAlignment(TResult & results,
     else
     {
         using TSimdMask = typename SimdMaskVector<TResult>::Type;
-        DPScoutState_<SimdAlignVariableLength<SimdAlignVariableLengthTraits<TSimdMask, TSequencesH, TSequencesV> > > state;
-        _prepareSimdAlignment(stringSimdH, stringSimdV, seqH, seqV, state);
+        using TDPProfile = typename SetupAlignmentProfile_<TAlgo, TFreeEndGaps, TGapModel, TTraceback>::Type;
+
+        DPScoutState_<SimdAlignVariableLength<
+                        SimdAlignVariableLengthTraits<TSimdMask,
+                                                      TSequencesH,
+                                                      TSequencesV,
+                                                      TDPProfile>
+                        >
+                     > state;
+        String<size_t> lengthsH;
+        String<size_t> lengthsV;
+        _prepareSimdAlignment(stringSimdH, stringSimdV, seqH, seqV, lengthsH, lengthsV, state);
 
         state.dimV = length(stringSimdV) + 1;
         state.isLocalAlignment = IsLocalAlignment_<TAlgo>::VALUE;
