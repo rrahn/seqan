@@ -91,6 +91,15 @@ _doComputeScore(DPCell_<TScoreValue, LinearGaps> & current,
                    TraceBitMap_<TScoreValue>::DIAGONAL,
                    tv,
                    TTracebackConfig());
+    if (IsLocalAlignment_<TAlgorithm>::VALUE)
+    {
+        tv = _maxScore(_scoreOfCell(current),
+                        TraceBitMap_<TScoreValue>::NONE,
+                        _scoreOfCell(current),
+                        TraceBitMap_<TScoreValue>::NONE,
+                        tv,
+                        TTracebackConfig{});
+    }
     previousVertical = current;
     return tv;
 }
@@ -123,6 +132,15 @@ _doComputeScore(DPCell_<TScoreValue, LinearGaps> & current,
                         TraceBitMap_<TScoreValue>::DIAGONAL,
                         TraceBitMap_<TScoreValue>::HORIZONTAL | TraceBitMap_<TScoreValue>::MAX_FROM_HORIZONTAL_MATRIX,
                         TTracebackConfig());
+    if (IsLocalAlignment_<TAlgorithm>::VALUE)
+    {
+        tv = _maxScore(_scoreOfCell(current),
+                        TraceBitMap_<TScoreValue>::NONE,
+                        _scoreOfCell(current),
+                        TraceBitMap_<TScoreValue>::NONE,
+                        tv,
+                        TTracebackConfig{});
+    }
     previousVertical = current;
     return tv;
 }
@@ -144,14 +162,24 @@ _doComputeScore(DPCell_<TScoreValue, LinearGaps> & current,
                 RecursionDirectionLowerDiagonal const &,
                 DPProfile_<TAlgorithm, LinearGaps, TTracebackConfig, TExecPolicy> const &)
 {
-    return _maxScore(_scoreOfCell(current),
-                     static_cast<TScoreValue>(_scoreOfCell(previousDiagonal) +
+    auto tv  = _maxScore(_scoreOfCell(current),
+                         static_cast<TScoreValue>(_scoreOfCell(previousDiagonal) +
                                               score(scoringScheme, seqHVal, seqVVal)),
-                     static_cast<TScoreValue>(_scoreOfCell(previousVertical) +
+                         static_cast<TScoreValue>(_scoreOfCell(previousVertical) +
                                               scoreGapExtendVertical(scoringScheme, seqHVal, seqVVal)),
-                     TraceBitMap_<TScoreValue>::DIAGONAL,
-                     TraceBitMap_<TScoreValue>::VERTICAL | TraceBitMap_<TScoreValue>::MAX_FROM_VERTICAL_MATRIX,
-                     TTracebackConfig());
+                         TraceBitMap_<TScoreValue>::DIAGONAL,
+                         TraceBitMap_<TScoreValue>::VERTICAL | TraceBitMap_<TScoreValue>::MAX_FROM_VERTICAL_MATRIX,
+                         TTracebackConfig());
+    if (IsLocalAlignment_<TAlgorithm>::VALUE)
+    {
+        tv = _maxScore(_scoreOfCell(current),
+                        TraceBitMap_<TScoreValue>::NONE,
+                        _scoreOfCell(current),
+                        TraceBitMap_<TScoreValue>::NONE,
+                        tv,
+                        TTracebackConfig{});
+    }
+    return tv;
 }
 
 // ----------------------------------------------------------------------------

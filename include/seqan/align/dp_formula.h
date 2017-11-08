@@ -247,19 +247,21 @@ _computeScore(TDPCell & current,
               TRecursionDirection const & recDir,
               TDPProfile const & dpProfile)
 {
-    auto traceDir = _doComputeScore(current, diagonal, horizontal, vertical,
-                                    seqHVal, seqVVal, scoringScheme, recDir, dpProfile);
-    if (IsLocalAlignment_<TDPProfile>::VALUE)
-    {
-        if (_scoreOfCell(current) <= 0)
-        {
-            _setScoreOfCell(current, static_cast<typename Value<TDPCell>::Type>(0));
-            // Cache next vertical score.
-            _scoreOfCell(vertical) = _scoreOfCell(current);
-            return TraceBitMap_<typename Value<TDPCell>::Type>::NONE;
-        }
-    }
-    return traceDir;
+    // auto traceDir = _doComputeScore(current, diagonal, horizontal, vertical,
+    //                                 seqHVal, seqVVal, scoringScheme, recDir, dpProfile);
+    return _doComputeScore(current, diagonal, horizontal, vertical, seqHVal, seqVVal, scoringScheme, recDir, dpProfile);
+
+    // if (IsLocalAlignment_<TDPProfile>::VALUE)
+    // {
+    //     if (_scoreOfCell(current) <= 0)
+    //     {
+    //         _setScoreOfCell(current, static_cast<typename Value<TDPCell>::Type>(0));
+    //         // Cache next vertical score.
+    //         _scoreOfCell(vertical) = _scoreOfCell(current);
+    //         return TraceBitMap_<typename Value<TDPCell>::Type>::NONE;
+    //     }
+    // }
+    // return traceDir;
 }
 
 template <typename TDPCell,
@@ -281,27 +283,28 @@ _computeScore(TDPCell & current,
               TDPProfile const & dpProfile)
 {
     // using TScoreValue = ExtractedScoreValueType_<TRecursionCellTuple>;
-    using TScoreValue = typename Value<TDPCell>::Type;
+    // using TScoreValue = typename Value<TDPCell>::Type;
 
-    auto traceDir = _doComputeScore(current, diagonal, horizontal, vertical, seqHVal, seqVVal, scoringScheme, recDir, dpProfile);
+    // auto traceDir = _doComputeScore(current, diagonal, horizontal, vertical, seqHVal, seqVVal, scoringScheme, recDir, dpProfile);
+    return _doComputeScore(current, diagonal, horizontal, vertical, seqHVal, seqVVal, scoringScheme, recDir, dpProfile);
 
-    if (IsLocalAlignment_<TDPProfile>::VALUE)
-    {
-        if (std::is_same<typename DPProfileType<TDPProfile, DPProfileTypeId::TRACE_CONFIG>::Type, TracebackOff>::value)
-        {
-            _scoreOfCell(current) = max(_scoreOfCell(current), TraceBitMap_<TScoreValue>::NONE);
-            _scoreOfCell(vertical) = _scoreOfCell(current);
-            return TraceBitMap_<TScoreValue>::NONE;
-        }
-        else
-        {
-            auto cmp = cmpGt(createVector<TScoreValue>(1), _scoreOfCell(current));
-            _setScoreOfCell(current, TraceBitMap_<TScoreValue>::NONE, cmp);
-            _scoreOfCell(vertical) = _scoreOfCell(current);
-            return blend(traceDir, TraceBitMap_<TScoreValue>::NONE, cmp);
-        }
-    }
-    return traceDir;
+    // if (IsLocalAlignment_<TDPProfile>::VALUE)
+    // {
+    //     if (std::is_same<typename DPProfileType<TDPProfile, DPProfileTypeId::TRACE_CONFIG>::Type, TracebackOff>::value)
+    //     {
+    //         _scoreOfCell(current) = max(_scoreOfCell(current), TraceBitMap_<TScoreValue>::NONE);
+    //         _scoreOfCell(vertical) = _scoreOfCell(current);
+    //         return TraceBitMap_<TScoreValue>::NONE;
+    //     }
+    //     else
+    //     {
+    //         auto cmp = cmpGt(createVector<TScoreValue>(1), _scoreOfCell(current));
+    //         _setScoreOfCell(current, TraceBitMap_<TScoreValue>::NONE, cmp);
+    //         _scoreOfCell(vertical) = _scoreOfCell(current);
+    //         return blend(traceDir, TraceBitMap_<TScoreValue>::NONE, cmp);
+    //     }
+    // }
+    // return traceDir;
 }
 
 // ----------------------------------------------------------------------------

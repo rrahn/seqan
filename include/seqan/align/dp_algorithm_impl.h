@@ -317,7 +317,10 @@ _computeCell(TDPScout & scout,
 
         // TODO(rrahn): Refactor to set vertical score only when max is updated.
         // TODO(rrahn): Only if traceback is enabled.
-        _setVerticalScoreOfCell(current, _verticalScoreOfCell(vertical));
+        if (IsTracebackEnabled_<TDPProfile>::VALUE)
+        {
+            _setVerticalScoreOfCell(current, _verticalScoreOfCell(vertical));
+        }
         _scoutBestScore(scout, current, traceMatrixNavigator,
                         TIsLastColumn(), TIsLastRow());
     }

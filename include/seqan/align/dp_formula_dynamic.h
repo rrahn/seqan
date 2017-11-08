@@ -451,6 +451,16 @@ _doComputeScore(DPCell_<TScoreValue, DynamicGaps> & activeCell,
     TTraceValue tvMax = _internalComputeScore(activeCell, tmpScore._score, TTracebackConfig());  // Stores from where the maximal score comes.
     tmpScore._score = intermediate;
     tvMax = _internalComputeScore(activeCell, tmpScore._score, tvGap, tvMax, TTracebackConfig(), RecursionDirectionDiagonal());
+
+    if (IsLocalAlignment_<TAlgorithm>::VALUE)
+    {
+        tvMax = _maxScore(_scoreOfCell(activeCell),
+                          TraceBitMap_<TScoreValue>::NONE,
+                          _scoreOfCell(activeCell),
+                          TraceBitMap_<TScoreValue>::NONE,
+                          tvMax,
+                          TTracebackConfig{});
+    }
     previousVertical = activeCell;
     return tvMax;
 }
@@ -487,6 +497,16 @@ _doComputeScore(DPCell_<TScoreValue, DynamicGaps> & activeCell,
     setGapExtension(activeCell, False(), True());
     tv = _internalComputeScore(activeCell, intermediate, tv, TraceBitMap_<TScoreValue>::MAX_FROM_HORIZONTAL_MATRIX,
                                TTracebackConfig(),RecursionDirectionDiagonal());
+
+    if (IsLocalAlignment_<TAlgorithm>::VALUE)
+    {
+        tv = _maxScore(_scoreOfCell(activeCell),
+                       TraceBitMap_<TScoreValue>::NONE,
+                       _scoreOfCell(activeCell),
+                       TraceBitMap_<TScoreValue>::NONE,
+                       tv,
+                       TTracebackConfig{});
+    }
     previousVertical = activeCell;
     return tv;
 }
@@ -516,8 +536,18 @@ _doComputeScore(DPCell_<TScoreValue, DynamicGaps> & activeCell,
                                            TTracebackConfig(), RecursionDirectionVertical());
     setGapExtension(activeCell, True(), False());
     TScoreValue tmpScore = _scoreOfCell(previousDiagonal) + score(scoringScheme, seqHVal, seqVVal);
-    return _internalComputeScore(activeCell, tmpScore, tv, TraceBitMap_<TScoreValue>::MAX_FROM_VERTICAL_MATRIX,
+    tv = _internalComputeScore(activeCell, tmpScore, tv, TraceBitMap_<TScoreValue>::MAX_FROM_VERTICAL_MATRIX,
                                  TTracebackConfig(), RecursionDirectionDiagonal());
+    if (IsLocalAlignment_<TAlgorithm>::VALUE)
+    {
+        tv = _maxScore(_scoreOfCell(activeCell),
+                        TraceBitMap_<TScoreValue>::NONE,
+                        _scoreOfCell(activeCell),
+                        TraceBitMap_<TScoreValue>::NONE,
+                        tv,
+                        TTracebackConfig{});
+    }
+    return tv;
 }
 
 // ----------------------------------------------------------------------------
