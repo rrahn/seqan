@@ -195,7 +195,7 @@ Assignment 1
    Objective
      Construct an alignment using the Align data structure for the sequences ``"ACGTCACCTC"`` and ``"ACGGGCCTATC"``.
      Insert two gaps at the second position and insert one gap at the fifth position of the first sequence.
-     Insert one gap at the ninth position of the second sequence.
+     Insert two gaps at the ninth position of the second sequence.
      Iterate over the rows of your Align object and print the total count of gaps that exist within the alignment.
 
    Hints

@@ -316,7 +316,7 @@ Now let's look at local pairwise alignments.
 
 SeqAn offers the classical Smith-Waterman algorithm that computes the best local alignment with respect to a given scoring scheme, and the Waterman-Eggert algorithm, which computes not only the best but also suboptimal local alignments.
 
-We are going to demonstrate the usage of both in the following example where first the best local alignment of two character strings and then all local alignments of two DNA sequences with a score greater than or equal to 4 are computed.
+We are going to demonstrate the usage of both in the following example where first the best local alignment of two character strings and then all local alignments of two DNA sequences with a score greater than or equal to 5 are computed.
 
 .. includefrags:: demos/tutorial/pairwise_sequence_alignment/alignment_local.cpp
    :fragment: main
@@ -339,7 +339,7 @@ Next, several local alignments of the two given DNA sequences are going to be co
    :fragment: init2
 
 A :dox:`LocalAlignmentEnumerator` object needs to be initialized on the :dox:`Align` object.
-In addition to the Align object and the scoring scheme, we now also pass the ``finder`` and a minimal score value, 4 in this case, to the localAlignment function.
+In addition to the Align object and the scoring scheme, we now also pass the ``finder`` and a minimal score value, 5 in this case, to the localAlignment function.
 The ``WatermanEggert`` tag specifies the desired Waterman-Eggert algorithm.
 While the score of the local alignment satisfies the minimal score cutoff, the alignments are printed with their scores and the subsequence begin and end positions.
 
