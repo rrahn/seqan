@@ -637,38 +637,45 @@ public:
         readSequence(seq, faiIndex, rId);
 
         // Index into variants.svRecords.
-        unsigned svIdx = 0;
-        StructuralVariantRecord svRecord;
-        if (!empty(variants.svRecords))
-            svRecord = variants.svRecords[0];
+        auto svRecordIt = begin(variants.svRecords);
 
         // For each base, compute the whether to simulate a SNP and/or small indel.
-        for (unsigned pos = 0; pos < length(seq); ++pos)
+        for (int64_t pos = 0; pos < static_cast<int64_t>(length(seq)); ++pos)
         {
             // Seek next possible SV record that could have pos close to its breakends.
             bool skip = false;  // marker in case we switch SV records
-            while ((int)pos >= svRecord.endPosition())
+            while (svRecordIt != end(variants.svRecords) && pos >= (*svRecordIt).pos)
             {
+                StructuralVariantRecord const & svRecord = *svRecordIt;
                 // Skip if near breakend.
                 skip = svRecord.nearBreakend(pos);
+
+                // Skip if inside SV.
+                if (pos <= svRecord.endPosition())
+                {
+                    skip = true;
+                    break;
+                }
 
                 if (options.verbosity >= 3)
                     std::cerr << " FROM " << svRecord;
 
-                svIdx += 1;
-                if (svIdx < length(variants.svRecords))
-                    svRecord = variants.svRecords[svIdx];
-                else
-                    svRecord.pos = -1;  // mark as sentinel
+                ++svRecordIt;
 
                 if (options.verbosity >= 3)
-                    std::cerr << " TO " << svRecord << "\n";
+                {
+                    std::cerr << " TO ";
+                    if (svRecordIt != end(variants.svRecords))
+                         std::cerr << svRecord << "\n";
+                    else
+                        std::cerr << "end\n";
+                }
             }
             // Skip if pos is near the SV breakend.
-            if (skip || svRecord.nearBreakend(pos))
+            if (skip || (svRecordIt != end(variants.svRecords) && (*svRecordIt).nearBreakend(pos)))
             {
                 if (options.verbosity >= 3)
-                    std::cerr << "pos " << pos << " is near " << svRecord << " (or previous)\n";
+                    std::cerr << "pos " << pos << " is near " << *svRecordIt << " (or previous)\n";
                 continue;
             }
 

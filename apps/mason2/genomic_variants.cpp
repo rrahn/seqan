@@ -59,7 +59,7 @@ int StructuralVariantRecord::endPosition() const
             if (size > 0)
                 return pos;
             else
-                return pos + size;
+                return pos - size;
         case INVERSION:
             return pos + size;
         case TRANSLOCATION:
@@ -419,8 +419,11 @@ int VariantMaterializer::_materializeLargeVariants(
         SEQAN_ASSERT_LT(svRecord.pos, (int)length(contig));
         // We do not need to adjust the sizes for insertions.
         if (svRecord.kind != StructuralVariantRecord::INDEL || svRecord.size < 0)
-            svRecord.size = hostToVirtualPosition(journal, svRecord.pos + svRecord.size) -
-                    hostToVirtualPosition(journal, svRecord.pos);
+        {
+            svRecord.size = -(hostToVirtualPosition(journal, svRecord.pos + -svRecord.size) -
+                              hostToVirtualPosition(journal, svRecord.pos));
+        }
+
         if (svRecord.targetPos != -1)
             svRecord.targetPos = hostToVirtualPosition(journal, svRecord.targetPos);
         if (verbosity >= 2)
