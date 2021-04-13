@@ -106,8 +106,27 @@ struct MasonVariatorOptions
     // Haplotype / Allele Configuration
     // ----------------------------------------------------------------------
 
+    // The number of samples to simulate.
+    int numSamples;
     // The number of haplotypes to simulate.
     int numHaplotypes;
+
+    int totalHaplotypeCount() const
+    {
+        return numSamples * numHaplotypes;
+    }
+
+    // Convert global haplotype index to a sample index
+    int convertToSampleIndex(int const haplotypeIdx) const
+    {
+        return haplotypeIdx / numHaplotypes;
+    }
+
+    // Convert global haplotype index to a haplotype index of sample
+    int convertToHaplotypeIndex(int const haplotypeIdx) const
+    {
+        return haplotypeIdx % numHaplotypes;
+    }
 
     // The string to use to separate the haplotype identifier from the chromosome name in the output FASTA ifle.
     seqan::CharString haplotypeSep;
@@ -163,6 +182,7 @@ void print(std::ostream & out, MasonVariatorOptions const & options)
         << "\n"
         << "GENERATE VAR IDS     \t" << getYesNoStr(options.genVarIDs) << "\n"
         << "\n"
+        << "NUM SAMPLES          \t" << options.numSamples << "\n"
         << "NUM HAPLOTYPES       \t" << options.numHaplotypes << "\n"
         << "HAPLOTYPE SEP        \t\"" << options.haplotypeSep << "\"\n"
         << "\n"
