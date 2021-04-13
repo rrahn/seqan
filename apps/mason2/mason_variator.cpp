@@ -706,6 +706,7 @@ public:
             // is no variation in the deleted sequence.
             if (isSnp)
             {
+                int currentSnpCount = length(variants.snps);
                 if (options.verbosity >= 3)
                     std::cerr << "Simulating SNP at (" << rId << ", " << pos << ")\n";
                 if (!simulateSnp(variants, seq, haploCount, rId, pos))
@@ -715,7 +716,8 @@ public:
                     // Add name.
                     std::stringstream ss;
                     ss << "sim_snp_" << nextSnpNo++;
-                    for (int i = 0; i < haploCount; ++i)
+                    int simulatedSnpCount = length(variants.snps) - currentSnpCount;
+                    for (int i = 0; i < simulatedSnpCount; ++i)
                         appendValue(variants.snpIDs, ss.str());
                     SEQAN_ASSERT_EQ(length(variants.snpIDs), length(variants.snps));
                 }
@@ -911,7 +913,11 @@ public:
             appendName(contigNamesCache(context(vcfFileOut)), sequenceName(faiIndex, i));
         }
         // Copy over sample names.
-        appendName(sampleNamesCache(context(vcfFileOut)), "simulated");
+        for (int32_t sampleIdx = 0; sampleIdx < options.numSamples; ++sampleIdx)
+        {
+            std::string sample_name = "simulated_" + std::to_string(sampleIdx);
+            appendName(sampleNamesCache(context(vcfFileOut)), sample_name);
+        }
 
         // Write out VCF header.
         writeHeader(vcfFileOut, vcfHeader);
@@ -1151,14 +1157,14 @@ public:
         {
             PositionMap posMap;  // unused, though
             std::vector<SmallVarInfo> varInfos;  // small variants for counting in read alignments
-            varMat.run(seqVariants, posMap, varInfos, breakpoints, contig, hId);
+            varMat.run(seqVariants, posMap, varInfos, breakpoints, contig, sampleIdx, hId);
         }
 
         // Build sequence id.
         seqan::CharString id = sequenceName(faiIndex, rId);
         append(id, options.haplotypeSep);
-        char buffer[20];
-        snprintf(buffer, 19, "%d", hId + 1);
+        char buffer[58];
+        snprintf(buffer, 57, "sample_%d haplotype_%d", sampleIdx + 1, hId + 1);
         append(id, buffer);
 
         // Write out breakpoints.
@@ -1812,7 +1818,12 @@ parseCommandLine(MasonVariatorOptions & options, int argc, char const ** argv)
 
     addSection(parser, "Haplotype / Allele Configuration");
 
-    addOption(parser, seqan::ArgParseOption("n", "num-haplotypes", "The number of haplotypes to simulate.",
+    addOption(parser, seqan::ArgParseOption("", "num-samples", "The number of samples to simulate.",
+                                            seqan::ArgParseOption::INTEGER, "NUM"));
+    setMinValue(parser, "num-samples", "1");
+    setDefaultValue(parser, "num-samples", "1");
+
+    addOption(parser, seqan::ArgParseOption("n", "num-haplotypes", "The number of haplotypes to simulate per sample.",
                                             seqan::ArgParseOption::INTEGER, "NUM"));
     setMinValue(parser, "num-haplotypes", "1");
     setDefaultValue(parser, "num-haplotypes", "1");
@@ -1997,6 +2008,7 @@ parseCommandLine(MasonVariatorOptions & options, int argc, char const ** argv)
     getOptionValue(noGenVarIDs, parser, "no-gen-var-ids");
     options.genVarIDs = !noGenVarIDs;
 
+    getOptionValue(options.numSamples, parser, "num-samples");
     getOptionValue(options.numHaplotypes, parser, "num-haplotypes");
     getOptionValue(options.haplotypeSep, parser, "haplotype-sep");
     getOptionValue(options.snpRate, parser, "snp-rate");
