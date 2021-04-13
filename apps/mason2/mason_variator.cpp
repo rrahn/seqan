@@ -745,21 +745,24 @@ public:
             return false;  // No SNP next to an N.
 
         // We simulate an alternative base for each haplotype.
-
+        bool simulatedSnp = false;
         seqan::Dna5 from = seq[pos];
         for (int hId = 0; hId < haploCount; ++hId)
         {
-            std::uniform_int_distribution<int> dist(0, 2);
+            std::uniform_int_distribution<int> dist(0, 3);
             int toInt = dist(rng);
-            if (ordValue(from) <= toInt)
-                toInt += 1;
+            if (ordValue(from) == toInt)
+                continue;
             // std::cerr << hId << "\t" << rId << "\t" << pos << "\t" << from << "\t" << seqan::Dna5(toInt) << "\n";
             SEQAN_ASSERT_NEQ((int)ordValue(from), toInt);
             seqan::Dna5 to(toInt);
-            appendValue(variants.snps, SnpRecord(hId, rId, pos, to));
+            int sampleIdx = options.convertToSampleIndex(hId);
+            int haplotypeIdx = options.convertToHaplotypeIndex(hId);
+            appendValue(variants.snps, SnpRecord(sampleIdx, haplotypeIdx, rId, pos, to));
+            simulatedSnp = true;
         }
 
-        return true;
+        return simulatedSnp;
     }
 
     // Return true if SNP could be simulated.
