@@ -498,8 +498,10 @@ public:
 
         std::uniform_int_distribution<int> distHaplo(0, haploCount - 1);
         int hId = distHaplo(rng);
+        int sampleIdx = options.convertToSampleIndex(hId);
+        int haplotypeIdx = options.convertToHaplotypeIndex(hId);
         appendValue(variants.svRecords, StructuralVariantRecord(
-                StructuralVariantRecord::INDEL, hId, rId, pos, size));
+                StructuralVariantRecord::INDEL, sampleIdx, haplotypeIdx, rId, pos, size));
         back(variants.svRecords).seq = indelSeq;
         if (options.genVarIDs)
         {
@@ -543,8 +545,10 @@ public:
             return false;  // do not allow segment to overlap with stretch
         std::uniform_int_distribution<int> distHaplo(0, haploCount - 1);
         int hId = distHaplo(rng);
+        int sampleIdx = options.convertToSampleIndex(hId);
+        int haplotypeIdx = options.convertToHaplotypeIndex(hId);
         appendValue(variants.svRecords, StructuralVariantRecord(
-                StructuralVariantRecord::INVERSION, hId, rId, pos, size));
+                StructuralVariantRecord::INVERSION, sampleIdx, haplotypeIdx, rId, pos, size));
         if (options.genVarIDs)
         {
             // Add name.
@@ -563,13 +567,15 @@ public:
         std::uniform_int_distribution<int> distPos(pos + size + options.minSVSize,
                                                    pos + size + options.maxSVSize);
         int hId = distHaplo(rng);
+        int sampleIdx = options.convertToSampleIndex(hId);
+        int haplotypeIdx = options.convertToHaplotypeIndex(hId);
         int tPos = distPos(rng);
         if (tPos >= (int)sequenceLength(faiIndex, rId))
             return false;
         if (overlapsWithN(seq, pos, pos + size) || isNearN(seq, tPos))
             return false;  // do not allow segment to overlap with strecht of Ns and target to be next to an N
         appendValue(variants.svRecords, StructuralVariantRecord(
-                StructuralVariantRecord::TRANSLOCATION, hId, rId, pos, size, rId, tPos));
+                StructuralVariantRecord::TRANSLOCATION, sampleIdx, haplotypeIdx, rId, pos, size, rId, tPos));
         if (options.genVarIDs)
         {
             // Add name.
@@ -766,6 +772,8 @@ public:
         std::uniform_int_distribution<int> distDeletion(0, 1);
         std::uniform_int_distribution<int> distDNA(0, 3);
         int hId = distHaplo(rng);
+        int sampleIdx = options.convertToSampleIndex(hId);
+        int haplotypeIdx = options.convertToHaplotypeIndex(hId);
         seqan::CharString indelSeq;
         reserve(indelSeq, options.maxSmallIndelSize);
         int indelSize = distSize(rng);
@@ -779,7 +787,7 @@ public:
         indelSize = deletion ? -indelSize : indelSize;
         for (int i = 0; i < indelSize; ++i)  // not executed in case of deleted sequence
             appendValue(indelSeq, seqan::Dna5(distDNA(rng)));
-        appendValue(variants.smallIndels, SmallIndelRecord(hId, rId, pos, indelSize, indelSeq));
+        appendValue(variants.smallIndels, SmallIndelRecord(sampleIdx, haplotypeIdx, rId, pos, indelSize, indelSeq));
         return true;
     }
 };
@@ -993,19 +1001,19 @@ public:
     // levels -- levels
     // hId -- haplotype id, -1 for original
     // rId -- reference id
-    int _writeMethylationLevels(MethylationLevels const & levels, int hId, int rId)
+    int _writeMethylationLevels(MethylationLevels const & levels, int sampleIdx, int hId, int rId)
     {
         std::stringstream idTop;
         idTop << sequenceName(faiIndex, rId);
         if (hId != -1)
-            idTop << options.haplotypeSep << (hId + 1);
+            idTop << options.haplotypeSep << sampleIdx << "_" << (hId + 1);
         idTop << options.haplotypeSep << "TOP";
         writeRecord(outMethLevelStream, idTop.str(), levels.forward);
 
         std::stringstream idBottom;
         idBottom << sequenceName(faiIndex, rId);
         if (hId != -1)
-            idBottom << options.haplotypeSep << (hId + 1);
+            idBottom << options.haplotypeSep << sampleIdx << "_" << (hId + 1);
         idBottom << options.haplotypeSep << "BOT";
         writeRecord(outMethLevelStream, idBottom.str(), levels.reverse);
 
@@ -1073,10 +1081,10 @@ public:
 
         // Simulate variants.
         Variants variants;
-        svSim.simulateContig(variants, rId, options.numHaplotypes);
+        svSim.simulateContig(variants, rId, options.totalHaplotypeCount());
         std::sort(begin(variants.svRecords, seqan::Standard()),
                   end(variants.svRecords, seqan::Standard()));
-        smallSim.simulateContig(variants, rId, options.numHaplotypes);
+        smallSim.simulateContig(variants, rId, options.totalHaplotypeCount());
         // TODO(holtgrew): This list is wrong.
         if (options.verbosity >= 1)
             std::cerr << "  snps:                " << length(variants.snps) << "\n"
@@ -1098,20 +1106,28 @@ public:
             // Write out methylation levels for reference except when they were already in the input.
             if (options.methSimOptions.simulateMethylationLevels && !empty(options.methFastaOutFile) &&
                 empty(options.methFastaInFile))
-                if (_writeMethylationLevels(methLevels, -1, rId) != 0)
+                if (_writeMethylationLevels(methLevels, -1, -1, rId) != 0)
                     return 1;
             // Apply variations to contigs and write out.
-            for (int hId = 0; hId < options.numHaplotypes; ++hId)
+            for (int sampleIdx = 0; sampleIdx < options.numSamples; ++sampleIdx)
             {
-                if (_writeContigs(contig, variants, methLevels, rId, hId) != 0)
-                    return 1;
+                for (int hId = 0; hId < options.numHaplotypes; ++hId)
+                {
+                    if (_writeContigs(contig, variants, methLevels, rId, sampleIdx, hId) != 0)
+                        return 1;
+                }
             }
         }
 
         return 0;
     }
 
-    int _writeContigs(seqan::Dna5String const & contig, Variants const & variants, MethylationLevels const & levels, int rId, int hId)
+    int _writeContigs(seqan::Dna5String const & contig,
+                      Variants const & variants,
+                      MethylationLevels const & levels,
+                      int rId,
+                      int sampleIdx,
+                      int hId)
     {
         // Create contig with the small and large variants.
         VariantMaterializer varMat(methRng, variants, options.methSimOptions);
@@ -1122,10 +1138,10 @@ public:
             MethylationLevels levelsVariants;
             PositionMap posMap;  // unused, though
             std::vector<SmallVarInfo> varInfos;  // small variants for counting in read alignments
-            varMat.run(seqVariants, posMap, levelsVariants, varInfos, breakpoints, contig, levels, hId);
+            varMat.run(seqVariants, posMap, levelsVariants, varInfos, breakpoints, contig, levels, sampleIdx, hId);
             // Write out methylation levels if necessary.
             if (!empty(options.methFastaOutFile))
-                if (_writeMethylationLevels(levelsVariants, hId, rId) != 0)
+                if (_writeMethylationLevels(levelsVariants, sampleIdx, hId, rId) != 0)
                     return 1;
         }
         else
@@ -1260,12 +1276,13 @@ public:
         seqan::String<bool> inTos;
         resize(inTos, 4, false);
         seqan::Dna5String tos;
-        resize(tos, options.numHaplotypes, from);
+        resize(tos, options.totalHaplotypeCount(), from);
         unsigned idx = snpsIdx - 1;
         do
         {
             SEQAN_ASSERT(snpRecord.to != from);
-            tos[snpRecord.haplotype] = snpRecord.to;
+            size_t globalHaplotypeIdx = snpRecord.sample * options.numHaplotypes + snpRecord.haplotype;
+            tos[globalHaplotypeIdx] = snpRecord.to;
             inTos[ordValue(seqan::Dna5(snpRecord.to))] = true;
 
             if (snpsIdx >= length(variants.snps))
@@ -1293,25 +1310,29 @@ public:
         }
         vcfRecord.filter = "PASS";
         vcfRecord.info = ".";
-        // Build genotype infos.
-        appendValue(vcfRecord.genotypeInfos, "");
-        for (int hId = 0; hId < options.numHaplotypes; ++hId)
+        vcfRecord.format = "GT"; // Add GT format field.
+        // Build genotype infos for each sample.
+        resize(vcfRecord.genotypeInfos, options.numSamples);
+        for (int globalHaplotypeIdx = 0, sampleIdx = 0; sampleIdx < options.numSamples; ++sampleIdx)
         {
-            if (!empty(vcfRecord.genotypeInfos[0]))
-                appendValue(vcfRecord.genotypeInfos[0], '|');
-            if (tos[hId] == vcfRecord.ref[0])
+            for (int hId = 0; hId < options.numHaplotypes; ++hId, ++globalHaplotypeIdx)
             {
-                appendValue(vcfRecord.genotypeInfos[0], '0');
-            }
-            else
-            {
-                char buffer[20];
-                for (unsigned i = 0; i < length(vcfRecord.alt); i += 2)
-                    if (tos[hId] == vcfRecord.alt[i])
-                    {
-                        snprintf(buffer, 19, "%d", 1 + i / 2);
-                        append(vcfRecord.genotypeInfos[0], buffer);
-                    }
+                if (!empty(vcfRecord.genotypeInfos[sampleIdx]))
+                    appendValue(vcfRecord.genotypeInfos[sampleIdx], '|');
+                if (tos[globalHaplotypeIdx] == vcfRecord.ref[0])
+                {
+                    appendValue(vcfRecord.genotypeInfos[sampleIdx], '0');
+                }
+                else
+                {
+                    char buffer[20];
+                    for (unsigned i = 0; i < length(vcfRecord.alt); i += 2)
+                        if (tos[globalHaplotypeIdx] == vcfRecord.alt[i])
+                        {
+                            snprintf(buffer, 19, "%d", 1 + i / 2);
+                            append(vcfRecord.genotypeInfos[sampleIdx], buffer);
+                        }
+                }
             }
         }
 
@@ -1356,6 +1377,7 @@ public:
         vcfRecord.id = variants.getVariantName(variants.posToIdx(Variants::SMALL_INDEL, idx));
         vcfRecord.filter = "PASS";
         vcfRecord.info = ".";
+        vcfRecord.format = "GT";
         // Build genotype infos.
 
         // Compute the number of bases in the REF column (1 in case of insertion and (k + 1) in the case of a
@@ -1373,12 +1395,14 @@ public:
 
         // Compute ALT columns and a map to the ALT.
         seqan::String<int> toIds;
-        resize(toIds, options.numHaplotypes, 0);
+        resize(toIds, options.totalHaplotypeCount(), 0);
         for (unsigned i = 0; i < length(records); ++i)
         {
             if (i > 0)
                 appendValue(vcfRecord.alt, ',');
-            toIds[records[i].haplotype] = i + 1;
+
+            int globalId = records[i].sample * options.numHaplotypes + records[i].haplotype;
+            toIds[globalId] = i + 1;
             if (records[i].size > 0)  // insertion
             {
                 appendValue(vcfRecord.alt, vcfRecord.ref[0]);
@@ -1393,14 +1417,17 @@ public:
         }
 
         // Create genotype infos.
-        appendValue(vcfRecord.genotypeInfos, "");
-        for (int i = 0; i < options.numHaplotypes; ++i)
+        resize(vcfRecord.genotypeInfos, options.numSamples);
+        for (int globalHaplotypeIdx = 0, sampleIdx = 0; sampleIdx < options.numSamples; ++sampleIdx)
         {
-            if (i > 0)
-                appendValue(vcfRecord.genotypeInfos[0], '|');
-            char buffer[20];
-            snprintf(buffer, 19, "%d", toIds[i]);
-            append(vcfRecord.genotypeInfos[0], buffer);
+            for (int haplotypeIdx = 0; haplotypeIdx < options.numHaplotypes; ++haplotypeIdx, ++globalHaplotypeIdx)
+            {
+                if (haplotypeIdx > 0)
+                    appendValue(vcfRecord.genotypeInfos[sampleIdx], '|');
+                char buffer[20];
+                snprintf(buffer, 19, "%d", toIds[globalHaplotypeIdx]);
+                append(vcfRecord.genotypeInfos[sampleIdx], buffer);
+            }
         }
 
         // Write out VCF record.
@@ -1430,6 +1457,7 @@ public:
             ss << "SVTYPE=DEL";
         ss << ";SVLEN=" << svRecord.size;
         vcfRecord.info = ss.str();
+        vcfRecord.format = "GT";
 
         // Compute the number of bases in the REF column (1 in case of insertion and (k + 1) in the case of a
         // deletion of length k.
@@ -1453,15 +1481,18 @@ public:
         }
 
         // Create genotype infos.
-        appendValue(vcfRecord.genotypeInfos, "");
-        for (int i = 0; i < options.numHaplotypes; ++i)
+        resize(vcfRecord.genotypeInfos, options.numSamples);
+        for (int sampleIdx = 0; sampleIdx < options.numSamples; ++sampleIdx)
         {
-            if (i > 0)
-                appendValue(vcfRecord.genotypeInfos[0], '|');
-            if (svRecord.haplotype == i)
-                appendValue(vcfRecord.genotypeInfos[0], '1');
-            else
-                appendValue(vcfRecord.genotypeInfos[0], '0');
+            for (int haplotypeIdx = 0; haplotypeIdx < options.numHaplotypes; ++haplotypeIdx)
+            {
+                if (haplotypeIdx > 0)
+                    appendValue(vcfRecord.genotypeInfos[sampleIdx], '|');
+                if (svRecord.sample == sampleIdx && svRecord.haplotype == haplotypeIdx)
+                    appendValue(vcfRecord.genotypeInfos[sampleIdx], '1');
+                else
+                    appendValue(vcfRecord.genotypeInfos[sampleIdx], '0');
+            }
         }
 
         // Write out VCF record.
@@ -1541,42 +1572,52 @@ public:
         rightOfCutR.info = "SVTYPE=BND";
         leftOfPaste.info = "SVTYPE=BND";
         rightOfPaste.info = "SVTYPE=BND";
+        // FORMAT
+        leftOfCutL.format = "GT";
+        rightOfCutL.format = "GT";
+        leftOfCutR.format = "GT";
+        rightOfCutR.format = "GT";
+        leftOfPaste.format = "GT";
+        rightOfPaste.format = "GT";
 
         // Create genotype infos.
-        appendValue(leftOfCutL.genotypeInfos, "");
-        appendValue(rightOfCutL.genotypeInfos, "");
-        appendValue(leftOfCutR.genotypeInfos, "");
-        appendValue(rightOfCutR.genotypeInfos, "");
-        appendValue(leftOfPaste.genotypeInfos, "");
-        appendValue(rightOfPaste.genotypeInfos, "");
-        for (int i = 0; i < options.numHaplotypes; ++i)
+        resize(leftOfCutL.genotypeInfos, options.numSamples);
+        resize(rightOfCutL.genotypeInfos, options.numSamples);
+        resize(leftOfCutR.genotypeInfos, options.numSamples);
+        resize(rightOfCutR.genotypeInfos, options.numSamples);
+        resize(leftOfPaste.genotypeInfos, options.numSamples);
+        resize(rightOfPaste.genotypeInfos, options.numSamples);
+        for (int sampleIdx = 0; sampleIdx < options.numSamples; ++sampleIdx)
         {
-            if (i > 0)
+            for (int haplotypeIdx = 0; haplotypeIdx < options.numHaplotypes; ++haplotypeIdx)
             {
-                appendValue(leftOfCutL.genotypeInfos[0], '|');
-                appendValue(rightOfCutL.genotypeInfos[0], '|');
-                appendValue(leftOfCutR.genotypeInfos[0], '|');
-                appendValue(rightOfCutR.genotypeInfos[0], '|');
-                appendValue(leftOfPaste.genotypeInfos[0], '|');
-                appendValue(rightOfPaste.genotypeInfos[0], '|');
-            }
-            if (svRecord.haplotype == i)
-            {
-                appendValue(leftOfCutL.genotypeInfos[0], '1');
-                appendValue(rightOfCutL.genotypeInfos[0], '1');
-                appendValue(leftOfCutR.genotypeInfos[0], '1');
-                appendValue(rightOfCutR.genotypeInfos[0], '1');
-                appendValue(leftOfPaste.genotypeInfos[0], '1');
-                appendValue(rightOfPaste.genotypeInfos[0], '1');
-            }
-            else
-            {
-                appendValue(leftOfCutL.genotypeInfos[0], '0');
-                appendValue(rightOfCutL.genotypeInfos[0], '0');
-                appendValue(leftOfCutR.genotypeInfos[0], '0');
-                appendValue(rightOfCutR.genotypeInfos[0], '0');
-                appendValue(leftOfPaste.genotypeInfos[0], '0');
-                appendValue(rightOfPaste.genotypeInfos[0], '0');
+                if (haplotypeIdx > 0)
+                {
+                    appendValue(leftOfCutL.genotypeInfos[sampleIdx], '|');
+                    appendValue(rightOfCutL.genotypeInfos[sampleIdx], '|');
+                    appendValue(leftOfCutR.genotypeInfos[sampleIdx], '|');
+                    appendValue(rightOfCutR.genotypeInfos[sampleIdx], '|');
+                    appendValue(leftOfPaste.genotypeInfos[sampleIdx], '|');
+                    appendValue(rightOfPaste.genotypeInfos[sampleIdx], '|');
+                }
+                if (svRecord.sample == sampleIdx && svRecord.haplotype == haplotypeIdx)
+                {
+                    appendValue(leftOfCutL.genotypeInfos[sampleIdx], '1');
+                    appendValue(rightOfCutL.genotypeInfos[sampleIdx], '1');
+                    appendValue(leftOfCutR.genotypeInfos[sampleIdx], '1');
+                    appendValue(rightOfCutR.genotypeInfos[sampleIdx], '1');
+                    appendValue(leftOfPaste.genotypeInfos[sampleIdx], '1');
+                    appendValue(rightOfPaste.genotypeInfos[sampleIdx], '1');
+                }
+                else
+                {
+                    appendValue(leftOfCutL.genotypeInfos[sampleIdx], '0');
+                    appendValue(rightOfCutL.genotypeInfos[sampleIdx], '0');
+                    appendValue(leftOfCutR.genotypeInfos[sampleIdx], '0');
+                    appendValue(rightOfCutR.genotypeInfos[sampleIdx], '0');
+                    appendValue(leftOfPaste.genotypeInfos[sampleIdx], '0');
+                    appendValue(rightOfPaste.genotypeInfos[sampleIdx], '0');
+                }
             }
         }
 
@@ -1609,17 +1650,22 @@ public:
         std::stringstream ss;
         ss << "SVTYPE=INV;END=" << (svRecord.pos + svRecord.size) << ";SVLEN=" << svRecord.size;
         vcfRecord.info = ss.str();
+        vcfRecord.format = "GT";
 
         // Create genotype infos.
-        appendValue(vcfRecord.genotypeInfos, "");
-        for (int i = 0; i < options.numHaplotypes; ++i)
+        resize(vcfRecord.genotypeInfos, options.numSamples);
+
+        for (int sampleIdx = 0; sampleIdx < options.numSamples; ++sampleIdx)
         {
-            if (i > 0)
-                appendValue(vcfRecord.genotypeInfos[0], '|');
-            if (svRecord.haplotype == i)
-                appendValue(vcfRecord.genotypeInfos[0], '1');
-            else
-                appendValue(vcfRecord.genotypeInfos[0], '0');
+            for (int haplotypeIdx = 0; haplotypeIdx < options.numHaplotypes; ++haplotypeIdx)
+            {
+                if (haplotypeIdx > 0)
+                    appendValue(vcfRecord.genotypeInfos[sampleIdx], '|');
+                if (svRecord.sample == sampleIdx && svRecord.haplotype == haplotypeIdx)
+                    appendValue(vcfRecord.genotypeInfos[sampleIdx], '1');
+                else
+                    appendValue(vcfRecord.genotypeInfos[sampleIdx], '0');
+            }
         }
 
         // Write out VCF record.
@@ -1648,17 +1694,21 @@ public:
         vcfRecord.info = ss.str();
         appendValue(vcfRecord.ref, contig[vcfRecord.beginPos]);
         vcfRecord.alt = "<DUP>";
+        vcfRecord.format = "GT";
 
         // Create genotype infos.
-        appendValue(vcfRecord.genotypeInfos, "");
-        for (int i = 0; i < options.numHaplotypes; ++i)
+        resize(vcfRecord.genotypeInfos, options.numSamples);
+        for (int sampleIdx = 0; sampleIdx < options.numSamples; ++sampleIdx)
         {
-            if (i > 0)
-                appendValue(vcfRecord.genotypeInfos[0], '|');
-            if (svRecord.haplotype == i)
-                appendValue(vcfRecord.genotypeInfos[0], '1');
-            else
-                appendValue(vcfRecord.genotypeInfos[0], '0');
+            for (int haplotypeIdx = 0; haplotypeIdx < options.numHaplotypes; ++haplotypeIdx)
+            {
+                if (haplotypeIdx > 0)
+                    appendValue(vcfRecord.genotypeInfos[sampleIdx], '|');
+                if (svRecord.sample == sampleIdx && svRecord.haplotype == haplotypeIdx)
+                    appendValue(vcfRecord.genotypeInfos[sampleIdx], '1');
+                else
+                    appendValue(vcfRecord.genotypeInfos[sampleIdx], '0');
+            }
         }
 
         // Write out VCF record.

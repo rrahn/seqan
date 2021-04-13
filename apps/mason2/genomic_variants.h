@@ -76,22 +76,24 @@ struct SnpRecord
     int pos;
 
     // The haplotype that this variation belongs to.
+    int sample;
     int haplotype;
 
     // The target nucleotide.
     seqan::Dna5 to;
 
-    SnpRecord() : rId(-1), pos(-1), haplotype(-1), to('\0')
+    SnpRecord() : rId(-1), pos(-1), sample(-1), haplotype(-1), to('\0')
     {}
 
-    SnpRecord(int haplotype, int rId, int pos, char to) :
-            rId(rId), pos(pos), haplotype(haplotype), to(to)
+    SnpRecord(int sample, int haplotype, int rId, int pos, char to) :
+            rId(rId), pos(pos), sample(sample), haplotype(haplotype), to(to)
     {}
 
     bool operator<(SnpRecord const & other) const
     {
         if (rId < other.rId || (rId == other.rId && pos < other.pos) ||
-            (rId == other.rId && pos == other.pos && haplotype < other.haplotype))
+            (rId == other.rId && pos == other.pos && sample < other.sample) ||
+            (rId == other.rId && pos == other.pos && sample == other.sample && haplotype < other.haplotype))
             return true;
         return false;
     }
@@ -119,6 +121,7 @@ struct SmallIndelRecord
     int pos;
 
     // The haplotype that this variation belongs to.
+    int sample;
     int haplotype;
 
     // The size of the indel, negative numbers for deletions, positive numbers for insertions.
@@ -127,11 +130,11 @@ struct SmallIndelRecord
     // The inserted sequence if any.
     seqan::CharString seq;
 
-    SmallIndelRecord() : rId(-1), pos(-1), haplotype(-1), size(0)
+    SmallIndelRecord() : rId(-1), pos(-1), sample(-1), haplotype(-1), size(0)
     {}
 
-    SmallIndelRecord(int haplotype, int rId, int pos, int size, seqan::CharString const & seq) :
-            rId(rId), pos(pos), haplotype(haplotype), size(size), seq(seq)
+    SmallIndelRecord(int sample, int haplotype, int rId, int pos, int size, seqan::CharString const & seq) :
+            rId(rId), pos(pos), sample(sample), haplotype(haplotype), size(size), seq(seq)
     {}
 
     bool operator<(SmallIndelRecord const & other) const
@@ -194,7 +197,8 @@ struct StructuralVariantRecord
     int rId;
     int pos;
 
-    // The haplotype that this variation belongs to.
+    // The sample and haplotype that this variation belongs to.
+    int sample;
     int haplotype;
 
     // In case of indel, negative numbers give deletions, positionve numbers give insertions.  In case of inversions,
@@ -211,12 +215,12 @@ struct StructuralVariantRecord
     seqan::CharString seq;
 
     StructuralVariantRecord() :
-            kind(INVALID), rId(-1), pos(-1), haplotype(-1), size(0), targetRId(-1), targetPos(-1)
+            kind(INVALID), rId(-1), pos(-1), sample(-1), haplotype(-1), size(0), targetRId(-1), targetPos(-1)
     {}
 
-    StructuralVariantRecord(Kind kind, int haplotype, int rId, int pos, int size,
+    StructuralVariantRecord(Kind kind, int sample, int haplotype, int rId, int pos, int size,
                             int targetRId = -1, int targetPos = -1) :
-            kind(kind), rId(rId), pos(pos), haplotype(haplotype), size(size), targetRId(targetRId),
+            kind(kind), rId(rId), pos(pos), sample(sample), haplotype(haplotype), size(size), targetRId(targetRId),
             targetPos(targetPos)
     {}
 
@@ -512,9 +516,10 @@ public:
             std::vector<SmallVarInfo> & smallVars,
             std::vector<std::pair<int, int> > & breakpoints,
             seqan::Dna5String const & refSeq,
+            int sampleIdx,
             int haplotypeId)
     {
-        return _runImpl(&resultSeq, &posMap, 0, smallVars, breakpoints, &refSeq, 0, haplotypeId);
+        return _runImpl(&resultSeq, &posMap, 0, smallVars, breakpoints, &refSeq, 0, sampleIdx, haplotypeId);
     }
 
     // Same as the run() above, but including reference levels.
@@ -525,9 +530,11 @@ public:
             std::vector<std::pair<int, int> > & breakpoints,
             seqan::Dna5String const & refSeq,
             MethylationLevels const & refLvls,
+            int sampleIdx,
             int haplotypeId)
     {
-        return _runImpl(&resultSeq, &posMap, &resultLvls, smallVars, breakpoints, &refSeq, &refLvls, haplotypeId);
+        return _runImpl(&resultSeq, &posMap, &resultLvls, smallVars, breakpoints, &refSeq, &refLvls, sampleIdx,
+                        haplotypeId);
     }
 
     // Implementation of the materialization, uses pointers instead of references for deciding whether materializing
@@ -539,6 +546,7 @@ public:
                  std::vector<std::pair<int, int> > & breakpoints,
                  seqan::Dna5String const * ref,
                  MethylationLevels const * refLvls,
+                 int sampleIdx,
                  int haplotypeId);
 
     // Materialization of the small variants.
@@ -551,6 +559,7 @@ public:
                                   seqan::Dna5String const & contig,
                                   Variants const & variants,
                                   MethylationLevels const * levels,
+                                  int sampleIdx,
                                   int hId);
 
     // Materialization of the large variants.
@@ -566,6 +575,7 @@ public:
                                   std::vector<SmallVarInfo> const & smallVarInfos,
                                   Variants const & variants,
                                   MethylationLevels const * levels,
+                                  int sampleIdx,
                                   int hId);
 };
 

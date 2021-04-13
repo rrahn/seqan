@@ -36,14 +36,14 @@
 
 std::ostream & operator<<(std::ostream & out, SnpRecord const & record)
 {
-    out << "SnpRecord(" << record.haplotype << ", " << record.rId << ", " << record.pos
+    out << "SnpRecord(" << record.sample << record.haplotype << ", " << record.rId << ", " << record.pos
         << ", " << record.to << ")";
     return out;
 }
 
 std::ostream & operator<<(std::ostream & out, SmallIndelRecord const & record)
 {
-    out << "SnpRecord(" << record.haplotype << ", " << record.rId << ", " << record.pos
+    out << "SnpRecord(" << record.sample << record.haplotype << ", " << record.rId << ", " << record.pos
         << ", " << record.size << ", " << record.seq << ")";
     return out;
 }
@@ -119,7 +119,7 @@ std::ostream & operator<<(std::ostream & out, StructuralVariantRecord const & re
             kind = "INVALID";
             break;
     }
-    out << "StructuralVariantRecord(kind=" << kind << ", haplotype=" << record.haplotype
+    out << "StructuralVariantRecord(kind=" << kind << ", sample=" << record.sample << ", haplotype=" << record.haplotype
         << ", rId=" << record.rId << ", pos=" << record.pos << ", size=" << record.size
         << ", targetRId=" << record.targetRId << ", targetPos=" << record.targetPos
         << ", seq=\"" << record.seq << "\")";
@@ -138,6 +138,7 @@ int VariantMaterializer::_runImpl(
         std::vector<std::pair<int, int> > & breakpoints,
         seqan::Dna5String const * ref,
         MethylationLevels const * refLvls,
+        int sampleIdx,
         int haplotypeId)
 {
     breakpoints.clear();
@@ -152,7 +153,7 @@ int VariantMaterializer::_runImpl(
     MethylationLevels * smallLvlsPtr = refLvls ? &levelsSmallVariants : 0;
     std::vector<SmallVarInfo> smallVarInfos;
     if (_materializeSmallVariants(seqSmallVariants, journal, smallLvlsPtr, smallVarInfos, *ref, *variants,
-                                  refLvls, haplotypeId) != 0)
+                                  refLvls, sampleIdx, haplotypeId) != 0)
         return 1;
 
     // Build position map for large variant -> small variant and small variant <-> reference position mapping.
@@ -160,7 +161,7 @@ int VariantMaterializer::_runImpl(
 
     // Apply structural variants and build the interval tree of posMap
     if (_materializeLargeVariants(*resultSeq, resultLvls, varInfos, breakpoints, *posMap, journal, seqSmallVariants,
-                                  smallVarInfos, *variants, smallLvlsPtr, haplotypeId) != 0)
+                                  smallVarInfos, *variants, smallLvlsPtr, sampleIdx, haplotypeId) != 0)
         return 1;
 
     // Sort resulting variant infos.
@@ -189,6 +190,7 @@ int VariantMaterializer::_materializeSmallVariants(
         seqan::Dna5String const & contig,
         Variants const & variants,
         MethylationLevels const * levels,
+        int sampleIdx,
         int hId)
 {
     if (methSimOptions)
@@ -232,7 +234,7 @@ int VariantMaterializer::_materializeSmallVariants(
         // TODO(holtgrew): Extract SNP and small indel handling into their own functions.
         if (snpRecord.getPos() < smallIndelRecord.getPos())  // process SNP records
         {
-            if (snpRecord.haplotype == hId)  // Ignore all but the current contig.
+            if (snpRecord.sample == sampleIdx && snpRecord.haplotype == hId)  // Ignore all but the current contig.
             {
                 if (verbosity >= 3)
                     std::cerr << "append(seq, infix(contig, " << lastPos << ", " << snpRecord.pos << ") " << __LINE__ << "\n";
@@ -265,7 +267,7 @@ int VariantMaterializer::_materializeSmallVariants(
         }
         else
         {
-            if (smallIndelRecord.haplotype == hId)  // Ignore all but the current contig.
+            if (smallIndelRecord.sample == sampleIdx && smallIndelRecord.haplotype == hId)  // Ignore all but the current contig.
             {
                 if (smallIndelRecord.size > 0)
                 {
@@ -376,6 +378,7 @@ int VariantMaterializer::_materializeLargeVariants(
         std::vector<SmallVarInfo> const & smallVarInfos,
         Variants const & variants,
         MethylationLevels const * levels,
+        int sampleIdx,
         int hId)
 {
     if (methSimOptions)
@@ -407,7 +410,7 @@ int VariantMaterializer::_materializeLargeVariants(
 
     for (unsigned i = 0; i < length(variants.svRecords); ++i)
     {
-        if (variants.svRecords[i].haplotype != hId)  // Ignore all but the current contig.
+        if (!(variants.svRecords[i].sample == sampleIdx && variants.svRecords[i].haplotype == hId))  // Ignore all but the current contig.
             continue;
         // We obtain a copy of the current SV record since we translate its positions below.
         StructuralVariantRecord svRecord = variants.svRecords[i];

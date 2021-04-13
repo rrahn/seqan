@@ -321,9 +321,9 @@ bool VcfMaterializer::_materializeNext(seqan::Dna5String & seq,
     // Materialize variants for the current haplotype.
     VariantMaterializer varMat(rng, contigVariants, *methOptions);
     if (levels)
-        varMat.run(seq, posMap, *levels, varInfos, breakpoints, contigSeq, currentLevels, nextHaplotype);
+        varMat.run(seq, posMap, *levels, varInfos, breakpoints, contigSeq, currentLevels, 0, nextHaplotype);
     else
-        varMat.run(seq, posMap, varInfos, breakpoints, contigSeq, nextHaplotype);
+        varMat.run(seq, posMap, varInfos, breakpoints, contigSeq, 0, nextHaplotype);
 
     // Write out rID and haploty
     rID = currRID;
