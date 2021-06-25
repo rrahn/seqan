@@ -83,6 +83,12 @@ SEQAN_CONCEPT_IMPL((std::array<TChar, N>), (StlContainerConcept));
 template <typename TChar, std::size_t N>
 SEQAN_CONCEPT_IMPL((std::array<TChar, N> const), (StlContainerConcept));
 
+template <typename TUnderlyingRange>
+SEQAN_CONCEPT_IMPL((std::ranges::ref_view<TUnderlyingRange>), (StlContainerConcept));
+
+template <typename TUnderlyingRange>
+SEQAN_CONCEPT_IMPL((std::ranges::ref_view<TUnderlyingRange> const), (StlContainerConcept));
+
 /* NOTE(h-2) on ConceptChecking and universal references
  *
  * When type deduction takes place before && then && can act as both && or &
@@ -192,6 +198,30 @@ SUPERMACRO__(std::list<TChar COMMA TAlloc>,        typename TChar COMMA typename
 SUPERMACRO__(std::forward_list<TChar COMMA TAlloc>,typename TChar COMMA typename TAlloc)
 SUPERMACRO__(std::array<TChar COMMA N>,            typename TChar COMMA std::size_t N)
 SUPERMACRO__(std::basic_string<TChar COMMA TTraits COMMA TAlloc>, typename TChar COMMA typename TTraits COMMA typename TAlloc)
+
+template <typename TUnderlyingRange>
+struct Iterator<std::ranges::ref_view<TUnderlyingRange>, Standard>
+{
+    using Type = std::ranges::iterator_t<std::ranges::ref_view<TUnderlyingRange>>;
+};
+
+template <typename TUnderlyingRange>
+struct Iterator<std::ranges::ref_view<TUnderlyingRange> const, Standard>
+{
+    using Type = std::ranges::iterator_t<std::ranges::ref_view<TUnderlyingRange>>;
+};
+
+template <typename TUnderlyingRange>
+struct Iterator<std::ranges::ref_view<TUnderlyingRange>, Rooted>
+{
+    using Type = std::ranges::iterator_t<std::ranges::ref_view<TUnderlyingRange>>;
+};
+
+template <typename TUnderlyingRange>
+struct Iterator<std::ranges::ref_view<TUnderlyingRange> const, Rooted>
+{
+    using Type = std::ranges::iterator_t<std::ranges::ref_view<TUnderlyingRange>>;
+};
 
 // ----------------------------------------------------------------------------
 // Mfn IsContiguous (default is False)
